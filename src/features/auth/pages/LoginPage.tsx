@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LoginForm } from "../components/LoginForm";
 import { authService } from "../services/authService";
+import { useAuth } from "../hooks/useAuth";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const { checkAuth } = useAuth();
 
   const handleLogin = async (credentials: any) => {
     setError("");
@@ -17,7 +19,7 @@ export const LoginPage = () => {
     try {
       await authService.login(credentials);
 
-      const user = await authService.getUserProfile();
+      const user = await checkAuth();
 
       if (user.sucursales?.length > 1) {
         sessionStorage.setItem("pendingUser", JSON.stringify(user));

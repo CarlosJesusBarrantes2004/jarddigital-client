@@ -12,6 +12,7 @@ export const useAuth = () => {
       const userData = await authService.getUserProfile();
       setUser(userData);
       setIsAuthenticated(true);
+      return userData;
     } catch (error) {
       setIsAuthenticated(false);
       setUser(null);
