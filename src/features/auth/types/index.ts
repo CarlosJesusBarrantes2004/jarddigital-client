@@ -4,11 +4,17 @@ export interface Role {
   nivel_jerarquia: number;
 }
 
+export interface Branch {
+  id: number;
+  nombre: string;
+}
+
 export interface User {
   id: number;
   username: string;
   nombre_completo: string;
   email: string;
   rol: Role;
+  sucursales: Branch[];
   activo: boolean;
 }

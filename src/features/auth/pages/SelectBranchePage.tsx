@@ -1,70 +1,62 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom"; // CAMBIO: de next/navigation
+import type { User } from "../types";
+import { LayoutGrid, LogOut } from "lucide-react";
+import { BranchCard } from "../components/BranchCard";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { MapPin, LogOut, ArrowRight } from "lucide-react";
-
-interface BranchOption {
-  id: number;
-  nombre: string;
-}
-
-interface UserData {
-  id: number;
-  nombre_completo: string;
-  modalidades: string[];
-  sucursales: BranchOption[];
-}
+import { authService } from "../services/authService";
 
 export const SelectBranchePage = () => {
-  const navigate = useNavigate(); // CAMBIO: useNavigate
-  const [user, setUser] = useState<UserData | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const pendingUser = sessionStorage.getItem("pendingUser");
-    if (!pendingUser) {
-      navigate("/login");
+    const pendingUserData = sessionStorage.getItem("pendingUser");
+    if (!pendingUserData) {
+      navigate("/auth/login");
       return;
     }
-    setUser(JSON.parse(pendingUser));
+    setUser(JSON.parse(pendingUserData));
   }, [navigate]);
 
   const handleSelectBranch = async (branchId: number) => {
-    setSelectedBranch(branchId);
+    if (!user) return;
+
+    setSelectedBranchId(branchId);
     setIsLoading(true);
 
-    // Simulación de carga
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    const selectedBranch = user.sucursales.find((b) => b.id === branchId);
 
-    if (user) {
-      const selectedBranchData = user.sucursales.find((b) => b.id === branchId);
-      if (selectedBranchData) {
-        sessionStorage.setItem(
-          "currentBranch",
-          JSON.stringify(selectedBranchData),
-        );
+    if (selectedBranch) {
+      // 1. Guardamos la sede elegida para el Dashboard
+      sessionStorage.setItem("currentBranch", JSON.stringify(selectedBranch));
 
-        if (user.modalidades.length > 1) {
-          // Si tiene varias modalidades (CALL/CAMPO), va a la siguiente selección
-          sessionStorage.setItem("pendingUser", JSON.stringify(user));
-          navigate("/auth/select-modality");
-        } else {
-          // Si solo tiene una, entra directo al sistema
-          sessionStorage.removeItem("pendingUser");
-          sessionStorage.setItem("currentUser", JSON.stringify(user));
-          sessionStorage.setItem("currentModality", user.modalidades[0]);
-          navigate("/dashboard"); // CAMBIO: ruta a nuestro dashboard
-        }
-      }
+      // 2. Establecemos modalidad por defecto si el backend no la envió aún
+      // (Para 'carlos_test' pusimos modalidad 1 en la base de datos)
+      sessionStorage.setItem("currentModality", "CALL CENTER");
+
+      // 3. Confirmamos al usuario y limpiamos el estado pendiente
+      sessionStorage.setItem("currentUser", JSON.stringify(user));
+      sessionStorage.removeItem("pendingUser");
+
+      navigate("/dashboard");
     }
     setIsLoading(false);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("pendingUser");
-    navigate("/login");
+  const handleLogout = async () => {
+    setIsLoading(true);
+
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    } finally {
+      sessionStorage.clear();
+      navigate("/auth/login");
+    }
   };
 
   if (!user) {
@@ -76,74 +68,50 @@ export const SelectBranchePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <MapPin className="w-8 h-8 text-primary" />
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
+            <LayoutGrid className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-primary mb-2">
-            Seleccionar Sucursal
+          <h1 className="text-3xl font-extrabold text-slate-900 mb-2">
+            Selección de Sede
           </h1>
-          <p className="text-muted-foreground">
-            Hola{" "}
-            <span className="font-semibold text-foreground">
-              {user.nombre_completo}
+          <p className="text-slate-500 font-medium">
+            Bienvenido,{" "}
+            <span className="text-primary font-bold">
+              {user.nombre_completo || user.username}
             </span>
-            , selecciona la sede para hoy:
+            . Indica en qué sucursal operarás hoy:
           </p>
         </div>
 
-        {/* Grid de Sucursales */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 gap-4 mb-8">
           {user.sucursales.map((branch) => (
-            <Card
+            <BranchCard
               key={branch.id}
-              onClick={() => !isLoading && handleSelectBranch(branch.id)}
-              className={`p-6 cursor-pointer transition-all duration-200 border-2 ${
-                selectedBranch === branch.id
-                  ? "border-primary bg-primary/5"
-                  : "border-transparent hover:border-primary/30 hover:bg-primary/10"
-              } ${isLoading && selectedBranch !== branch.id ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-primary mb-1">
-                    {branch.nombre}
-                  </h3>
-                  <p className="text-sm text-muted-foreground italic">
-                    Presiona para entrar
-                  </p>
-                </div>
-                {selectedBranch === branch.id && (
-                  <div className="ml-4">
-                    {isLoading ? (
-                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <ArrowRight className="w-6 h-6 text-primary" />
-                    )}
-                  </div>
-                )}
-              </div>
-            </Card>
+              nombre={branch.nombre}
+              isSelected={selectedBranchId === branch.id}
+              isLoading={isLoading}
+              onClick={() => handleSelectBranch(branch.id)}
+            />
           ))}
         </div>
 
-        {/* Info y Salida */}
-        <Card className="p-4 bg-primary/5 border-primary/10 mb-8 text-center text-sm text-slate-500">
-          Acceso autorizado para personal de Jard Digital
-        </Card>
-
-        <Button
-          variant="ghost"
-          onClick={handleLogout}
-          className="w-full text-destructive hover:bg-destructive/10"
-          disabled={isLoading}
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          Cancelar y Salir
-        </Button>
+        <div className="flex flex-col gap-4 items-center">
+          <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">
+            Seguridad Jard Digital - Acceso Restringido
+          </p>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+            disabled={isLoading}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Cancelar y salir
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -1,54 +1,33 @@
-import { useEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { Sidebar } from "@/components/sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 export const MainLayout = () => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated, loading } = useAuth();
 
-  useEffect(() => {
-    const currentUser = sessionStorage.getItem("currentUser");
-    const currentBranch = sessionStorage.getItem("currentBranch");
-    const currentModality = sessionStorage.getItem("currentModality");
-
-    // Validación de sesión para proteger el sistema
-    if (!currentUser || !currentBranch || !currentModality) {
-      navigate("/auth/login");
-      return;
-    }
-
-    setUser(JSON.parse(currentUser));
-    setIsLoading(false);
-  }, [navigate]);
-
-  if (isLoading) {
+  if (loading)
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground animate-pulse">
-          Cargando sistema...
-        </p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary border-opacity-50"></div>
+          <p className="text-slate-500 font-medium animate-pulse">
+            Sincronizando con Jard Digital...
+          </p>
+        </div>
       </div>
     );
-  }
 
-  // Mapeo de roles para el Header
-  const roleMap: Record<string, string> = {
-    Asesor: "advisor",
-    BackOffice: "back_office",
-    Supervisor: "manager",
-    Dueño: "admin",
-  };
+  if (!isAuthenticated) return <Navigate to={"/auth/login"} replace></Navigate>;
 
-  const role = roleMap[user?.rol_sistema] || "advisor";
+  const userRole = user?.rol?.nombre || "Asesor";
 
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
       <DashboardHeader
-        userName={user?.nombre_completo}
-        userRole={role as any}
+        userName={user?.nombre_completo || "Usuario"}
+        userRole={userRole as any}
       />
 
       {/* Contenido dinámico (Aquí se renderizará el Dashboard) */}

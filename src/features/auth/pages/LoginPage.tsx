@@ -18,15 +18,26 @@ export const LoginPage = () => {
 
     try {
       await authService.login(credentials);
-
       const user = await checkAuth();
 
-      if (user.sucursales?.length > 1) {
+      if (user.sucursales && user.sucursales.length > 1) {
         sessionStorage.setItem("pendingUser", JSON.stringify(user));
         navigate("/auth/select-branch");
-      } else navigate("/dashboard");
+      } else if (user.sucursales && user.sucursales.length === 1) {
+        sessionStorage.setItem(
+          "currentBranch",
+          JSON.stringify(user.sucursales[0]),
+        );
+
+        const defaultModality = user.modalidades?.[0] || "CALL";
+        sessionStorage.setItem("currentModality", defaultModality);
+
+        navigate("/dashboard");
+      } else {
+        setError("El usuario no tiene sucursales asignadas");
+      }
     } catch (error: any) {
-      setError("Ocurrió un error durante el login");
+      setError("Error en la autenticación");
     } finally {
       setIsLoading(false);
     }
