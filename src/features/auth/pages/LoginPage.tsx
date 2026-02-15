@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LoginForm } from "../components/LoginForm";
 import { authService } from "../services/authService";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../context/useAuth";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -20,17 +20,30 @@ export const LoginPage = () => {
       await authService.login(credentials);
       const user = await checkAuth();
 
+      console.log(user);
+
+      if (!user) throw new Error("No se pudo obtener el perfil del usuario");
+
       if (user.sucursales && user.sucursales.length > 1) {
         sessionStorage.setItem("pendingUser", JSON.stringify(user));
         navigate("/auth/select-branch");
       } else if (user.sucursales && user.sucursales.length === 1) {
+        const branch = user.sucursales[0];
+
         sessionStorage.setItem(
           "currentBranch",
-          JSON.stringify(user.sucursales[0]),
+          JSON.stringify({
+            id: branch.id_sucursal,
+            name: branch.nombre_sucursal,
+          }),
         );
-
-        const defaultModality = user.modalidades?.[0] || "CALL";
-        sessionStorage.setItem("currentModality", defaultModality);
+        sessionStorage.setItem(
+          "currentModality",
+          JSON.stringify({
+            id: branch.id_modalidad,
+            name: branch.nombre_modalidad,
+          }),
+        );
 
         navigate("/dashboard");
       } else {
@@ -44,33 +57,37 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4 font-sans">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-4 shadow-inner">
-            <Lock className="w-10 h-10 text-primary" />
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4 shadow-sm">
+            <Lock className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
+          <h1 className="text-3xl font-bold text-primary mb-2 tracking-tight">
             Jard Digital
           </h1>
-          <p className="text-slate-500 font-medium">
-            Panel de Control Operativo
+          <p className="text-muted-foreground font-medium">
+            Sistema de Call Center
           </p>
         </div>
 
-        <Card className="p-8 shadow-2xl border-white/20 bg-white/80 backdrop-blur-sm">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">
-            Bienvenido
+        <Card className="p-8 shadow-xl border-primary/10 bg-card/80 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-foreground mb-8">
+            Iniciar Sesión
           </h2>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium animate-in fade-in zoom-in duration-300">
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm font-medium animate-in fade-in zoom-in duration-300">
               ⚠️ {error}
             </div>
           )}
 
-          <LoginForm onSubmit={handleLogin} isLoading={isLoading}></LoginForm>
+          <LoginForm onSubmit={handleLogin} isLoading={isLoading} />
         </Card>
+
+        <p className="text-center text-xs text-muted-foreground mt-8">
+          © 2026 Jard Digital. Todos los derechos reservados.
+        </p>
       </div>
     </div>
   );

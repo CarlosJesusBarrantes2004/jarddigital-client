@@ -1,6 +1,5 @@
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { SelectBranchePage } from "@/features/auth/pages/SelectBranchePage";
-import { SelectModalityPage } from "@/features/auth/pages/SelectModalityPage";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { SalesPage } from "@/features/sales/pages/SalesPage";
 import { MainLayout } from "@/layouts/MainLayout";
@@ -21,10 +20,6 @@ export const AppRouter = () => {
         <Route
           path="/auth/select-branch"
           element={<SelectBranchePage></SelectBranchePage>}
-        ></Route>
-        <Route
-          path="/auth/select-modality"
-          element={<SelectModalityPage></SelectModalityPage>}
         ></Route>
 
         <Route element={<MainLayout></MainLayout>}>

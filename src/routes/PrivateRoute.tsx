@@ -1,4 +1,4 @@
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useAuth } from "@/features/auth/context/useAuth";
 import { Navigate, Outlet } from "react-router-dom";
 
 export const PrivateRoute = () => {

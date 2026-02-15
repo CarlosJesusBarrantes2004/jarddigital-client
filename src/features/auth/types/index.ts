@@ -1,12 +1,16 @@
 export interface Role {
+  id: number;
   codigo: string;
   nombre: string;
   nivel_jerarquia: number;
+  activo: boolean;
 }
 
 export interface Branch {
-  id: number;
-  nombre: string;
+  id_sucursal: number;
+  nombre_sucursal: string;
+  id_modalidad: number;
+  nombre_modalidad: string;
 }
 
 export interface User {

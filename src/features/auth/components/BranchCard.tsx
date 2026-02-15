@@ -1,7 +1,8 @@
+import { ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, MapPin } from "lucide-react";
 
 interface BranchCardProps {
+  id: number;
   nombre: string;
   isSelected: boolean;
   isLoading: boolean;
@@ -9,6 +10,7 @@ interface BranchCardProps {
 }
 
 export const BranchCard = ({
+  id,
   nombre,
   isSelected,
   isLoading,
@@ -16,26 +18,19 @@ export const BranchCard = ({
 }: BranchCardProps) => {
   return (
     <Card
-      onClick={!isLoading ? onClick : undefined}
+      onClick={() => !isLoading && onClick()}
       className={`p-6 cursor-pointer transition-all duration-200 border-2 ${
         isSelected
-          ? "border-primary bg-primary/5 shadow-md"
-          : "border-transparent hover:border-primary/30 hover:bg-primary/5"
+          ? "border-primary bg-primary/5"
+          : "border-transparent hover:border-primary/30 hover:bg-primary/2"
       } ${isLoading && !isSelected ? "opacity-50 cursor-not-allowed" : ""}`}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div
-            className={`p-3 rounded-xl ${isSelected ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}
-          >
-            <MapPin className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">{nombre}</h3>
-            <p className="text-xs text-slate-500 italic">
-              Sede operativa autorizada
-            </p>
-          </div>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-primary mb-1">{nombre}</h3>
+          <p className="text-sm text-muted-foreground">
+            Haz clic para ingresar
+          </p>
         </div>
 
         {isSelected && (
@@ -43,7 +38,7 @@ export const BranchCard = ({
             {isLoading ? (
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             ) : (
-              <ArrowRight className="w-6 h-6 text-primary animate-pulse" />
+              <ArrowRight className="w-6 h-6 text-primary" />
             )}
           </div>
         )}
