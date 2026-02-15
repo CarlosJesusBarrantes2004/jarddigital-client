@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -94,13 +95,7 @@ export const Sidebar = () => {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("currentUser");
-    sessionStorage.removeItem("currentBranch");
-    sessionStorage.removeItem("currentModality");
-    navigate("/auth/login");
-  };
+  const { logout } = useAuth();
 
   const handleChangeModality = () => {
     sessionStorage.removeItem("currentModality");
@@ -217,7 +212,7 @@ export const Sidebar = () => {
             {isExpanded && "Cambiar Modalidad"}
           </Button>
           <Button
-            onClick={handleLogout}
+            onClick={logout}
             variant="outline"
             className={cn(
               "w-full flex items-center gap-3 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive",

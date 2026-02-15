@@ -20,8 +20,6 @@ export const LoginPage = () => {
       await authService.login(credentials);
       const user = await checkAuth();
 
-      console.log(user);
-
       if (!user) throw new Error("No se pudo obtener el perfil del usuario");
 
       if (user.sucursales && user.sucursales.length > 1) {
