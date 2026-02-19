@@ -1,89 +1,134 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
-import {
-  BarChart3,
-  Users,
-  PhoneCall,
-  TrendingUp,
-  FileText,
-  UserCheck,
-  LogOut,
-  Menu,
-  X,
-  ChevronDown,
-  Smartphone,
-} from "lucide-react";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom"; // <- Cambiado a React Router
+import { LogOut, Menu, X, ChevronDown, Smartphone, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/features/auth/context/useAuth";
+import { sidebarSections } from "@/lib/sidebar-routes";
+import { useAuth } from "@/features/auth/context/useAuth"; // <- Importamos tu AuthContext
 
-interface MenuItemProps {
-  icon: React.ReactNode;
+interface SectionItemProps {
   label: string;
-  href?: string;
-  submenu?: Array<{ label: string; href: string }>;
-  isActive?: boolean;
+  href: string;
+  disabled?: boolean;
+  expanded?: boolean;
+  onClickItem?: () => void;
 }
 
-const MenuItem: React.FC<
-  MenuItemProps & { onClick?: () => void; expanded?: boolean }
-> = ({ icon, label, href, submenu, isActive, onClick, expanded }) => {
-  const [isSubmenuOpen, setIsSubmenuOpen] = useState(false);
-
-  const content = (
-    <>
-      <span className="text-xl flex-shrink-0">{icon}</span>
-      {expanded && (
-        <>
-          <span className="flex-1 text-left">{label}</span>
-          {submenu && (
-            <ChevronDown
-              className={cn(
-                "w-4 h-4 transition-transform",
-                isSubmenuOpen && "rotate-180",
-              )}
-            />
-          )}
-        </>
-      )}
-    </>
-  );
-
-  const buttonClassName = cn(
-    "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
-    isActive
-      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-      : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-  );
+const SectionItem: React.FC<SectionItemProps> = ({
+  label,
+  href,
+  disabled,
+  expanded,
+  onClickItem,
+}) => {
+  if (disabled) {
+    return (
+      <div
+        className={cn(
+          "w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-sidebar-foreground/50 opacity-50 cursor-not-allowed",
+          "relative",
+        )}
+      >
+        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
+        {expanded && <span className="flex-1">{label}</span>}
+        {expanded && (
+          <Badge variant="outline" className="text-xs">
+            Pronto
+          </Badge>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {href && !submenu ? (
-        <Link to={href} onClick={onClick}>
-          <div className={buttonClassName}>{content}</div>
-        </Link>
-      ) : (
+    // Cambiamos href por "to" para React Router
+    <Link to={href} onClick={onClickItem}>
+      <div className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
+        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
+        {expanded && <span className="flex-1">{label}</span>}
+      </div>
+    </Link>
+  );
+};
+
+interface SectionProps {
+  section: (typeof sidebarSections)[0];
+  isCollapsed: boolean;
+  isExpanded: boolean;
+  isAdmin?: boolean;
+  onClickItem?: () => void;
+}
+
+const Section: React.FC<SectionProps> = ({
+  section,
+  isCollapsed,
+  isExpanded,
+  isAdmin = true,
+  onClickItem,
+}) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const Icon = section.icon;
+
+  // Admin-only sections (Oculta la sección si requiere admin y el usuario no lo es)
+  if (section.adminOnly && !isAdmin) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Section Header */}
+      {section.collapsible ? (
         <button
-          onClick={() => {
-            if (submenu) setIsSubmenuOpen(!isSubmenuOpen);
-            onClick?.();
-          }}
-          className={buttonClassName}
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold text-sidebar-foreground hover:bg-sidebar-accent/30 transition-colors group"
         >
-          {content}
+          <Icon className="w-5 h-5 flex-shrink-0" />
+          {isExpanded && (
+            <>
+              <span className="flex-1 text-left">{section.title}</span>
+              {section.adminOnly && (
+                <Lock
+                  className="w-3 h-3 text-sidebar-foreground/40"
+                  title="Solo administradores"
+                />
+              )}
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 transition-transform",
+                  isOpen && "rotate-180",
+                )}
+              />
+            </>
+          )}
         </button>
+      ) : (
+        <div className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold text-sidebar-foreground">
+          <Icon className="w-5 h-5 flex-shrink-0" />
+          {isExpanded && (
+            <>
+              <span className="flex-1 text-left">{section.title}</span>
+              {section.adminOnly && (
+                <Lock
+                  className="w-3 h-3 text-sidebar-foreground/40"
+                  title="Solo administradores"
+                />
+              )}
+            </>
+          )}
+        </div>
       )}
-      {submenu && isSubmenuOpen && expanded && (
-        <div className="pl-8 mt-2 space-y-1">
-          {submenu.map((item) => (
-            <Link
+
+      {/* Section Items */}
+      {isOpen && (
+        <div className="space-y-1 pl-2">
+          {section.items.map((item) => (
+            <SectionItem
               key={item.href}
-              to={item.href}
-              className="block px-4 py-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/30 rounded-lg transition-colors"
-            >
-              {item.label}
-            </Link>
+              {...item}
+              expanded={isExpanded}
+              onClickItem={onClickItem}
+            />
           ))}
         </div>
       )}
@@ -91,62 +136,24 @@ const MenuItem: React.FC<
   );
 };
 
-export const Sidebar = () => {
-  const navigate = useNavigate();
+export function Sidebar() {
+  const navigate = useNavigate(); // Usamos useNavigate en vez de useRouter
+  const { user, logout } = useAuth(); // Consumimos el contexto real
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { logout } = useAuth();
 
-  const handleChangeModality = () => {
-    sessionStorage.removeItem("currentModality");
-    const currentUser = sessionStorage.getItem("currentUser");
-    const currentBranch = sessionStorage.getItem("currentBranch");
-    if (currentUser && currentBranch) {
-      sessionStorage.setItem("pendingUser", currentUser);
-      navigate("/auth/select-modality");
-    }
+  // Verificamos si es administrador usando los datos reales del backend
+  const isAdmin = user?.rol?.codigo === "DUENO";
+
+  const handleLogout = async () => {
+    // Usamos el método seguro de tu AuthContext
+    await logout();
   };
 
-  const menuItems: MenuItemProps[] = [
-    {
-      icon: <PhoneCall className="w-5 h-5" />,
-      label: "Campañas",
-      href: "/campaigns",
-    },
-    {
-      icon: <UserCheck className="w-5 h-5" />,
-      label: "Personal RH",
-      href: "/hr",
-    },
-    {
-      icon: <TrendingUp className="w-5 h-5" />,
-      label: "Ventas",
-      href: "/sales",
-    },
-    {
-      icon: <FileText className="w-5 h-5" />,
-      label: "Reportes",
-      href: "/reports",
-    },
-    {
-      icon: <Users className="w-5 h-5" />,
-      label: "Usuarios",
-      href: "/users",
-    },
-    {
-      icon: <BarChart3 className="w-5 h-5" />,
-      label: "BI",
-      href: "/bi",
-    },
-    {
-      icon: <FileText className="w-5 h-5" />,
-      label: "Documentación",
-      submenu: [
-        { label: "Guía de usuario", href: "/docs/user-guide" },
-        { label: "Políticas", href: "/docs/policies" },
-      ],
-    },
-  ];
+  const handleChangeModality = () => {
+    // Redirigimos a la pantalla de selección de sede/modalidad
+    navigate("/select-branch");
+  };
 
   return (
     <>
@@ -185,14 +192,16 @@ export const Sidebar = () => {
           </button>
         </div>
 
-        {/* Menu Items */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-          {menuItems.map((item, i) => (
-            <MenuItem
-              key={i}
-              {...item}
-              expanded={isExpanded}
-              onClick={() => setIsMobileOpen(false)}
+        {/* Menu Sections */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-4">
+          {sidebarSections.map((section) => (
+            <Section
+              key={section.title}
+              section={section}
+              isCollapsed={!isExpanded}
+              isExpanded={isExpanded}
+              isAdmin={isAdmin}
+              onClickItem={() => setIsMobileOpen(false)}
             />
           ))}
         </nav>
@@ -212,7 +221,7 @@ export const Sidebar = () => {
             {isExpanded && "Cambiar Modalidad"}
           </Button>
           <Button
-            onClick={logout}
+            onClick={handleLogout}
             variant="outline"
             className={cn(
               "w-full flex items-center gap-3 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive",
@@ -234,4 +243,4 @@ export const Sidebar = () => {
       )}
     </>
   );
-};
+}

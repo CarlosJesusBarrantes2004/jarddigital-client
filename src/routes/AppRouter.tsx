@@ -5,6 +5,7 @@ import { SalesPage } from "@/features/sales/pages/SalesPage";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PrivateRoute } from "./PrivateRoute";
+import { UsersPage } from "@/features/users/pages/UsersPage";
 
 export const AppRouter = () => {
   return (
@@ -27,6 +28,7 @@ export const AppRouter = () => {
             path="/dashboard"
             element={<DashboardPage></DashboardPage>}
           ></Route>
+          <Route path="/users" element={<UsersPage></UsersPage>}></Route>
           <Route path="/sales" element={<SalesPage></SalesPage>}></Route>
         </Route>
       </Route>
