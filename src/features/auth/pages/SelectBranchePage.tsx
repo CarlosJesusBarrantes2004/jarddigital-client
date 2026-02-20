@@ -50,7 +50,6 @@ export const SelectBranchePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <MapPin className="w-8 h-8 text-primary" />
@@ -71,7 +70,7 @@ export const SelectBranchePage = () => {
           {user.sucursales.map((branch) => (
             <BranchCard
               id={branch.id_sucursal}
-              nombre={branch.nombre_sucursal}
+              nombre={`${branch.nombre_sucursal} - ${branch.nombre_modalidad}`}
               isSelected={selectedBranchId === branch.id_sucursal}
               isLoading={isLoading}
               onClick={() => handleSelectBranch(branch.id_sucursal)}

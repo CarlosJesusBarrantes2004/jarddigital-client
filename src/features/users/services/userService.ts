@@ -12,7 +12,7 @@ export const userService = {
     const params = new URLSearchParams();
 
     if (filters?.search) params.append("search", filters.search);
-    if (filters?.id_rol) params.append("id_role", filters.id_rol.toString());
+    if (filters?.id_rol) params.append("id_rol", filters.id_rol.toString());
 
     const { data } = await api.get<User[]>(
       `/users/empleados/?${params.toString()}`,

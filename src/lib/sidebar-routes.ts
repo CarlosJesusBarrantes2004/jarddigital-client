@@ -14,7 +14,7 @@ export const sidebarSections = [
     title: "Capital Humano",
     icon: Users,
     collapsible: true,
-    adminOnly: true, // Esto es opcional, si quieres que los asesores no vean esto
+    adminOnly: true,
     items: [
       { label: "Colaboradores", href: "/users" },
       { label: "Asistencia", href: "/attendance", disabled: true },
@@ -24,11 +24,12 @@ export const sidebarSections = [
     title: "Configuración",
     icon: Settings,
     collapsible: true,
-    adminOnly: true, // Esto activa el candadito en el sidebar y lo oculta a no-admins
+    adminOnly: true,
     items: [
-      { label: "Sucursales", href: "/core/sucursales" },
-      { label: "Modalidades", href: "/core/modalidades" },
-      { label: "Maestros Globales", href: "/core/ubigeos" },
+      { label: "Sucursales", href: "/configuracion/sucursales" },
+      { label: "Modalidades", href: "/configuracion/modalidades" },
+      { label: "Roles", href: "/configuracion/roles" },
+      { label: "Maestros Globales", href: "/configuracion/ubigeos" },
     ],
   },
 ];

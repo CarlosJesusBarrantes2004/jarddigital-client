@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { userService } from "../services/userService";
 import type { BranchModalityOption, Role, User, UserPayload } from "../types";
-import { Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface UserFormProps {
   user?: User;
@@ -33,6 +34,9 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
 
   const [selectedBranches, setSelectedBranches] = useState<number[]>([]);
 
+  const isAsesor =
+    roles.find((r) => r.id === formData.id_rol)?.codigo === "ASESOR";
+
   useEffect(() => {
     const fetchBranches = async () => {
       try {
@@ -57,15 +61,24 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
   }, [roles, user, formData.id_rol]);
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      if (field === "id_rol") {
+        const nextRole = roles.find((r) => r.id === value);
+        if (nextRole?.codigo === "ASESOR" && selectedBranches.length > 0)
+          setSelectedBranches([selectedBranches[0]]);
+      }
+      return { ...prev, [field]: value };
+    });
   };
 
   const toggleBranch = (branchId: number) => {
-    setSelectedBranches((prev) =>
-      prev.includes(branchId)
+    setSelectedBranches((prev) => {
+      if (isAsesor) return [branchId];
+
+      return prev.includes(branchId)
         ? prev.filter((id) => id !== branchId)
-        : [...prev, branchId],
-    );
+        : [...prev, branchId];
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,12 +179,26 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
         </select>
       </Card>
 
-      <Card className="p-4 space-y-4">
-        <h3 className="font-semibold text-sm text-primary uppercase">
-          Asignación de Sedes y Modalidades
-        </h3>
+      <Card className="p-4 space-y-4 border-l-4 border-l-primary">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm text-primary uppercase">
+            Asignación de Sedes y Modalidades
+          </h3>
+          {isAsesor && (
+            <Badge
+              variant="secondary"
+              className="bg-amber-100 text-amber-800 border-amber-200 gap-1 animate-pulse"
+            >
+              <AlertCircle className="w-3 h-3" />
+              Límite: 1 Sede
+            </Badge>
+          )}
+        </div>
+
         <p className="text-xs text-muted-foreground">
-          Selecciona las sedes y modalidades a las que tendrá acceso
+          {isAsesor
+            ? "Como ASESOR, solo puede ser asignado a una sola combinación de sede y modalidad."
+            : "Selecciona las sedes y modalidades a las que tendrá acceso."}
         </p>
 
         <ScrollArea className="h-48 border rounded-lg p-3 space-y-2">
@@ -179,20 +206,16 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
-          ) : branchOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center mt-4">
-              No hay sedes disponibles
-            </p>
           ) : (
             branchOptions.map((branch) => (
               <div
                 key={branch.id}
                 onClick={() => toggleBranch(branch.id)}
                 className={cn(
-                  "p-3 rounded-lg cursor-pointer border-2 transition-colors mb-2 last:mb-0",
+                  "p-3 rounded-lg cursor-pointer border-2 transition-all mb-2 last:mb-0",
                   selectedBranches.includes(branch.id)
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50",
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border hover:border-primary/30",
                 )}
               >
                 <div className="flex items-center gap-3">

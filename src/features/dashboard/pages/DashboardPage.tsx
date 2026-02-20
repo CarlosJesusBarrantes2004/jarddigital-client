@@ -6,9 +6,12 @@ export const DashboardPage = () => {
   const branchData = JSON.parse(
     sessionStorage.getItem("currentBranch") || '{"nombre": "Sede Central"}',
   );
-  const modality = sessionStorage.getItem("currentModality") || "CALL";
+
+  const modalityRaw = sessionStorage.getItem("currentModality");
+  const modality = modalityRaw ? JSON.parse(modalityRaw) : null;
+
   const modalityDisplay =
-    modality === "CALL" ? "Centro de Llamadas" : "Ventas de Campo";
+    modality.name === "CALL CENTER" ? "Centro de Llamadas" : "Ventas de Campo";
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">

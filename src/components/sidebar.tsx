@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom"; // <- Cambiado a React Router
+import { useNavigate, Link } from "react-router-dom";
 import { LogOut, Menu, X, ChevronDown, Smartphone, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { sidebarSections } from "@/lib/sidebar-routes";
-import { useAuth } from "@/features/auth/context/useAuth"; // <- Importamos tu AuthContext
+import { useAuth } from "@/features/auth/context/useAuth";
 
 interface SectionItemProps {
   label: string;
@@ -42,7 +42,6 @@ const SectionItem: React.FC<SectionItemProps> = ({
   }
 
   return (
-    // Cambiamos href por "to" para React Router
     <Link to={href} onClick={onClickItem}>
       <div className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
         <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
@@ -70,14 +69,12 @@ const Section: React.FC<SectionProps> = ({
   const [isOpen, setIsOpen] = useState(true);
   const Icon = section.icon;
 
-  // Admin-only sections (Oculta la sección si requiere admin y el usuario no lo es)
   if (section.adminOnly && !isAdmin) {
     return null;
   }
 
   return (
     <div className="space-y-2">
-      {/* Section Header */}
       {section.collapsible ? (
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -119,7 +116,6 @@ const Section: React.FC<SectionProps> = ({
         </div>
       )}
 
-      {/* Section Items */}
       {isOpen && (
         <div className="space-y-1 pl-2">
           {section.items.map((item) => (
@@ -137,27 +133,23 @@ const Section: React.FC<SectionProps> = ({
 };
 
 export function Sidebar() {
-  const navigate = useNavigate(); // Usamos useNavigate en vez de useRouter
-  const { user, logout } = useAuth(); // Consumimos el contexto real
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Verificamos si es administrador usando los datos reales del backend
   const isAdmin = user?.rol?.codigo === "DUENO";
 
   const handleLogout = async () => {
-    // Usamos el método seguro de tu AuthContext
     await logout();
   };
 
   const handleChangeModality = () => {
-    // Redirigimos a la pantalla de selección de sede/modalidad
     navigate("/select-branch");
   };
 
   return (
     <>
-      {/* Mobile Toggle */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-sidebar text-sidebar-foreground"
@@ -169,7 +161,6 @@ export function Sidebar() {
         )}
       </button>
 
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground transition-all duration-300 z-40",
@@ -177,7 +168,6 @@ export function Sidebar() {
           isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* Logo Area */}
         <div className="h-20 flex items-center justify-between px-4 border-b border-sidebar-border">
           {isExpanded && (
             <h1 className="text-xl font-bold text-sidebar-primary">
@@ -192,7 +182,6 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Menu Sections */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-4">
           {sidebarSections.map((section) => (
             <Section
@@ -206,7 +195,6 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Change Modality & Logout Buttons */}
         <div className="border-t border-sidebar-border p-4 space-y-2">
           <Button
             onClick={handleChangeModality}
@@ -234,7 +222,6 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Mobile Overlay */}
       {isMobileOpen && (
         <button
           onClick={() => setIsMobileOpen(false)}

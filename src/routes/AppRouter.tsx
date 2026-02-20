@@ -6,6 +6,7 @@ import { MainLayout } from "@/layouts/MainLayout";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PrivateRoute } from "./PrivateRoute";
 import { UsersPage } from "@/features/users/pages/UsersPage";
+import { CorporativeConfigPage } from "@/features/core/pages/CorporativeConfigPage";
 
 export const AppRouter = () => {
   return (
@@ -30,6 +31,17 @@ export const AppRouter = () => {
           ></Route>
           <Route path="/users" element={<UsersPage></UsersPage>}></Route>
           <Route path="/sales" element={<SalesPage></SalesPage>}></Route>
+
+          <Route
+            path="/configuracion"
+            element={
+              <Navigate to={"/configuracion/sucursales"} replace></Navigate>
+            }
+          ></Route>
+          <Route
+            path="/configuracion/:tab"
+            element={<CorporativeConfigPage></CorporativeConfigPage>}
+          ></Route>
         </Route>
       </Route>
     </Routes>
