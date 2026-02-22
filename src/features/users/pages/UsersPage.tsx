@@ -1,7 +1,23 @@
 import { Card } from "@/components/ui/card";
 import { UsersManager } from "../components/UsersManager";
+import { useUsers } from "../hooks/useUsers";
 
 export const UsersPage = () => {
+  const {
+    users,
+    roles,
+    loading,
+    filters,
+    setFilters,
+    createUser,
+    updateUser,
+    deleteUser,
+  } = useUsers();
+
+  const totalCollaborators = users.length;
+  const assets = users.filter((u) => u.activo).length;
+  const inactive = totalCollaborators - assets;
+
   return (
     <div className="min-h-screen bg-background animate-in fade-in duration-500">
       <div className="space-y-6">
@@ -18,20 +34,33 @@ export const UsersPage = () => {
               <p className="text-muted-foreground text-sm">
                 Total de Colaboradores
               </p>
-              <p className="text-3xl font-bold text-primary mt-2">4</p>
+              <p className="text-3xl font-bold text-primary mt-2">
+                {totalCollaborators}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground text-sm">Activos</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">4</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">{assets}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-sm">Inactivos</p>
-              <p className="text-3xl font-bold text-yellow-600 mt-2">0</p>
+              <p className="text-3xl font-bold text-yellow-600 mt-2">
+                {inactive}
+              </p>
             </div>
           </div>
         </Card>
 
-        <UsersManager></UsersManager>
+        <UsersManager
+          users={users}
+          roles={roles}
+          loading={loading}
+          filters={filters}
+          onFilterChange={setFilters}
+          onCreateUser={createUser}
+          onUpdateUser={updateUser}
+          onDeleteUser={deleteUser}
+        ></UsersManager>
       </div>
     </div>
   );

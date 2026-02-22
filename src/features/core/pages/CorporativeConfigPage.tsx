@@ -51,10 +51,6 @@ export const CorporativeConfigPage = () => {
             <Shield className="w-4 h-4" />
             <span className="hidden sm:inline">Roles</span>
           </TabsTrigger>
-          <TabsTrigger value="maestros" className="gap-2">
-            <Database className="w-4 h-4" />
-            <span className="hidden sm:inline">Maestros</span>
-          </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
@@ -68,10 +64,6 @@ export const CorporativeConfigPage = () => {
 
           <TabsContent value="roles" className="m-0">
             <RolesManager></RolesManager>
-          </TabsContent>
-
-          <TabsContent value="maestros" className="m-0">
-            <p>Sección de Maestros en construcción...</p>
           </TabsContent>
         </div>
       </Tabs>

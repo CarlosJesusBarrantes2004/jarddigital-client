@@ -20,9 +20,16 @@ export interface UserPayload {
   nombre_completo: string;
   email: string;
   id_rol: number;
-  ids_modalidades_sede: number[];
+  ids_modalidades_sede?: number[];
   activo?: boolean;
   password?: string;
+}
+
+export interface SupervisorAssignmentPayload {
+  id_supervisor: number;
+  id_modalidad_sede: number;
+  fecha_inicio: string;
+  activo: boolean;
 }
 
 export interface UserFilters {

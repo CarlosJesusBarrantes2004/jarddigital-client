@@ -176,6 +176,7 @@ export const UsersTable = ({ users, onEdit, onDelete }: UsersTableProps) => {
                   <Button
                     size="sm"
                     variant="ghost"
+                    className="hover:cursor-pointer"
                     onClick={() => onEdit(user)}
                   >
                     <Edit2 className="w-4 h-4" />
@@ -183,6 +184,7 @@ export const UsersTable = ({ users, onEdit, onDelete }: UsersTableProps) => {
                   <Button
                     size="sm"
                     variant="ghost"
+                    className="hover:cursor-pointer"
                     onClick={() => onDelete(user.id)}
                   >
                     <Trash2 className="w-4 h-4" />

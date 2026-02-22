@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { LogOut, Menu, X, ChevronDown, Smartphone, Lock } from "lucide-react";
+import { LogOut, Menu, X, ChevronDown, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -51,25 +51,31 @@ const SectionItem: React.FC<SectionItemProps> = ({
   );
 };
 
+// Modificamos SectionProps para recibir el rol del usuario
 interface SectionProps {
   section: (typeof sidebarSections)[0];
   isCollapsed: boolean;
   isExpanded: boolean;
-  isAdmin?: boolean;
+  userRole: string; // <-- Agregado
   onClickItem?: () => void;
 }
 
 const Section: React.FC<SectionProps> = ({
   section,
-  isCollapsed,
   isExpanded,
-  isAdmin = true,
+  userRole,
   onClickItem,
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const Icon = section.icon;
 
-  if (section.adminOnly && !isAdmin) {
+  // MAGIA: Filtramos los items permitidos para este rol
+  const allowedItems = section.items.filter((item) =>
+    item.roles.includes(userRole as any),
+  );
+
+  // Si no hay items permitidos en esta sección, no renderizamos la sección entera
+  if (allowedItems.length === 0) {
     return null;
   }
 
@@ -84,12 +90,6 @@ const Section: React.FC<SectionProps> = ({
           {isExpanded && (
             <>
               <span className="flex-1 text-left">{section.title}</span>
-              {section.adminOnly && (
-                <Lock
-                  className="w-3 h-3 text-sidebar-foreground/40"
-                  title="Solo administradores"
-                />
-              )}
               <ChevronDown
                 className={cn(
                   "w-4 h-4 transition-transform",
@@ -103,22 +103,14 @@ const Section: React.FC<SectionProps> = ({
         <div className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold text-sidebar-foreground">
           <Icon className="w-5 h-5 flex-shrink-0" />
           {isExpanded && (
-            <>
-              <span className="flex-1 text-left">{section.title}</span>
-              {section.adminOnly && (
-                <Lock
-                  className="w-3 h-3 text-sidebar-foreground/40"
-                  title="Solo administradores"
-                />
-              )}
-            </>
+            <span className="flex-1 text-left">{section.title}</span>
           )}
         </div>
       )}
 
       {isOpen && (
         <div className="space-y-1 pl-2">
-          {section.items.map((item) => (
+          {allowedItems.map((item) => (
             <SectionItem
               key={item.href}
               {...item}
@@ -138,14 +130,14 @@ export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  const isAdmin = user?.rol?.codigo === "DUENO";
+  const userRoleCode = user?.rol?.codigo || "ASESOR";
 
   const handleLogout = async () => {
     await logout();
   };
 
   const handleChangeModality = () => {
-    navigate("/select-branch");
+    navigate("/auth/select-branch"); // Corregido para que apunte bien a tu ruta
   };
 
   return (
@@ -189,25 +181,28 @@ export function Sidebar() {
               section={section}
               isCollapsed={!isExpanded}
               isExpanded={isExpanded}
-              isAdmin={isAdmin}
+              userRole={userRoleCode} // <-- Pasamos el rol aquí
               onClickItem={() => setIsMobileOpen(false)}
             />
           ))}
         </nav>
 
         <div className="border-t border-sidebar-border p-4 space-y-2">
-          <Button
-            onClick={handleChangeModality}
-            variant="outline"
-            className={cn(
-              "w-full flex items-center gap-3 border-sidebar-border text-sidebar-foreground hover:bg-primary/10 hover:text-primary",
-              !isExpanded && "justify-center",
-            )}
-            title="Cambiar modalidad de trabajo"
-          >
-            <Smartphone className="w-5 h-5" />
-            {isExpanded && "Cambiar Modalidad"}
-          </Button>
+          {/* El botón de cambiar modalidad solo debería verse si no es DUEÑO */}
+          {userRoleCode !== "DUENO" && (
+            <Button
+              onClick={handleChangeModality}
+              variant="outline"
+              className={cn(
+                "w-full flex items-center gap-3 border-sidebar-border text-sidebar-foreground hover:bg-primary/10 hover:text-primary",
+                !isExpanded && "justify-center",
+              )}
+              title="Cambiar modalidad de trabajo"
+            >
+              <Smartphone className="w-5 h-5" />
+              {isExpanded && "Cambiar Modalidad"}
+            </Button>
+          )}
           <Button
             onClick={handleLogout}
             variant="outline"

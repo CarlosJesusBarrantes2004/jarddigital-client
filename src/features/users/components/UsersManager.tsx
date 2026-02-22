@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { UserForm } from "./UserForm";
 import {
   Sheet,
@@ -10,9 +10,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useUsers } from "../hooks/useUsers";
 import { useState } from "react";
-import type { User, UserPayload } from "../types";
+import type { Role, User, UserPayload } from "../types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,19 +23,33 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UsersTable } from "./UsersTable";
+import { GlobalLoader } from "@/components/GlobalLoader";
 
-export const UsersManager = () => {
-  const {
-    users,
-    roles,
-    loading,
-    filters,
-    setFilters,
-    createUser,
-    updateUser,
-    deleteUser,
-  } = useUsers();
+interface UsersManagerProps {
+  users: User[];
+  roles: Role[];
+  loading: boolean;
+  filters: any;
+  onFilterChange: (filters: any) => void;
+  onCreateUser: (
+    payload: UserPayload,
+    isSup: boolean,
+    branches: number[],
+  ) => Promise<boolean>;
+  onUpdateUser: (id: number, payload: Partial<UserPayload>) => Promise<boolean>;
+  onDeleteUser: (id: number) => Promise<void>;
+}
 
+export const UsersManager = ({
+  users,
+  roles,
+  loading,
+  filters,
+  onFilterChange,
+  onCreateUser,
+  onUpdateUser,
+  onDeleteUser,
+}: UsersManagerProps) => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
@@ -55,16 +68,20 @@ export const UsersManager = () => {
 
   const confirmDelete = async () => {
     if (userToDelete) {
-      await deleteUser(userToDelete);
+      await onDeleteUser(userToDelete);
       setUserToDelete(null);
     }
   };
 
-  const handleSave = async (data: UserPayload) => {
+  const handleSave = async (
+    data: UserPayload,
+    isSupervisor: boolean,
+    branches: number[],
+  ) => {
     let success = false;
 
-    if (selectedUser) success = await updateUser(selectedUser.id, data);
-    else success = await createUser(data);
+    if (selectedUser) success = await onUpdateUser(selectedUser.id, data);
+    else success = await onCreateUser(data, isSupervisor, branches);
 
     if (success) setIsSheetOpen(false);
   };
@@ -79,7 +96,7 @@ export const UsersManager = () => {
               placeholder="Buscar por nombre, usuario o email..."
               value={filters.search}
               onChange={(e) =>
-                setFilters((prev) => ({ ...prev, search: e.target.value }))
+                onFilterChange((prev) => ({ ...prev, search: e.target.value }))
               }
               className="pl-10"
             />
@@ -87,7 +104,7 @@ export const UsersManager = () => {
           <select
             value={filters.id_rol || ""}
             onChange={(e) =>
-              setFilters((prev) => ({
+              onFilterChange((prev) => ({
                 ...prev,
                 id_rol: Number(e.target.value) || 0,
               }))
@@ -112,14 +129,7 @@ export const UsersManager = () => {
       </Card>
 
       {loading ? (
-        <Card className="p-10 flex justify-center items-center h-48">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">
-              Cargando colaboradores...
-            </p>
-          </div>
-        </Card>
+        <GlobalLoader message="Cargando colaboradores..."></GlobalLoader>
       ) : (
         <UsersTable
           users={users}
@@ -145,7 +155,7 @@ export const UsersManager = () => {
           </SheetHeader>
           <div className="m-6">
             <UserForm
-              user={selectedUser}
+              user={selectedUser || undefined}
               roles={roles}
               onSave={handleSave}
               onCancel={() => setIsSheetOpen(false)}

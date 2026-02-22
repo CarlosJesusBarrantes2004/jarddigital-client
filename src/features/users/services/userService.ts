@@ -5,6 +5,7 @@ import type {
   User,
   UserFilters,
   UserPayload,
+  SupervisorAssignmentPayload,
 } from "../types";
 
 export const userService = {
@@ -48,6 +49,11 @@ export const userService = {
     const { data } = await api.get<BranchModalityOption[]>(
       "/core/sucursales-modalidades/",
     );
+    return data;
+  },
+
+  assignSupervisor: async (payload: SupervisorAssignmentPayload) => {
+    const { data } = await api.post("/users/asignaciones-supervisor/", payload);
     return data;
   },
 };

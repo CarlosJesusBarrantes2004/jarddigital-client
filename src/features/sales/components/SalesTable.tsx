@@ -1,199 +1,156 @@
+// features/sales/components/SalesTable.tsx
+import { Edit2, Eye, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Edit2, Eye, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { SalesDetailComplete } from "./SalesDetailComplete";
+import type { Venta } from "../types";
 
-interface SalesTableProps {
-  role?: string;
-  onViewDetails?: (sale: any) => void;
-  onEdit?: (sale: any) => void;
-  onDelete?: (id: number) => void;
+export function EstadoBadge({ estado }: { estado: string }) {
+  const colors: Record<string, string> = {
+    CONFORME: "bg-green-100 text-green-800 border-green-200",
+    ATENDIDO: "bg-green-100 text-green-800 border-green-200",
+    PENDIENTE: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    EJECUCION: "bg-blue-100 text-blue-800 border-blue-200",
+    RECHAZADO: "bg-red-100 text-red-800 border-red-200",
+    OBSERVADO: "bg-orange-100 text-orange-800 border-orange-200",
+  };
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs font-medium",
+        colors[estado] || "bg-slate-100 text-slate-800",
+      )}
+    >
+      {estado}
+    </Badge>
+  );
 }
 
-// Datos de prueba alineados con JARD DIGITAL
-const mockSalesData: any[] = [
-  {
-    id: 1,
-    id_asesor: 1,
-    cliente_nombre: "Juan Carlos Pérez",
-    cliente_numero_doc: "12345678",
-    modalidad_venta: "CALL",
-    id_producto: 1,
-    costo_fijo_plan: 89.9,
-    estado_sot: "Pendiente",
-    fecha_venta: new Date("2024-02-10"),
-    estado_audios_general: "Completo",
-  },
-  {
-    id: 2,
-    id_asesor: 1,
-    cliente_nombre: "María González",
-    cliente_numero_doc: "87654321",
-    modalidad_venta: "CALL",
-    id_producto: 2,
-    costo_fijo_plan: 149.9,
-    estado_sot: "Ejecucion",
-    fecha_venta: new Date("2024-02-09"),
-    estado_audios_general: "Completo",
-  },
-];
+interface SalesTableProps {
+  ventas: Venta[];
+  userRole: string;
+  onAction: (venta: Venta, action: "ver" | "gestion" | "clonar") => void;
+}
 
-const estadoBadgeColor = (estado: string) => {
-  switch (estado) {
-    case "Pendiente":
-      return "bg-yellow-100 text-yellow-800";
-    case "Ejecucion":
-      return "bg-blue-100 text-blue-800";
-    case "Instalada":
-      return "bg-green-100 text-green-800";
-    case "Rechazada":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
+export function SalesTable({ ventas, userRole, onAction }: SalesTableProps) {
+  const canManage = ["BACKOFFICE", "DUENO", "SUPERVISOR"].includes(userRole);
 
-export const SalesTable = ({
-  role = "advisor",
-  onViewDetails,
-  onEdit,
-  onDelete,
-}: SalesTableProps) => {
-  const [sales] = useState(mockSalesData);
-  const [selectedSale, setSelectedSale] = useState<any | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleViewDetails = (sale: any) => {
-    setSelectedSale(sale);
-    setIsModalOpen(true);
-    onViewDetails?.(sale);
-  };
-
-  // Filtrado básico por rol (si eres asesor solo ves las tuyas)
-  const filteredSales =
-    role === "advisor" ? sales.filter((s) => s.id_asesor === 1) : sales;
-
-  const handleEditSale = (sale: Venta) => {
-    onEdit?.(sale);
-  };
-
-  const handleDeleteSale = (id: number) => {
-    onDelete?.(id);
-    setIsModalOpen(false);
-  };
+  console.log(ventas);
 
   return (
-    <div className="space-y-4">
-      <Card className="overflow-hidden border-border shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b">
-              <tr className="text-slate-600">
-                <th className="px-6 py-4 text-left font-semibold">Cliente</th>
-                <th className="px-6 py-4 text-left font-semibold">Producto</th>
-                <th className="px-6 py-4 text-left font-semibold">Modalidad</th>
-                <th className="px-6 py-4 text-left font-semibold">
-                  Estado SOT
+    <Card className="overflow-hidden bg-white border-slate-200">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-slate-100 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">
+                Cliente
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">
+                Producto
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">
+                Fecha
+              </th>
+              {canManage && (
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">
+                  Asesor
                 </th>
-                <th className="px-6 py-4 text-left font-semibold">Fecha</th>
-                <th className="px-6 py-4 text-center font-semibold">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filteredSales.map((sale) => (
-                <tr
-                  key={sale.id}
-                  className="hover:bg-slate-50/50 transition-colors"
-                >
+              )}
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">
+                Estado SOT
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">
+                Estado Audio
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-semibold text-slate-700 uppercase">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {ventas.map((venta) => (
+              <tr
+                key={venta.id}
+                className="hover:bg-slate-50 transition-colors"
+              >
+                <td className="px-6 py-4">
+                  <p className="font-medium text-slate-900">
+                    {venta.cliente_nombre}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    DNI: {venta.cliente_numero_doc}
+                  </p>
+                </td>
+                <td className="px-6 py-4">
+                  <p className="text-sm text-slate-900">
+                    {venta.nombre_producto || "Producto Base"}
+                  </p>
+                  <p className="text-xs text-slate-500">{venta.tecnologia}</p>
+                </td>
+                <td className="px-6 py-4">
+                  <p className="text-sm text-slate-900">
+                    {venta.fecha_venta
+                      ? new Date(venta.fecha_venta).toLocaleDateString()
+                      : "En proceso"}
+                  </p>
+                </td>
+                {canManage && (
                   <td className="px-6 py-4">
-                    <p className="font-medium text-slate-900">
-                      {sale.cliente_nombre}
+                    <p className="text-sm text-slate-900">
+                      {venta.nombre_asesor || "Asesor"}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {sale.cliente_numero_doc}
-                    </p>
                   </td>
-                  <td className="px-6 py-4">
-                    <p className="text-slate-700">ID: {sale.id_producto}</p>
-                    <p className="text-xs text-primary font-bold">
-                      S/ {sale.costo_fijo_plan}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 font-medium text-slate-600">
-                    {sale.modalidad_venta}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={cn(
-                        "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider",
-                        estadoBadgeColor(sale.estado_sot),
-                      )}
-                    >
-                      {sale.estado_sot}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500">
-                    {sale.fecha_venta.toLocaleDateString("es-PE")}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1">
+                )}
+                <td className="px-6 py-4">
+                  <EstadoBadge estado={venta.nombre_estado || "PENDIENTE"} />
+                </td>
+                <td className="px-6 py-4">
+                  <EstadoBadge
+                    estado={venta.audio_subido ? "CONFORME" : "PENDIENTE"}
+                  />
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    {/* MAGIA: Si está rechazado, mostramos botón de reingreso */}
+                    {venta.nombre_estado === "Rechazado" ? (
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleViewDetails(sale)}
-                        className="text-sky-600 h-8 w-8"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onAction(venta, "clonar")}
+                        className="text-orange-600 border-orange-200 hover:bg-orange-50 gap-2"
+                        title="Reingresar esta venta como una nueva"
                       >
-                        <Eye size={16} />
+                        <RefreshCw className="w-4 h-4" />
+                        <span className="hidden sm:inline text-xs font-semibold">
+                          Reingresar
+                        </span>
                       </Button>
-                      {role !== "advisor" && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => onEdit?.(sale)}
-                          className="text-amber-600 h-8 w-8"
-                        >
-                          <Edit2 size={16} />
-                        </Button>
-                      )}
-                      {role === "owner" && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => onDelete?.(sale.id)}
-                          className="text-red-600 h-8 w-8"
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {selectedSale && (
-        <SalesDetailComplete
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedSale(null);
-          }}
-          sale={selectedSale}
-          onEdit={handleEditSale}
-          onDelete={handleDeleteSale}
-          canEdit={
-            role === "backoffice" || role === "supervisor" || role === "owner"
-          }
-          canDelete={role === "owner"}
-        />
-      )}
-    </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          onAction(venta, canManage ? "gestion" : "ver")
+                        }
+                        className="text-blue-600 hover:bg-blue-50"
+                      >
+                        {canManage ? (
+                          <Edit2 className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
-};
+}

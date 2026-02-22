@@ -2,18 +2,18 @@ import { Card } from "@/components/ui/card";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LoginForm } from "../components/LoginForm";
+import { LoginForm } from "../components/form/LoginForm";
 import { authService } from "../services/authService";
 import { useAuth } from "../context/useAuth";
+import type { LoginFormValues } from "../components/form/schemas/loginSchema";
+import { toast } from "sonner";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
   const { checkAuth } = useAuth();
 
-  const handleLogin = async (credentials: any) => {
-    setError("");
+  const handleLogin = async (credentials: LoginFormValues) => {
     setIsLoading(true);
 
     try {
@@ -21,6 +21,11 @@ export const LoginPage = () => {
       const user = await checkAuth();
 
       if (!user) throw new Error("No se pudo obtener el perfil del usuario");
+
+      if (user.rol.codigo === "DUENO") {
+        navigate("/dashboard");
+        return;
+      }
 
       if (user.sucursales && user.sucursales.length > 1) {
         sessionStorage.setItem("pendingUser", JSON.stringify(user));
@@ -45,10 +50,18 @@ export const LoginPage = () => {
 
         navigate("/dashboard");
       } else {
-        setError("El usuario no tiene sucursales asignadas");
+        toast.error("Acceso denegado: El usuario no tiene sedes asignadas.");
       }
-    } catch (error: any) {
-      setError("Error en la autenticación");
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.detail ||
+        error.response?.data?.error ||
+        "Credenciales incorrectas o error de conexión.";
+
+      console.error("⛔ Error de Auth:", error.response?.data || error.message);
+
+      // Lanzamos el Toast de error
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -73,12 +86,6 @@ export const LoginPage = () => {
           <h2 className="text-2xl font-bold text-foreground mb-8">
             Iniciar Sesión
           </h2>
-
-          {error && (
-            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm font-medium animate-in fade-in zoom-in duration-300">
-              ⚠️ {error}
-            </div>
-          )}
 
           <LoginForm onSubmit={handleLogin} isLoading={isLoading} />
         </Card>

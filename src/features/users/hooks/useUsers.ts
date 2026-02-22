@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import type { Role, User, UserPayload } from "../types";
 import { userService } from "../services/userService";
 import { toast } from "sonner";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 export const useUsers = () => {
+  const { user: currentUser } = useAuth();
+
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,25 +33,55 @@ export const useUsers = () => {
   const fetchRoles = useCallback(async () => {
     try {
       const data = await userService.getRoles();
-      setRoles(data);
+      const currentUserRole = currentUser?.rol.codigo;
+
+      let filteredRoles = data.filter((r) => r.codigo !== "DUENO");
+
+      if (currentUserRole === "SUPERVISOR")
+        filteredRoles = filteredRoles.filter((r) => r.codigo === "ASESOR");
+      else if (currentUserRole === "RRHH")
+        filteredRoles = filteredRoles.filter((r) =>
+          ["ASESOR", "SUPERVISOR"].includes(r.codigo),
+        );
+
+      setRoles(filteredRoles);
     } catch (error) {
       console.error(error);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     fetchUsers();
     fetchRoles();
   }, [fetchUsers, fetchRoles]);
 
-  const createUser = async (payload: UserPayload) => {
+  const createUser = async (
+    payload: UserPayload,
+    isSupervisor: boolean,
+    selectedBranches: number[],
+  ) => {
     try {
-      await userService.create(payload);
-      toast.success("Usuario creado");
+      const newUser = await userService.create(payload);
+
+      if (isSupervisor && newUser.id) {
+        const today = new Date().toISOString().split("T")[0];
+
+        for (const branchId of selectedBranches) {
+          await userService.assignSupervisor({
+            id_supervisor: newUser.id,
+            id_modalidad_sede: branchId,
+            fecha_inicio: today,
+            activo: true,
+          });
+        }
+      }
+
+      toast.success("Usuario creado exitosamente");
       fetchUsers();
       return true;
     } catch (error) {
       toast.error("Error creando usuario");
+      console.error(error);
       return false;
     }
   };
@@ -69,6 +102,7 @@ export const useUsers = () => {
     try {
       await userService.delete(id);
       toast.success("Usuario desactivado");
+      fetchUsers();
     } catch (error) {
       toast.error("Error eliminado");
     }
