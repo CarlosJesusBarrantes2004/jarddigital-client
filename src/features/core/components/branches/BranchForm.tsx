@@ -1,46 +1,43 @@
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
-import type { Branch, BranchModality, BranchPayload } from "../../types";
-import { useEffect, useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+
+import {
+  branchFormSchema,
+  type BranchFormData,
+} from "../../schemas/branchSchema";
+
+import type { Branch, Modality } from "../../types";
 
 interface BranchFormProps {
   branch: Branch | null;
-  modalities: BranchModality[];
-  onSave: (data: BranchPayload) => Promise<void>;
+  modalities: Modality[];
+  isSubmitting: boolean;
+  onSave: (data: BranchFormData) => Promise<void>;
   onCancel: () => void;
 }
-
-const branchFormSchema = z.object({
-  nombre: z.string().min(2, { message: "El nombre es obligatorio" }),
-  direccion: z.string().min(5, { message: "La dirección es obligatoria" }),
-  activo: z.boolean().default(true),
-  ids_modalidades: z
-    .array(z.number())
-    .min(1, { message: "Debes seleccionar al menos una modalidad" }),
-});
-
-type BranchFormData = z.infer<typeof branchFormSchema>;
 
 export const BranchForm = ({
   branch,
   modalities,
+  isSubmitting,
   onSave,
   onCancel,
 }: BranchFormProps) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const form = useForm<BranchFormData>({
     resolver: zodResolver(branchFormSchema),
     defaultValues: {
@@ -57,7 +54,7 @@ export const BranchForm = ({
         nombre: branch.nombre,
         direccion: branch.direccion,
         activo: branch.activo,
-        ids_modalidades: branch.modalidades.map((m) => m.id) || [],
+        ids_modalidades: branch.modalidades.map((m) => m.id),
       });
     else
       form.reset({
@@ -68,23 +65,17 @@ export const BranchForm = ({
       });
   }, [branch, form]);
 
-  const onSubmit = async (data: BranchFormData) => {
-    setIsSubmitting(true);
-    await onSave(data);
-    setIsSubmitting(false);
-  };
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
+      <form onSubmit={form.handleSubmit(onSave)} className="space-y-6 p-6">
         <FormField
           control={form.control}
           name="nombre"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre</FormLabel>
+              <FormLabel>Nombre de la Sucursal</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: Jard Digital - Lima" {...field} />
+                <Input placeholder="Ej: Jard Digital - Centro" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -96,9 +87,9 @@ export const BranchForm = ({
           name="direccion"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Dirección</FormLabel>
+              <FormLabel>Dirección Física</FormLabel>
               <FormControl>
-                <Input placeholder="Dirección completa" {...field} />
+                <Input placeholder="Av. Principal 123, Chiclayo" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -108,31 +99,49 @@ export const BranchForm = ({
         <FormField
           control={form.control}
           name="ids_modalidades"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
-              <FormLabel>Modalidades</FormLabel>
-              <div className="space-y-2">
-                {modalities.map((option) => (
-                  <label
-                    key={option.id}
-                    className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-muted"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={field.value.includes(option.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          field.onChange([...field.value, option.id]);
-                        } else {
-                          field.onChange(
-                            field.value.filter((v) => v !== option.id),
-                          );
-                        }
-                      }}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-sm">{option.nombre}</span>
-                  </label>
+              <div className="mb-4">
+                <FormLabel className="text-base">
+                  Modalidades Operativas
+                </FormLabel>
+                <FormDescription>
+                  Seleccione los tipos de operaciones permitidas en esta sede.
+                </FormDescription>
+              </div>
+              <div className="grid grid-cols-1 gap-3 border rounded-lg p-4 bg-slate-50/50">
+                {modalities.map((item) => (
+                  <FormField
+                    key={item.id}
+                    control={form.control}
+                    name="ids_modalidades"
+                    render={({ field }) => {
+                      return (
+                        <FormItem
+                          key={item.id}
+                          className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(item.id)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...field.value, item.id])
+                                  : field.onChange(
+                                      field.value?.filter(
+                                        (value) => value !== item.id,
+                                      ),
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer flex-1 text-sm">
+                            {item.nombre}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
                 ))}
               </div>
               <FormMessage />
@@ -144,30 +153,24 @@ export const BranchForm = ({
           control={form.control}
           name="activo"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 bg-slate-50/50">
               <FormControl>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={field.value}
-                  onChange={(e) => field.onChange(e.target.checked)}
-                  className="w-4 h-4"
+                  onCheckedChange={field.onChange}
                 />
               </FormControl>
-              <FormLabel className="font-normal">Sucursal Activa</FormLabel>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Sucursal Activa</FormLabel>
+                <FormDescription>
+                  Determina si los asesores pueden operar en esta sede.
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />
 
-        <div className="flex gap-2">
-          <Button type="submit" className="flex-1" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : branch ? (
-              "Guardar Cambios"
-            ) : (
-              "Crear Sucursal"
-            )}
-          </Button>
+        <div className="flex gap-3 pt-4 border-t">
           <Button
             type="button"
             variant="outline"
@@ -176,6 +179,19 @@ export const BranchForm = ({
             className="flex-1"
           >
             Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 bg-primary text-primary-foreground"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : branch ? (
+              "Guardar Cambios"
+            ) : (
+              "Crear Sucursal"
+            )}
           </Button>
         </div>
       </form>

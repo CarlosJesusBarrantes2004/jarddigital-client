@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Branch, BranchModality, BranchPayload } from "../types";
+import { toast } from "sonner";
+
+import { extractApiError } from "@/lib/api-errors";
+
 import { coreService } from "../services/coreService";
+
+import type { Branch, Modality, BranchPayload } from "../types";
 
 export const useBranches = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [modalities, setModalities] = useState<BranchModality[]>([]);
+  const [modalities, setModalities] = useState<Modality[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchInitialData = useCallback(async () => {
@@ -16,12 +21,13 @@ export const useBranches = () => {
         coreService.getModalities(),
       ]);
 
-      console.log(branchesData, modalitiesData);
-
       setBranches(branchesData);
       setModalities(modalitiesData);
     } catch (error) {
       console.error("Error fetching core data:", error);
+      toast.error(
+        "No se pudieron cargar los datos de configuración corporativa.",
+      );
     } finally {
       setLoading(false);
     }
@@ -35,9 +41,11 @@ export const useBranches = () => {
     try {
       await coreService.createBranch(payload);
       await fetchInitialData();
+      toast.success("Sucursal creada exitosamente.");
       return true;
     } catch (error) {
-      console.log(error);
+      console.error(error);
+      toast.error(extractApiError(error));
       return false;
     }
   };
@@ -46,9 +54,11 @@ export const useBranches = () => {
     try {
       await coreService.updateBranch(id, payload);
       await fetchInitialData();
+      toast.success("Sucursal actualizada exitosamente.");
       return true;
     } catch (error) {
       console.error(error);
+      toast.error(extractApiError(error));
       return false;
     }
   };
@@ -57,9 +67,11 @@ export const useBranches = () => {
     try {
       await coreService.deleteBranch(id);
       setBranches((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Sucursal desactivada exitosamente.");
       return true;
     } catch (error) {
       console.error(error);
+      toast.error(extractApiError(error));
       return false;
     }
   };

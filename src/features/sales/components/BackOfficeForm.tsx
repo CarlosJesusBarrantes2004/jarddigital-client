@@ -1,7 +1,17 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Loader2, ShieldAlert } from "lucide-react";
+
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -9,207 +19,310 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
-import type { Venta, BackofficePayload, CatalogoItem } from "../types";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface Props {
-  venta: Venta;
-  estadosSOT: CatalogoItem[];
-  estadosAudio: CatalogoItem[]; // Opcional, pero útil si necesitas forzar el CONFORME
+import {
+  backofficeFormSchema,
+  type BackofficeFormData,
+} from "../schemas/saleSchema";
+
+import type { BackofficePayload, CatalogItem, Sale } from "../types";
+
+interface BackofficeFormProps {
+  sale: Sale;
+  sotStates: CatalogItem[];
+  audioStates: CatalogItem[];
   onSave: (data: BackofficePayload) => Promise<boolean>;
   onClose: () => void;
 }
 
 export function BackofficeForm({
-  venta,
-  estadosSOT,
-  estadosAudio,
+  sale,
+  sotStates,
+  audioStates,
   onSave,
   onClose,
-}: Props) {
+}: BackofficeFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Helper para sacar solo la fecha "YYYY-MM-DD" si viene con hora "YYYY-MM-DDTHH:MM:SSZ"
   const extractDate = (dateString?: string) =>
     dateString ? dateString.split("T")[0] : "";
 
-  const [formData, setFormData] = useState<BackofficePayload>({
-    codigo_sec: venta.codigo_sec || "",
-    codigo_sot: venta.codigo_sot || "",
-    fecha_visita_programada: venta.fecha_visita_programada || "",
-    id_estado_sot: venta.id_estado_sot || 0,
-    fecha_real_inst: extractDate(venta.fecha_real_inst),
-    fecha_rechazo: extractDate(venta.fecha_rechazo),
+  const form = useForm<BackofficeFormData>({
+    resolver: zodResolver(backofficeFormSchema),
+    defaultValues: {
+      codigo_sec: sale.codigo_sec || "",
+      codigo_sot: sale.codigo_sot || "",
+      fecha_visita_programada: extractDate(sale.fecha_visita_programada),
+      id_estado_sot: sale.id_estado_sot?.toString() || "",
+      id_estado_audios: sale.id_estado_audios?.toString() || "",
+      observacion_audios: sale.observacion_audios || "",
+      fecha_real_inst: "",
+      fecha_rechazo: "",
+    },
   });
 
-  // Identificamos qué código de estado SOT se ha seleccionado actualmente en el combo
-  const selectedEstadoObj = estadosSOT.find(
-    (e) => e.id === formData.id_estado_sot,
+  const currentStateId = form.watch("id_estado_sot");
+  const selectedStateObj = sotStates.find(
+    (e) => e.id.toString() === currentStateId,
   );
-  const codigoEstadoActual = selectedEstadoObj?.codigo?.toUpperCase(); // 'ATENDIDO', 'RECHAZADO', etc.
+  const isAttended = selectedStateObj?.codigo?.toUpperCase() === "ATENDIDO";
+  const isRejected = selectedStateObj?.codigo?.toUpperCase() === "RECHAZADO";
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const currentAudioId = form.watch("id_estado_audios");
+  const isAudioRejected =
+    audioStates
+      .find((e) => e.id.toString() === currentAudioId)
+      ?.codigo?.toUpperCase() === "RECHAZADO";
+
+  const onSubmit = async (data: BackofficeFormData) => {
     setIsSubmitting(true);
 
-    // Limpiamos datos vacíos para no enviar strings vacíos donde Django espera Null
-    const payload: any = { ...formData };
+    const payload: any = { ...data };
 
-    // Limpieza dinámica
     Object.keys(payload).forEach((key) => {
-      if (payload[key] === "" || payload[key] === 0) {
-        delete payload[key];
-      }
+      if (payload[key] === "" || payload[key] === "0") delete payload[key];
     });
 
-    // Si no es ATENDIDO, no enviamos fecha de instalación para no ensuciar BD
-    if (codigoEstadoActual !== "ATENDIDO") delete payload.fecha_real_inst;
-    // Si no es RECHAZADO, no enviamos fecha de rechazo
-    if (codigoEstadoActual !== "RECHAZADO") delete payload.fecha_rechazo;
+    if (payload.id_estado_sot)
+      payload.id_estado_sot = Number(payload.id_estado_sot);
+    if (payload.id_estado_audios)
+      payload.id_estado_audios = Number(payload.id_estado_audios);
 
-    const success = await onSave(payload);
-    setIsSubmitting(false);
-    if (success) onClose();
+    if (!isAttended) delete payload.fecha_real_inst;
+    if (!isRejected && !isAudioRejected) delete payload.fecha_rechazo;
+
+    try {
+      const success = await onSave(payload as BackofficePayload);
+      if (success) onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <Card className="p-4 space-y-3 bg-slate-50 border-slate-200">
-        <h3 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
-          Resumen Venta
-        </h3>
-        <p className="text-sm">
-          <strong>Cliente:</strong> {venta.cliente_nombre} - DNI{" "}
-          {venta.cliente_numero_doc}
-        </p>
-        <p className="text-sm">
-          <strong>Asesor:</strong> {venta.nombre_asesor}
-        </p>
-      </Card>
-
-      <Card className="p-4 space-y-4">
-        <h3 className="font-semibold text-sm text-primary uppercase">
-          Gestión Operativa
-        </h3>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-6 pb-24 animate-in fade-in duration-300"
+      >
+        <Card className="p-4 bg-slate-50 border-slate-200">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-slate-400 mt-0.5" />
             <div>
-              <label className="text-sm font-medium">Código SEC</label>
-              <Input
-                value={formData.codigo_sec}
-                onChange={(e) =>
-                  setFormData({ ...formData, codigo_sec: e.target.value })
-                }
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Código SOT</label>
-              <Input
-                value={formData.codigo_sot}
-                onChange={(e) =>
-                  setFormData({ ...formData, codigo_sot: e.target.value })
-                }
-                className="mt-1"
-              />
+              <p className="text-sm font-bold text-slate-900">
+                {sale.cliente_nombre}
+              </p>
+              <p className="text-xs text-slate-500">
+                DNI: {sale.cliente_numero_doc} | Asesor: {sale.nombre_asesor}
+              </p>
+              <p className="text-xs font-semibold text-primary mt-1">
+                Plan: {sale.nombre_producto} ({sale.tecnologia})
+              </p>
             </div>
           </div>
+        </Card>
 
-          <div>
-            <label className="text-sm font-medium">
-              Fecha Visita Programada
-            </label>
-            <Input
-              type="date"
-              value={formData.fecha_visita_programada}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  fecha_visita_programada: e.target.value,
-                })
-              }
-              className="mt-1"
+        <Card className="p-5 space-y-4 border-blue-100 shadow-sm">
+          <h3 className="font-bold text-xs text-blue-800 uppercase tracking-wider border-b border-blue-100 pb-2">
+            Códigos de Instalación
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="codigo_sec"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Código SEC</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: SEC-123" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="codigo_sot"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Código SOT</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: SOT-456" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fecha_visita_programada"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Fecha Agenda SOT</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
+        </Card>
 
-          <div className="border-t pt-4">
-            <label className="text-sm font-medium text-blue-700">
-              Estado SOT Actual
-            </label>
-            <Select
-              onValueChange={(val) =>
-                setFormData({ ...formData, id_estado_sot: Number(val) })
-              }
-              value={formData.id_estado_sot?.toString()}
-            >
-              <SelectTrigger className="mt-1 border-blue-300 focus:ring-blue-500">
-                <SelectValue placeholder="Actualizar Estado..." />
-              </SelectTrigger>
-              <SelectContent>
-                {estadosSOT.map((e) => (
-                  <SelectItem key={e.id} value={e.id.toString()}>
-                    {e.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* DICTAMEN FINAL */}
+        <Card className="p-5 space-y-4 border-slate-200 shadow-sm">
+          <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider border-b pb-2">
+            Dictamen Final
+          </h3>
+
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="id_estado_audios"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Auditoría de Audios</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Estado de audios" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {audioStates.map((e) => (
+                        <SelectItem key={e.id} value={e.id.toString()}>
+                          {e.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {isAudioRejected && (
+              <FormField
+                control={form.control}
+                name="observacion_audios"
+                render={({ field }) => (
+                  <FormItem className="animate-in fade-in duration-200">
+                    <FormLabel className="text-red-600">
+                      Motivo de Rechazo (Audio)
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        className="border-red-200"
+                        placeholder="Especifique el error del audio..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
+              control={form.control}
+              name="id_estado_sot"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estado Operativo SOT</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="border-blue-300 focus:ring-blue-500 bg-blue-50/30">
+                        <SelectValue placeholder="Actualizar Estado..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {sotStates.map((e) => (
+                        <SelectItem key={e.id} value={e.id.toString()}>
+                          {e.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {isAttended && (
+              <FormField
+                control={form.control}
+                name="fecha_real_inst"
+                render={({ field }) => (
+                  <FormItem className="p-3 bg-green-50 border border-green-200 rounded-lg animate-in fade-in zoom-in-95 duration-200">
+                    <FormLabel className="text-green-800">
+                      Fecha Real de Instalación
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="border-green-300"
+                        {...field}
+                        required
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {(isRejected || isAudioRejected) && (
+              <FormField
+                control={form.control}
+                name="fecha_rechazo"
+                render={({ field }) => (
+                  <FormItem className="p-3 bg-red-50 border border-red-200 rounded-lg animate-in fade-in zoom-in-95 duration-200">
+                    <FormLabel className="text-red-800">
+                      Fecha de Caída/Rechazo
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="border-red-300"
+                        {...field}
+                        required
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
+        </Card>
 
-          {/* RENDERIZADO CONDICIONAL DE REGLAS DE NEGOCIO */}
-          {codigoEstadoActual === "ATENDIDO" && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg animate-in fade-in zoom-in duration-300">
-              <label className="text-sm font-medium text-green-800">
-                Fecha Real de Instalación (Obligatorio)
-              </label>
-              <Input
-                type="date"
-                required
-                value={formData.fecha_real_inst}
-                onChange={(e) =>
-                  setFormData({ ...formData, fecha_real_inst: e.target.value })
-                }
-                className="mt-1 border-green-300"
-              />
-            </div>
-          )}
-
-          {codigoEstadoActual === "RECHAZADO" && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg animate-in fade-in zoom-in duration-300">
-              <label className="text-sm font-medium text-red-800">
-                Fecha de Rechazo (Obligatorio)
-              </label>
-              <Input
-                type="date"
-                required
-                value={formData.fecha_rechazo}
-                onChange={(e) =>
-                  setFormData({ ...formData, fecha_rechazo: e.target.value })
-                }
-                className="mt-1 border-red-300"
-              />
-            </div>
-          )}
+        {/* CONTROLES */}
+        <div className="flex gap-3 p-4 bg-white/80 backdrop-blur-md border-t fixed bottom-0 right-0 left-0 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 z-50">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-md"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              "Registrar Gestión"
+            )}
+          </Button>
         </div>
-      </Card>
-
-      <div className="flex gap-3 pt-4">
-        <Button type="submit" disabled={isSubmitting} className="flex-1">
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            "Guardar Cambios"
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isSubmitting}
-          className="flex-1"
-        >
-          Cancelar
-        </Button>
-      </div>
-    </form>
+      </form>
+    </Form>
   );
 }

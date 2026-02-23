@@ -1,148 +1,207 @@
-// features/sales/pages/SalesPage.tsx
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Search, Plus, TrendingUp, CheckCircle2, Clock } from "lucide-react";
+
 import { Card } from "@/components/ui/card";
+import { GlobalLoader } from "@/components/GlobalLoader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
+  SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Search, Plus, TrendingUp, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@/features/auth/context/useAuth";
+
+import { useSales } from "../hooks/useSales";
 import { SalesTable } from "../components/SalesTable";
 import { NewSaleForm } from "../components/NewSaleForm";
 import { BackofficeForm } from "../components/BackOfficeForm";
-import { SaleDetailViewer } from "../components/SaleDetailViewer"; // IMPORTANTE
-import { useSales } from "../hooks/useSales";
-import { useAuth } from "@/features/auth/context/useAuth"; // Hook de Auth
+import { SaleDetailViewer } from "../components/SaleDetailViewer";
 
 export const SalesPage = () => {
   const { user } = useAuth();
   const {
-    ventas,
+    sales,
     loading,
-    productos,
-    grabadores,
-    estadosSOT,
-    createVenta,
+    products,
+    engravers,
+    sotStates,
+    audioStates,
+    createSale,
     updateBackoffice,
   } = useSales();
 
-  const [saleToClone, setSaleToClone] = useState<any | null>(null);
-
-  const userRoleCode = user?.rol?.codigo || "ASESOR";
-  // Regla: Backoffice, Dueño y Supervisor pueden gestionar ventas.
+  const userRoleCode = user?.rol.codigo || "ASESOR";
   const canManage = ["BACKOFFICE", "DUENO", "SUPERVISOR"].includes(
     userRoleCode,
   );
+  const isBackoffice = userRoleCode === "BACKOFFICE";
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterSotStates, setFilterSotStates] = useState<string>("TODOS");
+
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [sheetType, setSheetType] = useState<"nueva" | "gestion" | "ver">(
     "nueva",
   );
-  const [selectedVenta, setSelectedVenta] = useState<any | null>(null);
+  const [selectedSale, setSelectedSale] = useState<any | null>(null);
+  const [saleToClone, setSaleToClone] = useState<any | null>(null);
 
-  if (loading)
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+  const metrics = useMemo(
+    () => ({
+      total: sales.length,
+      pending: sales.filter(
+        (s) => s.codigo_estado === "EJECUCION" || !s.codigo_estado,
+      ).length,
+      installed: sales.filter((s) =>
+        ["ATENDIDO"].includes(s.codigo_estado || ""),
+      ).length,
+    }),
+    [sales],
+  );
 
-  const metricas = {
-    total: ventas.length,
-    instaladas: ventas.filter(
-      (v) => v.nombre_estado === "ATENDIDO" || v.nombre_estado === "CONFORME",
-    ).length,
-  };
+  const filteredSales = useMemo(() => {
+    return sales.filter((s) => {
+      const matchQuery =
+        s.cliente_nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.cliente_numero_doc.includes(searchQuery);
+
+      const matchState =
+        filterSotStates === "TODOS" || s.nombre_estado === filterSotStates;
+
+      return matchQuery && matchState;
+    });
+  }, [sales, searchQuery, filterSotStates]);
+
+  if (loading) return <GlobalLoader message="Analizando datos de ventas..." />;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Gestión de Ventas</h1>
-        <p className="text-slate-600 mt-1">
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+          Registro de Ventas
+        </h1>
+        <p className="text-slate-500 mt-1 font-medium text-sm sm:text-base">
           {canManage
-            ? "Gestiona las ventas operativas del equipo."
-            : "Visualiza tus ventas ingresadas."}
+            ? "Panel de control operativo y gestión SOT/SEC."
+            : "Historial de tus ventas ingresadas."}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-6 bg-white border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="p-5 bg-white border-slate-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-600 text-sm font-medium">
-                Ventas Totales
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">
+                Total Ingresadas
               </p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">
-                {metricas.total}
+              <p className="text-3xl font-bold text-blue-600 mt-1">
+                {metrics.total}
               </p>
             </div>
-            <TrendingUp className="w-12 h-12 text-blue-200" />
+            <TrendingUp className="w-10 h-10 text-blue-100" />
           </div>
         </Card>
-        <Card className="p-6 bg-white border-slate-200">
+
+        <Card className="p-5 bg-white border-slate-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-600 text-sm font-medium">Instaladas</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">
-                {metricas.instaladas}
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">
+                Pendientes Gestión
+              </p>
+              <p className="text-3xl font-bold text-yellow-500 mt-1">
+                {metrics.pending}
               </p>
             </div>
-            <CheckCircle2 className="w-12 h-12 text-green-200" />
+            <Clock className="w-10 h-10 text-yellow-100" />
+          </div>
+        </Card>
+
+        <Card className="p-5 bg-white border-slate-200 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">
+                Completadas
+              </p>
+              <p className="text-3xl font-bold text-green-600 mt-1">
+                {metrics.installed}
+              </p>
+            </div>
+            <CheckCircle2 className="w-10 h-10 text-green-100" />
           </div>
         </Card>
       </div>
 
-      <Card className="p-4 bg-white border-slate-200">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              placeholder="Buscar por DNI o Nombre..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+      <Card className="p-4 bg-white border-slate-200 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between gap-4">
+          <div className="flex flex-1 gap-3">
+            <div className="relative flex-1 md:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar cliente, DNI..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 border-slate-200 bg-slate-50/50"
+              />
+            </div>
+
+            {canManage && (
+              <div className="w-40 hidden sm:block">
+                <Select
+                  value={filterSotStates}
+                  onValueChange={setFilterSotStates}
+                >
+                  <SelectTrigger className="border-slate-200 bg-slate-50/50">
+                    <SelectValue placeholder="Filtrar Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TODOS">Todos los Estados</SelectItem>
+                    {sotStates.map((e) => (
+                      <SelectItem key={e.id} value={e.nombre}>
+                        {e.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          {/* Ocultamos el botón "Nueva Venta" al BackOffice puro si así lo deseas, o lo dejas. Asumo que todos pueden crear. */}
-          <Button
-            onClick={() => {
-              setSaleToClone(null);
-              setSheetType("nueva");
-              setIsSheetOpen(true);
-            }}
-            className="bg-primary"
-          >
-            <Plus className="w-4 h-4 mr-2" /> Nueva Venta
-          </Button>
+          {!isBackoffice && (
+            <Button
+              onClick={() => {
+                setSaleToClone(null);
+                setSheetType("nueva");
+                setIsSheetOpen(true);
+              }}
+              className="bg-primary hover:bg-primary/90 text-white font-medium shadow-sm"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Nueva Venta
+            </Button>
+          )}
         </div>
       </Card>
 
       <SalesTable
-        ventas={ventas.filter(
-          (v) =>
-            v.cliente_nombre
-              .toLowerCase()
-              .includes(searchQuery.toLowerCase()) ||
-            v.cliente_numero_doc.includes(searchQuery),
-        )}
+        ventas={filteredSales}
         userRole={userRoleCode}
-        onAction={(venta, action) => {
-          setSelectedVenta(venta);
-
-          // MAGIA DEL ENRUTAMIENTO LOCAL
+        onAction={(sale, action) => {
+          setSelectedSale(sale);
           if (action === "clonar") {
-            setSaleToClone(venta);
-            setSheetType("nueva"); // Usamos el form de Nueva Venta, pero pasándole datos
+            setSaleToClone(sale);
+            setSheetType("nueva");
           } else {
             setSaleToClone(null);
             setSheetType(action as "gestion" | "ver");
           }
-
           setIsSheetOpen(true);
         }}
       />
@@ -150,47 +209,61 @@ export const SalesPage = () => {
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent
           side="right"
-          className="w-full md:w-[500px] overflow-y-auto"
+          className="w-full sm:max-w-xl overflow-y-auto border-l shadow-2xl p-0"
         >
-          <SheetHeader>
-            <SheetTitle>
+          <div className="px-6 py-6 border-b bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm">
+            <SheetTitle className="text-2xl text-slate-800">
               {sheetType === "nueva"
-                ? "Nueva Venta"
+                ? saleToClone
+                  ? "Reingreso de Venta"
+                  : "Nueva Venta"
                 : sheetType === "gestion"
                   ? "Gestión Operativa SOT"
-                  : "Detalle de Venta"}
+                  : "Detalle del Cliente"}
             </SheetTitle>
-          </SheetHeader>
-          <div className="mt-6">
+            <SheetDescription className="text-slate-500 mt-1">
+              {sheetType === "nueva"
+                ? "Completa los datos requeridos para procesar la transacción."
+                : sheetType === "gestion"
+                  ? "Asigna códigos y fechas para la instalación."
+                  : "Vista de solo lectura del expediente comercial."}
+            </SheetDescription>
+          </div>
+
+          <div className="p-6">
             {sheetType === "nueva" && (
               <>
-                {/* Aviso visual si es un clon */}
                 {saleToClone && (
-                  <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800">
-                    <span className="font-bold">Modo Reingreso:</span> Revisa
-                    los datos pre-llenados, asigna un nuevo grabador de audio y
-                    guarda para generar la nueva venta.
+                  <div className="mb-6 p-4 bg-orange-50 border-l-4 border-orange-400 rounded-r-lg text-sm text-orange-800 animate-in fade-in">
+                    <span className="font-bold block text-orange-900 mb-1">
+                      Modo Clonación Activo
+                    </span>
+                    Los datos del cliente han sido pre-cargados. Asigne un nuevo
+                    grabador y guarde.
                   </div>
                 )}
                 <NewSaleForm
-                  productos={productos}
-                  grabadores={grabadores}
-                  initialData={saleToClone} // <-- Pasamos la data clonada
-                  onSave={createVenta}
+                  products={products}
+                  engravers={engravers}
+                  initialData={saleToClone}
+                  onSave={createSale}
                   onClose={() => setIsSheetOpen(false)}
                 />
               </>
             )}
-            {sheetType === "gestion" && selectedVenta && (
+
+            {sheetType === "gestion" && selectedSale && (
               <BackofficeForm
-                venta={selectedVenta}
-                estadosSOT={estadosSOT}
-                onSave={(data) => updateBackoffice(selectedVenta.id, data)}
+                sale={selectedSale}
+                sotStates={sotStates}
+                audioStates={audioStates}
+                onSave={(data) => updateBackoffice(selectedSale.id, data)}
                 onClose={() => setIsSheetOpen(false)}
               />
             )}
-            {sheetType === "ver" && selectedVenta && (
-              <SaleDetailViewer venta={selectedVenta} />
+
+            {sheetType === "ver" && selectedSale && (
+              <SaleDetailViewer sale={selectedSale} />
             )}
           </div>
         </SheetContent>

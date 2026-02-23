@@ -1,44 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { Role } from "@/features/auth/types";
-import type { RolePayload } from "../../types";
-import { Textarea } from "@/components/ui/textarea";
 
-const roleSchema = z.object({
-  codigo: z.string().min(2, "El código es obligatorio").toUpperCase(),
-  nombre: z.string().min(2, "El nombre es obligatorio"),
-  descripcion: z.string().optional(),
-  nivel_jerarquia: z.coerce.number().min(1).max(5), // Zod convierte el string del input a number
-  activo: z.boolean().default(true),
-});
+import { roleFormSchema, type RoleFormData } from "../../schemas/roleSchema";
 
-type RoleFormData = z.infer<typeof roleSchema>;
+import type { Role } from "../../types";
 
 interface RoleFormProps {
   role: Role | null;
-  onSave: (data: RolePayload) => Promise<void>;
+  isSubmitting: boolean;
+  onSave: (data: RoleFormData) => Promise<void>;
   onCancel: () => void;
 }
 
-export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+export function RoleForm({
+  role,
+  isSubmitting,
+  onSave,
+  onCancel,
+}: RoleFormProps) {
   const form = useForm<RoleFormData>({
-    resolver: zodResolver(roleSchema),
+    resolver: zodResolver(roleFormSchema),
     defaultValues: {
       codigo: "",
       nombre: "",
@@ -49,15 +46,15 @@ export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
   });
 
   useEffect(() => {
-    if (role) {
+    if (role)
       form.reset({
         codigo: role.codigo,
         nombre: role.nombre,
-        descripcion: (role as any).descripcion || "",
+        descripcion: role.descripcion || "",
         nivel_jerarquia: role.nivel_jerarquia,
         activo: role.activo,
       });
-    } else {
+    else
       form.reset({
         codigo: "",
         nombre: "",
@@ -65,49 +62,45 @@ export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
         nivel_jerarquia: 1,
         activo: true,
       });
-    }
   }, [role, form]);
-
-  const onSubmit = async (data: RoleFormData) => {
-    setIsSubmitting(true);
-    await onSave(data);
-    setIsSubmitting(false);
-  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="codigo"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Código del Rol</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Ej: SUPERVISOR"
-                  {...field}
-                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="nombre"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nombre del Rol</FormLabel>
-              <FormControl>
-                <Input placeholder="Ej: Supervisor" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <form onSubmit={form.handleSubmit(onSave)} className="space-y-6 p-6">
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="codigo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Código</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Ej: ASESOR"
+                    {...field}
+                    onChange={(e) =>
+                      field.onChange(e.target.value.toUpperCase())
+                    }
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="nombre"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nombre</FormLabel>
+                <FormControl>
+                  <Input placeholder="Ej: Asesor de Ventas" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}
@@ -117,7 +110,7 @@ export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
               <FormLabel>Descripción</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Describe las responsabilidades..."
+                  placeholder="Responsabilidades del rol..."
                   className="resize-none"
                   rows={3}
                   {...field}
@@ -152,9 +145,12 @@ export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
           control={form.control}
           name="activo"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+            <FormItem className="flex flex-row items-center justify-between rounded-md border p-4 bg-slate-50/50">
               <div className="space-y-0.5">
-                <FormLabel className="text-base">Estado Activo</FormLabel>
+                <FormLabel className="text-base">Rol Activo</FormLabel>
+                <FormDescription>
+                  Determina si este rol puede ser asignado a nuevos usuarios.
+                </FormDescription>
               </div>
               <FormControl>
                 <Switch
@@ -166,14 +162,7 @@ export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
           )}
         />
 
-        <div className="flex gap-3 pt-4">
-          <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              "Guardar"
-            )}
-          </Button>
+        <div className="flex gap-3 pt-4 border-t">
           <Button
             type="button"
             variant="outline"
@@ -182,6 +171,19 @@ export function RoleForm({ role, onSave, onCancel }: RoleFormProps) {
             className="flex-1"
           >
             Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 bg-primary text-primary-foreground"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : role ? (
+              "Guardar Cambios"
+            ) : (
+              "Crear Rol"
+            )}
           </Button>
         </div>
       </form>

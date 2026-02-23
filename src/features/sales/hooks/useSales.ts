@@ -1,41 +1,57 @@
 import { useState, useEffect, useCallback } from "react";
-import { salesService } from "../services/salesService";
-import type { Venta, VentaPayload, BackofficePayload } from "../types";
 import { toast } from "sonner";
 
+import { extractApiError } from "@/lib/api-errors";
+
+import { salesService } from "../services/salesService";
+
+import type {
+  BackofficePayload,
+  CatalogItem,
+  ProductItem,
+  Sale,
+  SalePayload,
+} from "../types";
+
 export const useSales = () => {
-  const [ventas, setVentas] = useState<Venta[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para catálogos
-  const [productos, setProductos] = useState<any[]>([]);
-  const [grabadores, setGrabadores] = useState<any[]>([]);
-  const [estadosSOT, setEstadosSOT] = useState<any[]>([]);
-  const [subEstados, setSubEstados] = useState<any[]>([]);
-  const [estadosAudio, setEstadosAudio] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [engravers, setEngravers] = useState<any[]>([]);
+  const [sotStates, setSotStates] = useState<CatalogItem[]>([]);
+  const [subStates, setSubStates] = useState<CatalogItem[]>([]);
+  const [audioStates, setAudioStates] = useState<CatalogItem[]>([]);
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
-    try {
-      // Optimizamos cargando todo en paralelo
-      const [vData, pData, gData, eSotData, subData, eAudioData] =
-        await Promise.all([
-          salesService.getVentas(),
-          salesService.getProductos(),
-          salesService.getGrabadores(),
-          salesService.getEstadosSOT(),
-          salesService.getSubEstadosSOT(),
-          salesService.getEstadosAudio(),
-        ]);
 
-      setVentas(vData);
-      setProductos(pData);
-      setGrabadores(gData);
-      setEstadosSOT(eSotData);
-      setSubEstados(subData);
-      setEstadosAudio(eAudioData);
+    try {
+      const [
+        salesData,
+        productsData,
+        engraversData,
+        sotStatesData,
+        subStatesData,
+        audioStatesData,
+      ] = await Promise.all([
+        salesService.getSales(),
+        salesService.getProducts(),
+        salesService.getEngravers(),
+        salesService.getSOTStates(),
+        salesService.getSOTSubStates(),
+        salesService.getAudioStates(),
+      ]);
+
+      setSales(salesData);
+      setProducts(productsData);
+      setEngravers(engraversData);
+      setSotStates(sotStatesData);
+      setSubStates(subStatesData);
+      setAudioStates(audioStatesData);
     } catch (error) {
       console.error("Error cargando datos de ventas:", error);
+      toast.error("Error de coneción al cargar el dashboard de ventas.");
     } finally {
       setLoading(false);
     }
@@ -45,58 +61,41 @@ export const useSales = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  const createVenta = async (payload: VentaPayload) => {
+  const createSale = async (payload: SalePayload) => {
     try {
-      await salesService.createVenta(payload);
-      await fetchInitialData(); // Recarga la tabla
+      await salesService.createSale(payload);
+      await fetchInitialData();
+      toast.success("Venta ingresada correctamente.");
       return true;
     } catch (error) {
-      console.error(
-        "⛔ ERROR DE DJANGO:",
-        error.response?.data || error.message,
-      );
-
-      // Opcional: Mostrarle una alerta rápida a ti (o al usuario) para no tener que abrir la consola
-      if (error.response?.data) {
-        alert("Error del Backend: " + JSON.stringify(error.response.data));
-      }
-
+      console.error("Error al crear venta:", error);
+      toast.error(extractApiError(error));
       return false;
     }
   };
 
   const updateBackoffice = async (id: number, payload: BackofficePayload) => {
     try {
-      await salesService.updateVentaBackoffice(id, payload);
-      toast.success("Venta actualizada exitosamente"); // <-- Usamos Toast
+      await salesService.updateSaleByBackoffice(id, payload);
       await fetchInitialData();
+      toast.success("Gestión operativa guardada.");
       return true;
-    } catch (error: any) {
-      console.error("⛔ Error Backoffice:", error.response?.data);
-
-      // Magia para extraer el primer mensaje de error del JSON de Django
-      if (error.response?.data) {
-        const errorData = error.response.data;
-        // Obtenemos la primera llave del error (ej. 'fecha_real_inst' o 'id_estado_sot')
-        const firstErrorKey = Object.keys(errorData)[0];
-        const errorMessage = errorData[firstErrorKey];
-        toast.error(`${firstErrorKey}: ${errorMessage}`);
-      } else {
-        toast.error("Error al actualizar la venta");
-      }
+    } catch (error) {
+      console.error("Error Backoffice:", error);
+      toast.error(extractApiError(error));
       return false;
     }
   };
 
   return {
-    ventas,
+    sales,
     loading,
-    productos,
-    grabadores,
-    estadosSOT,
-    subEstados,
-    estadosAudio,
-    createVenta,
+    products,
+    engravers,
+    sotStates,
+    subStates,
+    audioStates,
+    createSale,
     updateBackoffice,
   };
 };

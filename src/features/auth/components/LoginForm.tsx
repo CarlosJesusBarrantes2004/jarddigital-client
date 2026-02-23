@@ -1,14 +1,16 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Eye, EyeOff, Lock, User } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, Lock, User } from "lucide-react";
-import { useState } from "react";
-import { loginSchema, type LoginFormValues } from "./schemas/loginSchema";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
 
+import { loginFormSchema, type LoginFormData } from "../schemas/authSchema";
+
 interface LoginFormProps {
-  onSubmit: (credentials: LoginFormValues) => Promise<void>;
+  onSubmit: (credentials: LoginFormData) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -19,8 +21,8 @@ export const LoginForm = ({ onSubmit, isLoading }: LoginFormProps) => {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginFormSchema),
     defaultValues: {
       username: "",
       password: "",

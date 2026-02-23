@@ -1,13 +1,8 @@
-export type role_code =
-  | "DUENO"
-  | "SUPERVISOR"
-  | "RRHH"
-  | "BACKOFFICE"
-  | "ASESOR";
+import type { RoleCode } from "@/features/core/types";
 
 export interface Role {
   id: number;
-  codigo: role_code;
+  codigo: RoleCode;
   nombre: string;
   nivel_jerarquia: number;
   activo: boolean;

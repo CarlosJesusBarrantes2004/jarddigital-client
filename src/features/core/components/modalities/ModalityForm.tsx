@@ -1,76 +1,67 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+
+import {
+  modalityFormSchema,
+  type ModalityFormData,
+} from "../../schemas/modalitySchema";
+
 import type { Modality } from "../../types";
-
-const modalidadSchema = z.object({
-  nombre: z.string().min(2, "El nombre es obligatorio"),
-  activo: z.boolean().default(true),
-});
-
-type ModalityFormData = z.infer<typeof modalidadSchema>;
 
 interface ModalityFormProps {
   modality: Modality | null;
-  onSave: (data: { nombre: string; activo: boolean }) => Promise<void>;
+  isSubmitting: boolean;
+  onSave: (data: ModalityFormData) => Promise<void>;
   onCancel: () => void;
 }
 
 export function ModalityForm({
   modality,
+  isSubmitting,
   onSave,
   onCancel,
 }: ModalityFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const form = useForm<ModalityFormData>({
-    resolver: zodResolver(modalidadSchema),
+    resolver: zodResolver(modalityFormSchema),
     defaultValues: { nombre: "", activo: true },
   });
 
   useEffect(() => {
-    if (modality) {
+    if (modality)
       form.reset({
         nombre: modality.nombre,
         activo: modality.activo,
       });
-    } else {
-      form.reset({ nombre: "", activo: true });
-    }
+    else form.reset({ nombre: "", activo: true });
   }, [modality, form]);
-
-  const onSubmit = async (data: ModalityFormData) => {
-    setIsSubmitting(true);
-    await onSave(data);
-    setIsSubmitting(false);
-  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSave)} className="space-y-6 p-6">
         <FormField
           control={form.control}
           name="nombre"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre</FormLabel>
+              <FormLabel>Nombre de la Modalidad</FormLabel>
               <FormControl>
-                {/* Lo pasamos a mayúsculas automáticamente como es costumbre */}
                 <Input
-                  placeholder="Ej: CENTRO DE LLAMADAS"
+                  placeholder="Ej: CALL CENTER"
                   {...field}
                   onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                 />
@@ -84,9 +75,12 @@ export function ModalityForm({
           control={form.control}
           name="activo"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+            <FormItem className="flex flex-row items-center justify-between rounded-md border p-4 bg-slate-50/50">
               <div className="space-y-0.5">
-                <FormLabel className="text-base">Estado Activo</FormLabel>
+                <FormLabel className="text-base">Modalidad Activa</FormLabel>
+                <FormDescription>
+                  Permite o bloquea el acceso mediante esta modalidad.
+                </FormDescription>
               </div>
               <FormControl>
                 <Switch
@@ -98,14 +92,7 @@ export function ModalityForm({
           )}
         />
 
-        <div className="flex gap-3 pt-4">
-          <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              "Guardar"
-            )}
-          </Button>
+        <div className="flex gap-3 pt-4 border-t">
           <Button
             type="button"
             variant="outline"
@@ -114,6 +101,19 @@ export function ModalityForm({
             className="flex-1"
           >
             Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 bg-primary text-primary-foreground"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : modality ? (
+              "Guardar Cambios"
+            ) : (
+              "Crear Modalidad"
+            )}
           </Button>
         </div>
       </form>

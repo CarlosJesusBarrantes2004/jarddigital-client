@@ -1,4 +1,6 @@
-export interface Venta {
+export type StateCode = "EJECUCION" | "RECHAZADO" | "ATENDIDO";
+
+export interface Sale {
   id: number;
   id_producto: number;
   tecnologia: string;
@@ -8,24 +10,24 @@ export interface Venta {
   cliente_telefono: string;
   cliente_email: string;
 
-  // Nuevos campos Base
   cliente_papa: string;
   cliente_mama: string;
   numero_instalacion: string;
   cliente_fecha_nacimiento: string;
   plano: string;
 
-  // Nuevos campos RUC
   representante_legal_dni?: string;
   representante_legal_nombre?: string;
 
   id_distrito_instalacion: number;
   id_distrito_nacimiento?: number;
   direccion_detalle: string;
-  referencias?: string; // Nuevo
+  referencias?: string;
   coordenadas_gps?: string;
   es_full_claro: boolean;
   score_crediticio?: string;
+
+  // Backoffice
   codigo_sec?: string;
   codigo_sot?: string;
   fecha_venta?: string;
@@ -33,6 +35,7 @@ export interface Venta {
   bloque_horario?: string;
   id_sub_estado_sot?: number;
   id_estado_sot?: number;
+
   id_grabador_audios: number;
   audio_subido: boolean;
   id_estado_audios?: number;
@@ -42,11 +45,12 @@ export interface Venta {
   nombre_asesor?: string;
   nombre_producto?: string;
   nombre_estado?: string;
+  codigo_estado?: StateCode;
   nombre_supervisor?: string;
 }
 
-export type VentaPayload = Omit<
-  Venta,
+export type SalePayload = Omit<
+  Sale,
   | "id"
   | "codigo_sec"
   | "codigo_sot"
@@ -65,27 +69,6 @@ export type VentaPayload = Omit<
   | "fecha_venta"
 >;
 
-export interface Departamento {
-  id: number;
-  codigo_ubigeo: string;
-  nombre: string;
-}
-
-export interface Provincia {
-  id: number;
-  id_departamento: number;
-  codigo_ubigeo: string;
-  nombre: string;
-}
-
-export interface Distrito {
-  id: number;
-  id_provincia: number;
-  codigo_ubigeo: string;
-  nombre: string;
-}
-
-// Payload para Backoffice
 export interface BackofficePayload {
   codigo_sec?: string;
   codigo_sot?: string;
@@ -99,12 +82,12 @@ export interface BackofficePayload {
   fecha_rechazo?: string;
 }
 
-// Catálogos
-export interface CatalogoItem {
+export interface CatalogItem {
   id: number;
   codigo: string;
   nombre: string;
 }
-export interface ProductoItem extends CatalogoItem {
+export interface ProductItem extends CatalogItem {
   nombre_plan: string;
+  es_alto_valor: boolean;
 }

@@ -1,7 +1,11 @@
-import type { Role } from "@/features/auth/types";
 import { useCallback, useEffect, useState } from "react";
-import type { RolePayload } from "../types";
-import { api } from "@/api/axios";
+import { toast } from "sonner";
+
+import { extractApiError } from "@/lib/api-errors";
+
+import { coreService } from "../services/coreService";
+
+import type { Role, RolePayload } from "../types";
 
 export const useRoles = () => {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -10,10 +14,11 @@ export const useRoles = () => {
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<Role[]>("/users/roles/");
+      const data = await coreService.getRoles();
       setRoles(data);
     } catch (error) {
       console.error("Error fetching roles:", error);
+      toast.error("No se pudieron cargar los roles del sistema.");
     } finally {
       setLoading(false);
     }
@@ -25,30 +30,39 @@ export const useRoles = () => {
 
   const createRole = async (payload: RolePayload) => {
     try {
-      await api.post("/users/roles/", payload);
+      await coreService.createRole(payload);
       await fetchRoles();
+      toast.success("Rol creado exitosamente.");
       return true;
     } catch (error) {
+      console.error(error);
+      toast.error(extractApiError(error));
       return false;
     }
   };
 
   const updateRole = async (id: number, payload: RolePayload) => {
     try {
-      await api.patch(`/users/roles/${id}/`, payload);
+      await coreService.updateRole(id, payload);
       await fetchRoles();
+      toast.success("Rol actualizado exitosamente.");
       return true;
     } catch (error) {
+      console.error(error);
+      toast.error(extractApiError(error));
       return false;
     }
   };
 
   const deleteRole = async (id: number) => {
     try {
-      await api.delete(`/users/roles/${id}/`);
+      await coreService.deleteRole(id);
       setRoles((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Rol eliminado exitosamente.");
       return true;
     } catch (error) {
+      console.error(error);
+      toast.error(extractApiError(error));
       return false;
     }
   };

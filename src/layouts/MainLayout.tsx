@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
+
 import { Sidebar } from "@/components/sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { useAuth } from "@/features/auth/context/useAuth";
@@ -8,20 +9,16 @@ export const MainLayout = () => {
   const { user, isAuthenticated, loading } = useAuth();
 
   if (loading)
-    return (
-      <GlobalLoader message="Sincronizando con Jard Digital..."></GlobalLoader>
-    );
+    return <GlobalLoader message="Sincronizando con Jard Digital..." />;
 
-  if (!isAuthenticated) return <Navigate to={"/auth/login"} replace></Navigate>;
-
-  const userRole = user?.rol?.nombre || "Asesor";
+  if (!isAuthenticated) return <Navigate to="/auth/login" replace />;
 
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
       <DashboardHeader
         userName={user?.nombre_completo || "Usuario"}
-        userRole={userRole as any}
+        userRole={user?.rol.codigo as any}
       />
       <main className="pt-20 pl-0 lg:pl-64">
         <div className="p-6">

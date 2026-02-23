@@ -1,19 +1,22 @@
-import { Card } from "@/components/ui/card";
-import { Lock } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LoginForm } from "../components/form/LoginForm";
+import { Lock } from "lucide-react";
+import { toast } from "sonner";
+
+import { Card } from "@/components/ui/card";
+
 import { authService } from "../services/authService";
 import { useAuth } from "../context/useAuth";
-import type { LoginFormValues } from "../components/form/schemas/loginSchema";
-import { toast } from "sonner";
+import { LoginForm } from "../components/LoginForm";
+
+import type { LoginFormData } from "../schemas/authSchema";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { checkAuth } = useAuth();
 
-  const handleLogin = async (credentials: LoginFormValues) => {
+  const handleLogin = async (credentials: LoginFormData) => {
     setIsLoading(true);
 
     try {

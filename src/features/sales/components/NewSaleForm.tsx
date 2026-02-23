@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,678 +12,714 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
-import type { VentaPayload, ProductoItem } from "../types";
-import { useUbigeo } from "@/features/core/hooks/useUbigeo";
+import { useUbigeo } from "@/features/core/hooks/useUbigeos";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface Props {
-  productos: ProductoItem[];
-  grabadores: any[];
-  tiposDocumento?: any[];
+import { newSaleFormSchema, type NewSaleFormData } from "../schemas/saleSchema";
+
+import type { ProductItem, SalePayload } from "../types";
+
+interface NewSaleFormProps {
+  products: ProductItem[];
+  engravers: any[];
   initialData?: any;
-  onSave: (data: VentaPayload) => Promise<boolean>;
+  onSave: (data: SalePayload) => Promise<boolean>;
   onClose: () => void;
 }
 
 export function NewSaleForm({
-  productos,
-  grabadores,
-  tiposDocumento = [],
+  products = [],
+  engravers = [],
   initialData,
   onSave,
   onClose,
-}: Props) {
+}: NewSaleFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [depInst, setDepInst] = useState("");
+  const [provInst, setProvInst] = useState("");
+  const [depBirth, setDepBirth] = useState("");
+  const [provBirth, setProvBirth] = useState("");
+
+  const {
+    departments = [],
+    provincesInst = [],
+    districtsInst = [],
+    provincesBirth = [],
+    districtsBirth = [],
+    fetchProvinces,
+    fetchDistricts,
+  } = useUbigeo();
 
   const extractDate = (dateStr?: string) =>
     dateStr ? dateStr.split("T")[0] : "";
 
-  // Traemos la lógica de Ubigeo
-  const {
-    departamentos,
-    provinciasInst,
-    distritosInst,
-    provinciasNac,
-    distritosNac,
-    fetchProvincias,
-    fetchDistritos,
-  } = useUbigeo();
+  const form = useForm<NewSaleFormData>({
+    resolver: zodResolver(newSaleFormSchema),
+    defaultValues: {
+      id_tipo_documento: "1", // DNI por defecto
+      cliente_numero_doc: "",
+      cliente_nombre: "",
+      representante_legal_dni: "",
+      representante_legal_nombre: "",
+      cliente_telefono: "",
+      cliente_email: "",
+      cliente_papa: "",
+      cliente_mama: "",
+      cliente_fecha_nacimiento: "",
+      id_distrito_nacimiento: "",
+      id_distrito_instalacion: "",
+      direccion_detalle: "",
+      referencias: "",
+      coordenadas_gps: "",
+      es_full_claro: false,
+      id_producto: "",
+      tecnologia: "",
+      numero_instalacion: "",
+      plano: "",
+      score_crediticio: "",
+      id_grabador_audios: "",
+    },
+  });
 
-  const [depInst, setDepInst] = useState("");
-  const [provInst, setProvInst] = useState("");
-  const [depNac, setDepNac] = useState("");
-  const [provNac, setProvNac] = useState("");
-
-  const [formData, setFormData] = useState<VentaPayload>(() => {
+  useEffect(() => {
     if (initialData) {
-      return {
-        tecnologia: initialData.tecnologia || "",
-        cliente_nombre: initialData.cliente_nombre || "",
+      form.reset({
+        id_tipo_documento: initialData.id_tipo_documento?.toString() || "1",
         cliente_numero_doc: initialData.cliente_numero_doc || "",
-        cliente_telefono: initialData.cliente_telefono || "",
-        cliente_email: initialData.cliente_email || "",
-        id_producto: initialData.id_producto || 0,
-        es_full_claro: initialData.es_full_claro || false,
-        direccion_detalle: initialData.direccion_detalle || "",
-        coordenadas_gps: initialData.coordenadas_gps || "",
-        id_distrito_instalacion: initialData.id_distrito_instalacion || 0,
-        id_distrito_nacimiento: initialData.id_distrito_nacimiento || 0,
-        id_grabador_audios: 0, // El grabador siempre es nuevo porque es una nueva llamada
-        id_tipo_documento: initialData.id_tipo_documento || 1,
-        cliente_papa: initialData.cliente_papa || "",
-        cliente_mama: initialData.cliente_mama || "",
-        numero_instalacion: initialData.numero_instalacion || "",
-        cliente_fecha_nacimiento: extractDate(
-          initialData.cliente_fecha_nacimiento,
-        ),
-        plano: initialData.plano || "",
-        score_crediticio: initialData.score_crediticio || "",
-        referencias: initialData.referencias || "",
+        cliente_nombre: initialData.cliente_nombre || "",
         representante_legal_dni: initialData.representante_legal_dni || "",
         representante_legal_nombre:
           initialData.representante_legal_nombre || "",
-      };
+        cliente_telefono: initialData.cliente_telefono || "",
+        cliente_email: initialData.cliente_email || "",
+        cliente_papa: initialData.cliente_papa || "",
+        cliente_mama: initialData.cliente_mama || "",
+        cliente_fecha_nacimiento: extractDate(
+          initialData.cliente_fecha_nacimiento,
+        ),
+        id_distrito_nacimiento:
+          initialData.id_distrito_nacimiento?.toString() || "",
+        id_distrito_instalacion:
+          initialData.id_distrito_instalacion?.toString() || "",
+        direccion_detalle: initialData.direccion_detalle || "",
+        referencias: initialData.referencias || "",
+        coordenadas_gps: initialData.coordenadas_gps || "",
+        es_full_claro: initialData.es_full_claro || false,
+        id_producto: initialData.id_producto?.toString() || "",
+        tecnologia: initialData.tecnologia || "",
+        numero_instalacion: initialData.numero_instalacion || "",
+        plano: initialData.plano || "",
+        score_crediticio: initialData.score_crediticio || "",
+        id_grabador_audios: "", // Reset obligatorio del audio al clonar
+      });
     }
-    // Formulario vacío por defecto
-    return {
-      tecnologia: "",
-      cliente_nombre: "",
-      cliente_numero_doc: "",
-      cliente_telefono: "",
-      cliente_email: "",
-      id_producto: 0,
-      es_full_claro: false,
-      direccion_detalle: "",
-      coordenadas_gps: "",
-      id_distrito_instalacion: 0,
-      id_distrito_nacimiento: 0,
-      id_grabador_audios: 0,
-      id_tipo_documento: 1,
-      cliente_papa: "",
-      cliente_mama: "",
-      numero_instalacion: "",
-      cliente_fecha_nacimiento: "",
-      plano: "",
-      score_crediticio: "",
-      referencias: "",
-      representante_legal_dni: "",
-      representante_legal_nombre: "",
-    };
-  });
+  }, [initialData, form]);
 
-  // Saber si es RUC para mostrar/ocultar campos (Asumimos ID 3 = RUC según el JSON de Alejandro)
-  const isRuc = formData.id_tipo_documento === 3;
+  const currentDocType = form.watch("id_tipo_documento");
+  const isRuc = currentDocType === "3";
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (
-      !formData.id_producto ||
-      !formData.id_grabador_audios ||
-      !formData.tecnologia ||
-      !formData.id_tipo_documento ||
-      !formData.id_distrito_instalacion
-    ) {
-      alert(
-        "Por favor, asegúrese de completar todos los campos obligatorios y selects finales.",
-      );
-      return;
-    }
-
+  const onSubmit = async (data: NewSaleFormData) => {
     setIsSubmitting(true);
 
-    const payloadLimpio: any = {
-      ...formData,
-      // Aseguramos que viajen aunque estén vacíos para pasar el serializer
-      score_crediticio: formData.score_crediticio || "",
-      coordenadas_gps: formData.coordenadas_gps || "",
-      referencias: formData.referencias || "",
+    const payload: any = {
+      ...data,
+      id_tipo_documento: Number(data.id_tipo_documento),
+      id_distrito_instalacion: Number(data.id_distrito_instalacion),
+      id_producto: Number(data.id_producto),
+      id_grabador_audios: Number(data.id_grabador_audios),
     };
 
-    // Si NO es RUC, borramos los datos del representante para no ensuciar la DB
+    if (data.id_distrito_nacimiento) {
+      payload.id_distrito_nacimiento = Number(data.id_distrito_nacimiento);
+    } else {
+      delete payload.id_distrito_nacimiento; // Para que viaje Null a la BD si es vacío
+    }
+
     if (!isRuc) {
-      delete payloadLimpio.representante_legal_dni;
-      delete payloadLimpio.representante_legal_nombre;
+      delete payload.representante_legal_dni;
+      delete payload.representante_legal_nombre;
     }
-
-    // Si no puso distrito de nacimiento, lo borramos (permite nulo)
-    if (!payloadLimpio.id_distrito_nacimiento) {
-      delete payloadLimpio.id_distrito_nacimiento;
-    }
-
-    console.log("PAYLOAD FRONTEND:", payloadLimpio);
+    if (!payload.score_crediticio) delete payload.score_crediticio;
+    if (!payload.referencias) delete payload.referencias;
 
     try {
-      const success = await onSave(payloadLimpio);
+      const success = await onSave(payload as SalePayload);
       if (success) onClose();
-    } catch (error) {
-      console.error("Error al guardar la venta:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* ---------------- DATOS DEL CLIENTE ---------------- */}
-      <Card className="p-4 space-y-4 bg-slate-50">
-        <h3 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
-          Datos del Cliente
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Tipo Doc.
-            </label>
-            <Select
-              value={formData.id_tipo_documento?.toString()}
-              onValueChange={(val) =>
-                setFormData({ ...formData, id_tipo_documento: Number(val) })
-              }
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Seleccione" />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Mock o Dinámico */}
-                <SelectItem value="1">DNI</SelectItem>
-                <SelectItem value="2">CE</SelectItem>
-                <SelectItem value="3">RUC</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              N° Documento
-            </label>
-            <Input
-              value={formData.cliente_numero_doc}
-              onChange={(e) =>
-                setFormData({ ...formData, cliente_numero_doc: e.target.value })
-              }
-              required
-              className="mt-1"
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-6 animate-in fade-in duration-300 pb-24"
+      >
+        {/* ================= DATOS DEL CLIENTE ================= */}
+        <Card className="p-5 space-y-4 bg-white border-slate-200 shadow-sm">
+          <h3 className="font-bold text-xs text-primary uppercase tracking-wider border-b pb-2">
+            Identificación del Cliente
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="id_tipo_documento"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo Doc.</FormLabel>
+                  {/* VINCULACIÓN DIRECTA (Sin conversiones) */}
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="1">DNI</SelectItem>
+                      <SelectItem value="2">CE</SelectItem>
+                      <SelectItem value="3">RUC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className={isRuc ? "md:col-span-2" : ""}>
-            <label className="text-sm font-medium text-slate-700">
-              {isRuc ? "Razón Social" : "Nombre Completo"}
-            </label>
-            <Input
-              value={formData.cliente_nombre}
-              onChange={(e) =>
-                setFormData({ ...formData, cliente_nombre: e.target.value })
-              }
-              required
-              className="mt-1"
+            <FormField
+              control={form.control}
+              name="cliente_numero_doc"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>N° Documento</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: 7289..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          {/* CAMPOS CONDICIONALES PARA RUC */}
-          {isRuc && (
-            <>
-              <div>
-                <label className="text-sm font-medium text-slate-700 border-l-2 border-blue-500 pl-2">
-                  DNI Rep. Legal
-                </label>
-                <Input
-                  value={formData.representante_legal_dni}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      representante_legal_dni: e.target.value,
-                    })
-                  }
-                  required
-                  className="mt-1 border-blue-200"
+            <FormField
+              control={form.control}
+              name="cliente_nombre"
+              render={({ field }) => (
+                <FormItem className={isRuc ? "md:col-span-2" : ""}>
+                  <FormLabel>
+                    {isRuc ? "Razón Social" : "Nombre Completo"}
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nombre del titular..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {isRuc && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="representante_legal_dni"
+                  render={({ field }) => (
+                    <FormItem className="animate-in fade-in zoom-in-95 duration-200">
+                      <FormLabel className="text-blue-600">
+                        DNI Rep. Legal
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="border-blue-200"
+                          placeholder="Obligatorio"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 border-l-2 border-blue-500 pl-2">
-                  Nombre Rep. Legal
-                </label>
-                <Input
-                  value={formData.representante_legal_nombre}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      representante_legal_nombre: e.target.value,
-                    })
-                  }
-                  required
-                  className="mt-1 border-blue-200"
+                <FormField
+                  control={form.control}
+                  name="representante_legal_nombre"
+                  render={({ field }) => (
+                    <FormItem className="animate-in fade-in zoom-in-95 duration-200">
+                      <FormLabel className="text-blue-600">
+                        Nombre Rep. Legal
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          className="border-blue-200"
+                          placeholder="Obligatorio"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Teléfono
-            </label>
-            <Input
-              value={formData.cliente_telefono}
-              onChange={(e) =>
-                setFormData({ ...formData, cliente_telefono: e.target.value })
-              }
-              required
-              className="mt-1"
+            <FormField
+              control={form.control}
+              name="cliente_telefono"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Teléfono</FormLabel>
+                  <FormControl>
+                    <Input placeholder="999..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cliente_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Correo Electrónico</FormLabel>
+                  <FormControl>
+                    <Input type="email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cliente_papa"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre del Padre</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cliente_mama"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre de la Madre</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cliente_fecha_nacimiento"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Fecha de Nacimiento</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Card>
+
+        {/* ================= UBIGEO NACIMIENTO ================= */}
+        <Card className="p-5 space-y-4 bg-blue-50/30 border-l-4 border-l-blue-400 shadow-sm">
+          <h3 className="font-bold text-xs text-blue-700 uppercase tracking-wider border-b border-blue-200 pb-2">
+            Lugar de Nacimiento (Opcional)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormItem>
+              <FormLabel className="text-slate-600">Departamento</FormLabel>
+              <Select
+                onValueChange={(val) => {
+                  setDepBirth(val);
+                  fetchProvinces(Number(val), "Nacimiento");
+                  form.setValue("id_distrito_nacimiento", "");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments?.map((d) => (
+                    <SelectItem key={d.id} value={d.id.toString()}>
+                      {d.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+
+            <FormItem>
+              <FormLabel className="text-slate-600">Provincia</FormLabel>
+              <Select
+                disabled={!depBirth}
+                onValueChange={(val) => {
+                  setProvBirth(val);
+                  fetchDistricts(Number(val), "Nacimiento");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {provincesBirth?.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+
+            <FormField
+              control={form.control}
+              name="id_distrito_nacimiento"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-blue-700">
+                    Distrito
+                  </FormLabel>
+                  <Select
+                    disabled={!provBirth}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="border-blue-200 focus:ring-blue-400">
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {districtsBirth?.map((d) => (
+                        <SelectItem key={d.id} value={d.id.toString()}>
+                          {d.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Card>
+
+        {/* ================= UBIGEO INSTALACIÓN ================= */}
+        <Card className="p-5 space-y-4 bg-green-50/30 border-l-4 border-l-green-500 shadow-sm">
+          <h3 className="font-bold text-xs text-green-700 uppercase tracking-wider border-b border-green-200 pb-2">
+            Lugar de Instalación
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormItem>
+              <FormLabel>Departamento</FormLabel>
+              <Select
+                onValueChange={(val) => {
+                  setDepInst(val);
+                  fetchProvinces(Number(val), "Instalacion");
+                  form.setValue("id_distrito_instalacion", "");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments?.map((d) => (
+                    <SelectItem key={d.id} value={d.id.toString()}>
+                      {d.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+
+            <FormItem>
+              <FormLabel>Provincia</FormLabel>
+              <Select
+                disabled={!depInst}
+                onValueChange={(val) => {
+                  setProvInst(val);
+                  fetchDistricts(Number(val), "Instalacion");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {provincesInst?.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormItem>
+
+            <FormField
+              control={form.control}
+              name="id_distrito_instalacion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-green-700">
+                    Distrito (Final)
+                  </FormLabel>
+                  <Select
+                    disabled={!provInst}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="border-green-300 focus:ring-green-500">
+                        <SelectValue placeholder="Requerido" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {districtsInst?.map((d) => (
+                        <SelectItem key={d.id} value={d.id.toString()}>
+                          {d.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">Email</label>
-            <Input
-              type="email"
-              value={formData.cliente_email}
-              onChange={(e) =>
-                setFormData({ ...formData, cliente_email: e.target.value })
-              }
-              required
-              className="mt-1"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+            <FormField
+              control={form.control}
+              name="direccion_detalle"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Dirección Detallada</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Av. Principal..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="referencias"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Referencias</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Cerca del parque..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="coordenadas_gps"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Coordenadas GPS</FormLabel>
+                  <FormControl>
+                    <Input placeholder="-12.0464, -77.0428" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
+        </Card>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Nombre del Padre
-            </label>
-            <Input
-              value={formData.cliente_papa}
-              onChange={(e) =>
-                setFormData({ ...formData, cliente_papa: e.target.value })
-              }
-              required
-              className="mt-1"
+        {/* ================= DATOS DE VENTA ================= */}
+        <Card className="p-5 space-y-4 bg-white border-slate-200 shadow-sm">
+          <h3 className="font-bold text-xs text-slate-700 uppercase tracking-wider border-b pb-2">
+            Datos Operativos
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="id_producto"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Producto / Plan</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {products?.map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          {p.nombre_plan}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Nombre de la Madre
-            </label>
-            <Input
-              value={formData.cliente_mama}
-              onChange={(e) =>
-                setFormData({ ...formData, cliente_mama: e.target.value })
-              }
-              required
-              className="mt-1"
+            <FormField
+              control={form.control}
+              name="tecnologia"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tecnología</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="FTTH">FTTH (Fibra Óptica)</SelectItem>
+                      <SelectItem value="HFC">HFC (Cable)</SelectItem>
+                      <SelectItem value="WIRELESS">Wireless</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Fecha Nacimiento
-            </label>
-            <Input
-              type="date"
-              value={formData.cliente_fecha_nacimiento}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  cliente_fecha_nacimiento: e.target.value,
-                })
-              }
-              required
-              className="mt-1"
+            <FormField
+              control={form.control}
+              name="numero_instalacion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>N° de Instalación</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej. 971..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="plano"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plano Asignado</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Código..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="score_crediticio"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Score Crediticio</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: Verde" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="id_grabador_audios"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-bold text-slate-800">
+                    Grabador Responsable
+                  </FormLabel>
+                  {/* VINCULACIÓN DIRECTA Y LIMPIA */}
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="border-slate-300">
+                        <SelectValue placeholder="Seleccione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {engravers?.map((g) => (
+                        <SelectItem key={g.id} value={g.id.toString()}>
+                          {g.nombre_completo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="es_full_claro"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 md:col-span-2 bg-slate-50">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base font-bold">
+                      Cliente Full Claro
+                    </FormLabel>
+                    <FormDescription>
+                      Activa esta opción si el cliente aplica a beneficios Full
+                      Claro.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
             />
           </div>
+        </Card>
+
+        {/* ================= CONTROLES ================= */}
+        <div className="flex gap-3 p-4 bg-white/80 backdrop-blur-md border-t absolute bottom-0 left-0 right-0 z-50">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 bg-primary font-bold shadow-md"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              "Procesar Venta"
+            )}
+          </Button>
         </div>
-      </Card>
-
-      {/* ---------------- UBIGEO DE NACIMIENTO (CASCADA) ---------------- */}
-      <Card className="p-4 space-y-4 bg-slate-50 border-l-4 border-l-blue-400">
-        <h3 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
-          Lugar de Nacimiento
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500">
-              Departamento
-            </label>
-            <Select
-              onValueChange={(val) => {
-                setDepNac(val);
-                fetchProvincias(Number(val), "Nacimiento");
-                setFormData({ ...formData, id_distrito_nacimiento: 0 });
-              }}
-            >
-              <SelectTrigger className="mt-1 h-9">
-                <SelectValue placeholder="Seleccione" />
-              </SelectTrigger>
-              <SelectContent>
-                {departamentos.map((d) => (
-                  <SelectItem key={d.id} value={d.id.toString()}>
-                    {d.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500">
-              Provincia
-            </label>
-            <Select
-              disabled={!depNac}
-              onValueChange={(val) => {
-                setProvNac(val);
-                fetchDistritos(Number(val), "Nacimiento");
-              }}
-            >
-              <SelectTrigger className="mt-1 h-9">
-                <SelectValue placeholder="Seleccione" />
-              </SelectTrigger>
-              <SelectContent>
-                {provinciasNac.map((p) => (
-                  <SelectItem key={p.id} value={p.id.toString()}>
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-700 font-bold">
-              Distrito (Final)
-            </label>
-            <Select
-              disabled={!provNac}
-              onValueChange={(val) =>
-                setFormData({
-                  ...formData,
-                  id_distrito_nacimiento: Number(val),
-                })
-              }
-            >
-              <SelectTrigger className="mt-1 h-9 border-blue-300 focus:ring-blue-500">
-                <SelectValue placeholder="Requerido" />
-              </SelectTrigger>
-              <SelectContent>
-                {distritosNac.map((d) => (
-                  <SelectItem key={d.id} value={d.id.toString()}>
-                    {d.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </Card>
-
-      {/* ---------------- UBIGEO DE INSTALACIÓN Y DIRECCIÓN ---------------- */}
-      <Card className="p-4 space-y-4 bg-slate-50 border-l-4 border-l-green-400">
-        <h3 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
-          Ubicación de Instalación
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs font-medium text-slate-500">
-              Departamento
-            </label>
-            <Select
-              onValueChange={(val) => {
-                setDepInst(val);
-                fetchProvincias(Number(val), "Instalacion");
-                setFormData({ ...formData, id_distrito_instalacion: 0 });
-              }}
-            >
-              <SelectTrigger className="mt-1 h-9">
-                <SelectValue placeholder="Seleccione" />
-              </SelectTrigger>
-              <SelectContent>
-                {departamentos.map((d) => (
-                  <SelectItem key={d.id} value={d.id.toString()}>
-                    {d.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500">
-              Provincia
-            </label>
-            <Select
-              disabled={!depInst}
-              onValueChange={(val) => {
-                setProvInst(val);
-                fetchDistritos(Number(val), "Instalacion");
-              }}
-            >
-              <SelectTrigger className="mt-1 h-9">
-                <SelectValue placeholder="Seleccione" />
-              </SelectTrigger>
-              <SelectContent>
-                {provinciasInst.map((p) => (
-                  <SelectItem key={p.id} value={p.id.toString()}>
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-700 font-bold">
-              Distrito (Final)
-            </label>
-            <Select
-              disabled={!provInst}
-              onValueChange={(val) =>
-                setFormData({
-                  ...formData,
-                  id_distrito_instalacion: Number(val),
-                })
-              }
-            >
-              <SelectTrigger className="mt-1 h-9 border-green-300 focus:ring-green-500">
-                <SelectValue placeholder="Requerido" />
-              </SelectTrigger>
-              <SelectContent>
-                {distritosInst.map((d) => (
-                  <SelectItem key={d.id} value={d.id.toString()}>
-                    {d.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-          <div className="md:col-span-2">
-            <label className="text-sm font-medium text-slate-700">
-              Dirección Detallada
-            </label>
-            <Input
-              value={formData.direccion_detalle}
-              onChange={(e) =>
-                setFormData({ ...formData, direccion_detalle: e.target.value })
-              }
-              required
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Referencias
-            </label>
-            <Input
-              value={formData.referencias}
-              onChange={(e) =>
-                setFormData({ ...formData, referencias: e.target.value })
-              }
-              className="mt-1"
-              placeholder="Ej. Al lado del parque"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Coordenadas GPS
-            </label>
-            <Input
-              value={formData.coordenadas_gps}
-              onChange={(e) =>
-                setFormData({ ...formData, coordenadas_gps: e.target.value })
-              }
-              className="mt-1"
-              placeholder="-12.0464, -77.0428"
-            />
-          </div>
-          <div className="flex items-center gap-3 mt-4">
-            <Switch
-              checked={formData.es_full_claro}
-              onCheckedChange={(c) =>
-                setFormData({ ...formData, es_full_claro: c })
-              }
-            />
-            <label className="text-sm font-medium text-slate-700">
-              ¿Es Full Claro?
-            </label>
-          </div>
-        </div>
-      </Card>
-
-      {/* ---------------- DATOS DE VENTA ---------------- */}
-      <Card className="p-4 space-y-4 bg-slate-50">
-        <h3 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
-          Datos de Venta
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Producto
-            </label>
-            <Select
-              onValueChange={(val) =>
-                setFormData({ ...formData, id_producto: Number(val) })
-              }
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecciona producto" />
-              </SelectTrigger>
-              <SelectContent>
-                {productos.map((prod) => (
-                  <SelectItem key={prod.id} value={prod.id.toString()}>
-                    {prod.nombre_plan}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Tecnología
-            </label>
-            <Select
-              onValueChange={(val) =>
-                setFormData({ ...formData, tecnologia: val })
-              }
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecciona tecnología" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FTTH">FTTH (Fibra Óptica)</SelectItem>
-                <SelectItem value="HFC">HFC (Cable)</SelectItem>
-                <SelectItem value="WIRELESS">Wireless</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              N° Instalación
-            </label>
-            <Input
-              value={formData.numero_instalacion}
-              onChange={(e) =>
-                setFormData({ ...formData, numero_instalacion: e.target.value })
-              }
-              required
-              className="mt-1"
-              placeholder="Ej. 971100852"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">Plano</label>
-            <Input
-              value={formData.plano}
-              onChange={(e) =>
-                setFormData({ ...formData, plano: e.target.value })
-              }
-              required
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Score Crediticio
-            </label>
-            <Input
-              type="text"
-              value={formData.score_crediticio}
-              onChange={(e) =>
-                setFormData({ ...formData, score_crediticio: e.target.value })
-              }
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">
-              Grabador Audio
-            </label>
-            <Select
-              onValueChange={(val) =>
-                setFormData({ ...formData, id_grabador_audios: Number(val) })
-              }
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecciona grabador" />
-              </SelectTrigger>
-              <SelectContent>
-                {grabadores.map((grab) => (
-                  <SelectItem key={grab.id} value={grab.id.toString()}>
-                    {grab.nombre_completo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </Card>
-
-      {/* ---------------- BOTONES ---------------- */}
-      <div className="flex gap-3 pt-4">
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex-1 bg-blue-600 hover:bg-blue-700"
-        >
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            "Guardar Venta"
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isSubmitting}
-          className="flex-1"
-        >
-          Cancelar
-        </Button>
-      </div>
-    </form>
+      </form>
+    </Form>
   );
 }

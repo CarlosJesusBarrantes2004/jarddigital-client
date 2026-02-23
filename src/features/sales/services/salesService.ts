@@ -1,46 +1,45 @@
 import { api } from "@/api/axios";
+
 import type {
-  Venta,
-  VentaPayload,
+  Sale,
+  SalePayload,
   BackofficePayload,
-  CatalogoItem,
-  ProductoItem,
+  CatalogItem,
+  ProductItem,
 } from "../types";
 
 export const salesService = {
-  // Transacciones
-  getVentas: async (params?: any) => {
-    const { data } = await api.get<Venta[]>("/sales/ventas/", { params });
+  getSales: async (params?: Record<string, string>) => {
+    const { data } = await api.get<Sale[]>("/sales/ventas/", { params });
     return data;
   },
-  createVenta: async (payload: VentaPayload) => {
-    const { data } = await api.post<Venta>("/sales/ventas/", payload);
+  createSale: async (payload: SalePayload) => {
+    const { data } = await api.post<Sale>("/sales/ventas/", payload);
     return data;
   },
-  updateVentaBackoffice: async (id: number, payload: BackofficePayload) => {
-    const { data } = await api.patch<Venta>(`/sales/ventas/${id}/`, payload);
+  updateSaleByBackoffice: async (id: number, payload: BackofficePayload) => {
+    const { data } = await api.patch<Sale>(`/sales/ventas/${id}/`, payload);
     return data;
   },
 
-  // Catálogos
-  getProductos: async () => {
-    const { data } = await api.get<ProductoItem[]>("/sales/productos/");
+  getProducts: async () => {
+    const { data } = await api.get<ProductItem[]>("/sales/productos/");
     return data;
   },
-  getGrabadores: async () => {
+  getEngravers: async () => {
     const { data } = await api.get<any[]>("/sales/grabadores/");
-    return data; // Mapear 'nombre_completo' en el frontend
-  },
-  getEstadosSOT: async () => {
-    const { data } = await api.get<CatalogoItem[]>("/sales/estados-sot/");
     return data;
   },
-  getSubEstadosSOT: async () => {
-    const { data } = await api.get<CatalogoItem[]>("/sales/sub-estados-sot/");
+  getSOTStates: async () => {
+    const { data } = await api.get<CatalogItem[]>("/sales/estados-sot/");
     return data;
   },
-  getEstadosAudio: async () => {
-    const { data } = await api.get<CatalogoItem[]>("/sales/estados-audio/");
+  getSOTSubStates: async () => {
+    const { data } = await api.get<CatalogItem[]>("/sales/sub-estados-sot/");
+    return data;
+  },
+  getAudioStates: async () => {
+    const { data } = await api.get<CatalogItem[]>("/sales/estados-audio/");
     return data;
   },
 };

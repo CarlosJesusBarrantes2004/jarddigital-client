@@ -37,8 +37,6 @@ interface SalesTableProps {
 export function SalesTable({ ventas, userRole, onAction }: SalesTableProps) {
   const canManage = ["BACKOFFICE", "DUENO", "SUPERVISOR"].includes(userRole);
 
-  console.log(ventas);
-
   return (
     <Card className="overflow-hidden bg-white border-slate-200">
       <div className="overflow-x-auto">
