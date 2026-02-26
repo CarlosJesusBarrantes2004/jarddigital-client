@@ -11,7 +11,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-import type { Sale } from "../types";
+import type { Sale } from "../types/sales.types";
 
 interface SaleDetailViewerProps {
   sale: Sale;

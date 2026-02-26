@@ -26,9 +26,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   backofficeFormSchema,
   type BackofficeFormData,
-} from "../schemas/saleSchema";
+} from "../schemas/venta.schema";
 
-import type { BackofficePayload, CatalogItem, Sale } from "../types";
+import type {
+  BackofficePayload,
+  CatalogItem,
+  Sale,
+} from "../types/sales.types";
 
 interface BackofficeFormProps {
   sale: Sale;

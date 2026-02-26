@@ -1,101 +1,217 @@
-import { useState, useEffect, useCallback } from "react";
-import { toast } from "sonner";
-
-import { extractApiError } from "@/lib/api-errors";
-
-import { salesService } from "../services/salesService";
-
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  salesService,
+  catalogosService,
+  ubigeoService,
+} from "../services/sales.service";
 import type {
-  BackofficePayload,
-  CatalogItem,
-  ProductItem,
-  Sale,
-  SalePayload,
-} from "../types";
+  Venta,
+  VentaFiltros,
+  CreateVentaPayload,
+  UpdateVentaPayload,
+  EstadisticasAsesor,
+} from "../types/sales.types";
 
-export const useSales = () => {
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [loading, setLoading] = useState(true);
+// ==========================================
+// QUERY KEYS
+// ==========================================
 
-  const [products, setProducts] = useState<ProductItem[]>([]);
-  const [engravers, setEngravers] = useState<any[]>([]);
-  const [sotStates, setSotStates] = useState<CatalogItem[]>([]);
-  const [subStates, setSubStates] = useState<CatalogItem[]>([]);
-  const [audioStates, setAudioStates] = useState<CatalogItem[]>([]);
+export const salesKeys = {
+  all: ["ventas"] as const,
+  lists: () => [...salesKeys.all, "list"] as const,
+  list: (filtros?: VentaFiltros) => [...salesKeys.lists(), filtros] as const,
+  detail: (id: number) => [...salesKeys.all, "detail", id] as const,
 
-  const fetchInitialData = useCallback(async () => {
-    setLoading(true);
+  catalogos: {
+    estadosSOT: ["catalogos", "estados-sot"] as const,
+    subEstadosSOT: ["catalogos", "sub-estados-sot"] as const,
+    estadosAudio: ["catalogos", "estados-audio"] as const,
+    productos: ["catalogos", "productos"] as const,
+    grabadores: ["catalogos", "grabadores"] as const,
+    tiposDocumento: ["catalogos", "tipos-documento"] as const,
+  },
 
-    try {
-      const [
-        salesData,
-        productsData,
-        engraversData,
-        sotStatesData,
-        subStatesData,
-        audioStatesData,
-      ] = await Promise.all([
-        salesService.getSales(),
-        salesService.getProducts(),
-        salesService.getEngravers(),
-        salesService.getSOTStates(),
-        salesService.getSOTSubStates(),
-        salesService.getAudioStates(),
-      ]);
-
-      setSales(salesData);
-      setProducts(productsData);
-      setEngravers(engraversData);
-      setSotStates(sotStatesData);
-      setSubStates(subStatesData);
-      setAudioStates(audioStatesData);
-    } catch (error) {
-      console.error("Error cargando datos de ventas:", error);
-      toast.error("Error de coneción al cargar el dashboard de ventas.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
-
-  const createSale = async (payload: SalePayload) => {
-    try {
-      await salesService.createSale(payload);
-      await fetchInitialData();
-      toast.success("Venta ingresada correctamente.");
-      return true;
-    } catch (error) {
-      console.error("Error al crear venta:", error);
-      toast.error(extractApiError(error));
-      return false;
-    }
-  };
-
-  const updateBackoffice = async (id: number, payload: BackofficePayload) => {
-    try {
-      await salesService.updateSaleByBackoffice(id, payload);
-      await fetchInitialData();
-      toast.success("Gestión operativa guardada.");
-      return true;
-    } catch (error) {
-      console.error("Error Backoffice:", error);
-      toast.error(extractApiError(error));
-      return false;
-    }
-  };
-
-  return {
-    sales,
-    loading,
-    products,
-    engravers,
-    sotStates,
-    subStates,
-    audioStates,
-    createSale,
-    updateBackoffice,
-  };
+  ubigeo: {
+    departamentos: ["ubigeo", "departamentos"] as const,
+    provincias: (depId: number) => ["ubigeo", "provincias", depId] as const,
+    distritos: (provId: number) => ["ubigeo", "distritos", provId] as const,
+    distritoById: (id: number) => ["ubigeo", "distrito", id] as const,
+  },
 };
+
+// ==========================================
+// VENTAS QUERIES
+// ==========================================
+
+export function useVentas(filtros?: VentaFiltros) {
+  return useQuery({
+    queryKey: salesKeys.list(filtros),
+    queryFn: () => salesService.getVentas(filtros),
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useVenta(id: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: salesKeys.detail(id),
+    queryFn: () => salesService.getVenta(id),
+    enabled: !!id,
+    ...options,
+  });
+}
+
+// ==========================================
+// ESTADÍSTICAS ASESOR (calculadas del query)
+// ==========================================
+
+export function useEstadisticasAsesor(): {
+  stats: EstadisticasAsesor;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useVentas();
+
+  const ventas = data?.results ?? [];
+  const stats: EstadisticasAsesor = {
+    total: data?.count ?? 0,
+    atendidas: ventas.filter(
+      (v) => v.codigo_estado?.toUpperCase() === "ATENDIDO",
+    ).length,
+    en_ejecucion: ventas.filter(
+      (v) => v.codigo_estado?.toUpperCase() === "EJECUCION",
+    ).length,
+    rechazadas: ventas.filter(
+      (v) => v.codigo_estado?.toUpperCase() === "RECHAZADO",
+    ).length,
+    pendientes: ventas.filter((v) => v.id_estado_sot === null).length,
+  };
+
+  return { stats, isLoading };
+}
+
+// ==========================================
+// MUTACIONES
+// ==========================================
+
+export function useCreateVenta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateVentaPayload) =>
+      salesService.createVenta(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: salesKeys.lists() });
+    },
+  });
+}
+
+export function useUpdateVenta(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdateVentaPayload) =>
+      salesService.updateVenta(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: salesKeys.lists() });
+      qc.invalidateQueries({ queryKey: salesKeys.detail(id) });
+    },
+  });
+}
+
+export function useDeleteVenta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => salesService.deleteVenta(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: salesKeys.lists() });
+    },
+  });
+}
+
+// ==========================================
+// CATÁLOGOS QUERIES
+// ==========================================
+
+export function useEstadosSOT() {
+  return useQuery({
+    queryKey: salesKeys.catalogos.estadosSOT,
+    queryFn: catalogosService.getEstadosSOT,
+    staleTime: Infinity,
+  });
+}
+
+export function useSubEstadosSOT() {
+  return useQuery({
+    queryKey: salesKeys.catalogos.subEstadosSOT,
+    queryFn: catalogosService.getSubEstadosSOT,
+    staleTime: Infinity,
+  });
+}
+
+export function useEstadosAudio() {
+  return useQuery({
+    queryKey: salesKeys.catalogos.estadosAudio,
+    queryFn: catalogosService.getEstadosAudio,
+    staleTime: Infinity,
+  });
+}
+
+export function useProductos() {
+  return useQuery({
+    queryKey: salesKeys.catalogos.productos,
+    queryFn: catalogosService.getProductos,
+    staleTime: Infinity,
+  });
+}
+
+export function useGrabadores() {
+  return useQuery({
+    queryKey: salesKeys.catalogos.grabadores,
+    queryFn: catalogosService.getGrabadores,
+    staleTime: 1000 * 60 * 5, // 5 min
+  });
+}
+
+export function useTiposDocumento() {
+  return useQuery({
+    queryKey: salesKeys.catalogos.tiposDocumento,
+    queryFn: catalogosService.getTiposDocumento,
+    staleTime: Infinity,
+  });
+}
+
+// ==========================================
+// UBIGEO QUERIES (cascada)
+// ==========================================
+
+export function useDepartamentos() {
+  return useQuery({
+    queryKey: salesKeys.ubigeo.departamentos,
+    queryFn: ubigeoService.getDepartamentos,
+    staleTime: Infinity,
+  });
+}
+
+export function useProvincias(departamentoId: number | null | undefined) {
+  return useQuery({
+    queryKey: salesKeys.ubigeo.provincias(departamentoId!),
+    queryFn: () => ubigeoService.getProvincias(departamentoId!),
+    enabled: !!departamentoId,
+    staleTime: Infinity,
+  });
+}
+
+export function useDistritos(provinciaId: number | null | undefined) {
+  return useQuery({
+    queryKey: salesKeys.ubigeo.distritos(provinciaId!),
+    queryFn: () => ubigeoService.getDistritos(provinciaId!),
+    enabled: !!provinciaId,
+    staleTime: Infinity,
+  });
+}
+
+export function useDistritoById(distritoId: number | null | undefined) {
+  return useQuery({
+    queryKey: salesKeys.ubigeo.distritoById(distritoId!),
+    queryFn: () => ubigeoService.getDistritoById(distritoId!),
+    enabled: !!distritoId,
+    staleTime: Infinity,
+  });
+}

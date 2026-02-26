@@ -63,7 +63,6 @@ export const LoginPage = () => {
 
       console.error("⛔ Error de Auth:", error.response?.data || error.message);
 
-      // Lanzamos el Toast de error
       toast.error(errorMsg);
     } finally {
       setIsLoading(false);

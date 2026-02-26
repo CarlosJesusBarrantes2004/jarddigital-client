@@ -25,9 +25,12 @@ import { Switch } from "@/components/ui/switch";
 import { useUbigeo } from "@/features/core/hooks/useUbigeos";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { newSaleFormSchema, type NewSaleFormData } from "../schemas/saleSchema";
+import {
+  newSaleFormSchema,
+  type NewSaleFormData,
+} from "../schemas/venta.schema";
 
-import type { ProductItem, SalePayload } from "../types";
+import type { ProductItem, SalePayload } from "../types/sales.types";
 
 interface NewSaleFormProps {
   products: ProductItem[];

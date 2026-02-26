@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Venta } from "../types";
+import type { Venta } from "../types/sales.types";
 
 export function EstadoBadge({ estado }: { estado: string }) {
   const colors: Record<string, string> = {

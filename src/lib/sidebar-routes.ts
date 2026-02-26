@@ -1,5 +1,5 @@
 import type { role_code } from "@/features/auth/types";
-import { LayoutDashboard, Users, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Settings, ShoppingBag } from "lucide-react";
 
 type RoleArray = role_code[];
 
@@ -21,11 +21,22 @@ export const sidebarSections = [
           "ASESOR",
         ] as RoleArray,
       },
-      // RRHH no ve ventas
+    ],
+  },
+  {
+    title: "Comercial",
+    icon: ShoppingBag,
+    collapsible: true,
+    items: [
       {
-        label: "Ventas",
+        label: "Mis Ventas",
         href: "/sales",
-        roles: ["DUENO", "SUPERVISOR", "BACKOFFICE", "ASESOR"] as RoleArray,
+        roles: ["ASESOR"], // el asesor ve "Mis Ventas"
+      },
+      {
+        label: "Gestión de Ventas",
+        href: "/sales",
+        roles: ["BACKOFFICE", "SUPERVISOR", "DUENO"], // los demás ven "Gestión"
       },
     ],
   },
