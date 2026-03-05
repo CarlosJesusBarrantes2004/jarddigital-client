@@ -169,11 +169,15 @@ export function buildColumnsBackoffice(
     {
       accessorKey: "fecha_visita_programada",
       header: "Visita",
-      cell: ({ row }) =>
-        row.original.fecha_visita_programada ? (
+      cell: ({ row }) => {
+        // Extraemos el string de la fecha que llega del backend ("YYYY-MM-DD")
+        const fechaStr = row.original.fecha_visita_programada;
+        
+        return fechaStr ? (
           <span className="text-[13px] text-foreground/80">
             {format(
-              new Date(row.original.fecha_visita_programada),
+              // EL PARCHE CRÍTICO: Añadimos T00:00:00 para forzar el Timezone Local
+              new Date(`${fechaStr}T00:00:00`), 
               "dd MMM yyyy",
               { locale: es },
             )}
@@ -182,7 +186,8 @@ export function buildColumnsBackoffice(
           <span className="text-[10px] text-muted-foreground/40">
             Sin programar
           </span>
-        ),
+        );
+      },
     },
     {
       accessorKey: "fecha_creacion",

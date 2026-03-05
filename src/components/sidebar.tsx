@@ -221,12 +221,37 @@ const NavSection = ({
 };
 
 const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
+  
   const { user, activeWorkspace, selectWorkspace } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  
   const workspaces: Workspace[] = user?.sucursales ?? [];
+  const isBackoffice = user?.rol?.codigo === "BACKOFFICE";
 
   if (workspaces.length === 0) return null;
+
+  // ---> NUEVA LÓGICA: BLOQUEO VISUAL PARA BACKOFFICE <---
+  if (isBackoffice) {
+    return (
+      <div
+        className="w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground opacity-80 cursor-default"
+        title="Vista Global Backoffice"
+      >
+        <Building2 size={14} className="shrink-0" />
+        {expanded && (
+          <div className="flex-1 overflow-hidden text-left">
+            <span className="block text-[13px] font-medium text-sidebar-foreground truncate leading-snug">
+              Vista Global
+            </span>
+            <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate">
+              Tus Sedes Asignadas
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const handleSelect = (ws: Workspace) => {
     selectWorkspace(ws);

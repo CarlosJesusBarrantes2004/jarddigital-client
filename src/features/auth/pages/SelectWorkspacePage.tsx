@@ -1,15 +1,29 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, ChevronRight, Layers, LogOut } from "lucide-react";
-
 import { useAuth } from "../context/useAuth";
-
 import type { Workspace } from "../types";
 
 export const SelectWorkspacePage = () => {
   const navigate = useNavigate();
-  const { user, selectWorkspace, logout } = useAuth();
-
+  
+  // 1. Extraemos activeWorkspace para usarlo como candado
+  const { user, activeWorkspace, selectWorkspace, logout } = useAuth();
+  
   const workspaces: Workspace[] = user?.sucursales ?? [];
+
+  useEffect(() => {
+    if (user?.rol?.codigo === "BACKOFFICE") {
+      // 2. CANDADO CRÍTICO: Solo seteamos la sede si NO hay una ya activa
+      if (workspaces.length > 0 && !activeWorkspace) {
+        selectWorkspace(workspaces[0]);
+      }
+      // 3. Usamos replace: true para no ensuciar el historial de navegación
+      navigate("/dashboard", { replace: true });
+    }
+  // 4. Deshabilitamos la regla de dependencias exhaustivas aquí para evitar el loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeWorkspace, navigate]);
 
   const handleSelect = (workspace: Workspace) => {
     selectWorkspace(workspace);
@@ -21,6 +35,8 @@ export const SelectWorkspacePage = () => {
     navigate("/auth/login");
   };
 
+  // Evitamos el parpadeo visual mientras se redirige al Backoffice
+  if (user?.rol?.codigo === "BACKOFFICE") return null;
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-background font-sans p-8 overflow-hidden transition-colors duration-300">
       {/* Fondo Atmosférico Celeste */}
