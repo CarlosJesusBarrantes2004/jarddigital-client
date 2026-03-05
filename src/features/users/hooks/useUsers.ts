@@ -36,11 +36,12 @@ export const useUsers = () => {
       const currentCode = currentUser?.rol?.codigo;
 
       let available = allRoles.filter((r) => r.codigo !== "DUENO");
+
       if (currentCode === "SUPERVISOR") {
         available = available.filter((r) => r.codigo === "ASESOR");
       } else if (currentCode === "RRHH") {
         available = available.filter((r) =>
-          ["ASESOR", "SUPERVISOR"].includes(r.codigo),
+          ["ASESOR", "SUPERVISOR", "BACKOFFICE"].includes(r.codigo),
         );
       }
       setRoles(available);

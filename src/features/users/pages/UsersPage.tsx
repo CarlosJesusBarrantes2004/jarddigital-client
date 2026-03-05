@@ -48,8 +48,10 @@ export const UsersPage = () => {
     deactivateUser,
   } = useUsers();
 
+  console.log(currentUser);
   console.log(users);
   console.log(roles);
+  console.log(workspaceOptions);
 
   const isDueno = currentUser?.rol?.codigo === "DUENO";
 

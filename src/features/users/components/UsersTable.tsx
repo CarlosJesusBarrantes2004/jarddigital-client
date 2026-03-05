@@ -35,6 +35,8 @@ const ROLE_META: Record<string, { label: string; bg: string; color: string }> =
 function getRoleMeta(roles: Role[], idRol: number) {
   if (idRol === 1) return ROLE_META.DUENO;
 
+  if (idRol === 3) return ROLE_META.RRHH;
+
   const role = roles.find((r) => r.id === idRol);
 
   if (!role)

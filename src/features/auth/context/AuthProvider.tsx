@@ -6,7 +6,7 @@ import { AuthContext } from "./AuthContext";
 
 import type { ActiveWorkspace, User, Workspace } from "../types";
 
-const SESSION_KEY_WORKSPACE = "jard:activeWorkspace";
+export const SESSION_KEY_WORKSPACE = "jard:activeWorkspace";
 
 function buildActiveWorkspace(workspace: Workspace): ActiveWorkspace {
   return {

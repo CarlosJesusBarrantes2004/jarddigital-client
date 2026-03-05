@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { userService } from "../services/userService";
@@ -14,10 +14,12 @@ import type {
   WorkspaceOption,
 } from "../types";
 import { Switch } from "@/components/ui/switch";
+import { SESSION_KEY_WORKSPACE } from "@/features/auth/context/AuthProvider";
 
 interface UserFormProps {
   user?: User;
   roles: Role[];
+  currentUser: User | null;
   onSave: (
     data: CreateUserPayload | UpdateUserPayload,
     isSupervisor: boolean,
@@ -63,12 +65,18 @@ const ROLE_BADGE: Record<
   },
 };
 
-export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
+export const UserForm = ({
+  user,
+  roles,
+  currentUser,
+  onSave,
+  onCancel,
+}: UserFormProps) => {
   const isEditing = !!user;
 
-  const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>(
-    [],
-  );
+  const [rawWorkspaceOptions, setRawWorkspaceOptions] = useState<
+    WorkspaceOption[]
+  >([]);
   const [loadingWs, setLoadingWs] = useState(true);
   const [selectedWsIds, setSelectedWsIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,16 +108,53 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
   const isOwner = roleCode === "DUENO";
   const needsWorkspace = !isOwner && watchedRolId !== 0; // Solo pide sede si ya eligió rol y no es dueño
 
+  const isRestrictedUser =
+    currentUser?.rol?.codigo === "SUPERVISOR" ||
+    currentUser?.rol?.codigo === "RRHH";
+
+  const activeSessionSede = useMemo(() => {
+    try {
+      const item = sessionStorage.getItem(SESSION_KEY_WORKSPACE);
+      return item ? JSON.parse(item) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const activeWsId = activeSessionSede?.id_modalidad_sede;
+
+  const workspaceOptions = useMemo(() => {
+    // Si el usuario actual es DUENO, ve todas las sedes.
+    if (currentUser?.rol?.codigo === "DUENO") {
+      return rawWorkspaceOptions;
+    }
+
+    // Si es SUPERVISOR o RRHH, extraemos los IDs de las sedes a las que pertenece
+    const sedesPermitidasIds =
+      currentUser?.sucursales?.map((s) => s.id_modalidad_sede) || [];
+
+    // Y filtramos las opciones crudas del backend
+    return rawWorkspaceOptions.filter((ws) =>
+      sedesPermitidasIds.includes(ws.id),
+    );
+  }, [rawWorkspaceOptions, currentUser]);
+
   // ── Cargar opciones de workspace ─────────────
   useEffect(() => {
     userService
       .getWorkspaceOptions()
       .then((opts) => {
-        setWorkspaceOptions(opts);
+        setRawWorkspaceOptions(opts);
         if (user?.sucursales) {
           setSelectedWsIds(user.sucursales.map((s) => s.id_modalidad_sede));
-        } else if (!isEditing && roles.length > 0 && watchedRolId === 0) {
-          setValue("id_rol", roles[0].id);
+        } else {
+          if (roles.length > 0 && watchedRolId === 0)
+            setValue("id_rol", roles[0].id);
+
+          // Si quien crea es Supervisor/RRHH, le pre-seleccionamos obligatoriamente su sede de sesión
+          if (isRestrictedUser && activeWsId) {
+            setSelectedWsIds([activeWsId]);
+          }
         }
       })
       .catch(console.error)
@@ -118,10 +163,15 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
 
   // Cuando cambia el rol
   useEffect(() => {
-    if (isOwner) setSelectedWsIds([]);
-    if (isAdvisor && selectedWsIds.length > 1)
+    if (isOwner) {
+      setSelectedWsIds([]);
+    } else if (isRestrictedUser && activeWsId && !isEditing) {
+      // Forzar Sede activa siempre
+      setSelectedWsIds([activeWsId]);
+    } else if (isAdvisor && selectedWsIds.length > 1) {
       setSelectedWsIds([selectedWsIds[0]]);
-  }, [isOwner, isAdvisor]); // eslint-disable-line react-hooks/exhaustive-deps
+    }
+  }, [isOwner, isAdvisor, isRestrictedUser, activeWsId, isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Toggle de workspace ───────────────────────
   const toggleWorkspace = (wsId: number) => {
@@ -311,9 +361,16 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
       {needsWorkspace && (
         <div className="bg-card border-l-4 border-l-primary border-y border-r border-y-border border-r-border rounded-2xl p-5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center justify-between mb-4">
-            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground m-0">
-              Sedes asignadas
-            </p>
+            <div>
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-foreground m-0">
+                Sedes asignadas
+              </p>
+              {isRestrictedUser && !isEditing && (
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Asignación fija para tu sesión actual.
+                </p>
+              )}
+            </div>
             {isAdvisor && (
               <span className="text-[10px] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5 uppercase tracking-[0.06em]">
                 Solo 1 sede
@@ -332,15 +389,23 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
             <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full">
               {workspaceOptions.map((ws) => {
                 const isSelected = selectedWsIds.includes(ws.id);
+                // Si el usuario es supervisor/rrhh y estamos creando, se bloquean los clicks
+                const isLocked = isRestrictedUser && !isEditing;
+
                 return (
                   <div
                     key={ws.id}
-                    onClick={() => toggleWorkspace(ws.id)}
+                    onClick={() => {
+                      if (!isLocked) toggleWorkspace(ws.id);
+                    }}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200",
+                      "flex items-center gap-3 p-3 rounded-xl border transition-all duration-200",
                       isSelected
                         ? "bg-primary/10 border-primary/30"
-                        : "bg-background border-border hover:bg-muted hover:border-primary/20",
+                        : "bg-background border-border",
+                      isLocked
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer hover:bg-muted hover:border-primary/20",
                     )}
                   >
                     <div
@@ -353,7 +418,7 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
                     >
                       {isSelected && <Check size={12} strokeWidth={3} />}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 flex justify-between items-center">
                       <span
                         className={cn(
                           "block text-[13px] font-medium transition-colors",
@@ -362,13 +427,22 @@ export const UserForm = ({ user, roles, onSave, onCancel }: UserFormProps) => {
                       >
                         {ws.etiqueta}
                       </span>
+                      {isLocked && isSelected && (
+                        <Lock size={12} className="text-primary/50" />
+                      )}
                     </div>
                   </div>
                 );
               })}
+
+              {workspaceOptions.length === 0 && (
+                <p className="text-[12px] text-muted-foreground text-center py-4 bg-muted/50 rounded-lg">
+                  No tienes sedes asignadas para otorgar acceso.
+                </p>
+              )}
             </div>
           )}
-          {selectedWsIds.length === 0 && (
+          {selectedWsIds.length === 0 && workspaceOptions.length > 0 && (
             <p className="text-[11px] text-destructive flex items-center gap-1 mt-2">
               <AlertCircle size={11} /> Selecciona al menos una sede
             </p>

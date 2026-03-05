@@ -107,29 +107,34 @@ export function RoleForm({
             <FormField
               control={form.control}
               name="nivel_jerarquia"
-              render={({ field }) => (
-                <FormItem className="flex flex-col gap-1.5 space-y-0">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
-                    Nivel Jerárquico
-                  </label>
-                  <FormControl>
-                    <input
-                      type="number"
-                      min="1"
-                      max="5"
-                      placeholder="1 = Mayor"
-                      className={cn(
-                        "h-11 bg-background border rounded-xl px-3.5 font-mono text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
-                        form.formState.errors.nivel_jerarquia
-                          ? "border-destructive"
-                          : "border-border",
-                      )}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-[11px] text-destructive flex items-center gap-1" />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const isOwner = role?.codigo === "DUENO";
+
+                return (
+                  <FormItem className="flex flex-col gap-1.5 space-y-0">
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
+                      Nivel Jerárquico
+                    </label>
+                    <FormControl>
+                      <input
+                        type="number"
+                        min="1"
+                        max="5"
+                        placeholder="1 = Mayor"
+                        disabled={isOwner}
+                        className={cn(
+                          "h-11 bg-background border rounded-xl px-3.5 font-mono text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                          form.formState.errors.nivel_jerarquia
+                            ? "border-destructive"
+                            : "border-border",
+                        )}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-[11px] text-destructive flex items-center gap-1" />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField
