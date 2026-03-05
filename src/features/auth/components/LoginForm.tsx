@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
 
-import { loginFormSchema, type LoginFormData } from "../schemas/authSchema";
+import { loginFormSchema, type LoginFormData } from "../schemas/loginSchema";
 
 interface LoginFormProps {
   onSubmit: (credentials: LoginFormData) => Promise<void>;

@@ -26,13 +26,15 @@ export const CorporativeConfigPage = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+    <div className="font-sans min-h-screen p-8 max-w-[1200px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* ── Header ── */}
+      <div className="mb-8">
+        <h1 className="font-serif text-[clamp(1.6rem,3vw,2.25rem)] font-bold text-foreground leading-tight mb-2 tracking-tight">
           Configuración Corporativa
         </h1>
-        <p className="text-slate-500 mt-1 font-medium text-sm sm:text-base">
-          Gestiona sucursales, modalidades operativas y roles del sistema.
+        <p className="text-sm text-muted-foreground font-light max-w-2xl">
+          Arquitectura del sistema. Gestiona las sucursales operativas,
+          modalidades de atención y roles de seguridad.
         </p>
       </div>
 
@@ -41,48 +43,53 @@ export const CorporativeConfigPage = () => {
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-3 lg:w-[600px] h-11 p-1 bg-slate-100/80 rounded-lg">
+        {/* Selector de Tabs Premium */}
+        <TabsList className="flex w-full md:w-fit p-1.5 bg-card/80 backdrop-blur-md border border-border rounded-2xl h-auto shadow-sm">
           <TabsTrigger
             value="sucursales"
-            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md transition-all"
+            className="flex-1 md:flex-none gap-2.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none transition-all duration-300"
           >
-            <Building2 className="w-4 h-4" />
-            <span className="hidden sm:inline font-semibold">Sucursales</span>
+            <Building2 size={16} />
+            <span className="hidden sm:inline">Sucursales</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="modalidades"
-            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md transition-all"
+            className="flex-1 md:flex-none gap-2.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none transition-all duration-300"
           >
-            <Smartphone className="w-4 h-4" />
-            <span className="hidden sm:inline font-semibold">Modalidades</span>
+            <Smartphone size={16} />
+            <span className="hidden sm:inline">Modalidades</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="roles"
-            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md transition-all"
+            className="flex-1 md:flex-none gap-2.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none transition-all duration-300"
           >
-            <Shield className="w-4 h-4" />
-            <span className="hidden sm:inline font-semibold">Roles</span>
+            <Shield size={16} />
+            <span className="hidden sm:inline">Roles</span>
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-6 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        {/* Contenidos */}
+        <div className="mt-8 relative ring-offset-background focus-visible:outline-none">
           <TabsContent
             value="sucursales"
-            className="m-0 border-none outline-none"
+            className="m-0 border-none outline-none data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 duration-300"
           >
             <BranchesManager />
           </TabsContent>
 
           <TabsContent
             value="modalidades"
-            className="m-0 border-none outline-none"
+            className="m-0 border-none outline-none data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 duration-300"
           >
             <ModalitiesManager />
           </TabsContent>
 
-          <TabsContent value="roles" className="m-0 border-none outline-none">
+          <TabsContent
+            value="roles"
+            className="m-0 border-none outline-none data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 duration-300"
+          >
             <RolesManager />
           </TabsContent>
         </div>

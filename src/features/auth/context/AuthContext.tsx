@@ -1,18 +1,18 @@
 import { createContext } from "react";
-import type { Branch, User } from "../types";
 
-interface AuthContextType {
+import type { ActiveWorkspace, User, Workspace } from "../types";
+
+export interface AuthContextValue {
   user: User | null;
-  currentBranch: { id: number; name: string } | null;
-  currentModality: { id: number; name: string } | null;
+  activeWorkspace: ActiveWorkspace | null;
   isAuthenticated: boolean;
-  loading: boolean;
-  login: (user: User) => void;
+  isLoading: boolean;
+  setUser: (user: User) => void;
+  selectWorkspace: (workspace: Workspace) => void;
   logout: () => Promise<void>;
-  selectBranch: (branch: Branch) => void;
   checkAuth: () => Promise<User | null>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(
+export const AuthContext = createContext<AuthContextValue | undefined>(
   undefined,
 );

@@ -24,6 +24,8 @@ export const useRoles = () => {
     }
   }, []);
 
+  console.log(roles);
+
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);

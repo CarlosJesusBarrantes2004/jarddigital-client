@@ -1,129 +1,434 @@
-import { useEffect } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
 import {
+  X,
   Loader2,
   Lock,
+  RefreshCw,
   AlertTriangle,
-  Info,
+  ChevronDown,
   Play,
+  Pause,
   CheckCircle2,
   XCircle,
-  Volume2,
+  FileAudio,
+  User,
+  Settings,
+  Clock,
+  MessageSquare,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 import {
-  updateVentaBackofficeSchema,
-  type UpdateVentaBackofficeValues,
-} from "../../schemas/venta.schema";
-import {
-  useUpdateVenta,
+  useUpdateVentaBackoffice,
   useEstadosSOT,
   useSubEstadosSOT,
   useEstadosAudio,
 } from "../../hooks/useSales";
-import type { Venta, AudioVenta } from "../../types/sales.types";
-import { EstadoBadge } from "../EstadoBadge";
+import type { Venta, EstadoSOT } from "../../types/sales.types";
+import { Button } from "@/components/ui/button";
 
-// ── Campo solo lectura con candado ────────────────────────────────────────────
-function Campo({ label, value }: { label: string; value?: string | null }) {
+// ── Schema de validación ──────────────────────────────────────────────────────
+const schema = z.object({
+  codigo_sec: z.string().optional(),
+  codigo_sot: z.string().optional(),
+  fecha_visita_programada: z.string().nullable().optional(),
+  bloque_horario: z.string().nullable().optional(),
+  id_sub_estado_sot: z.number().nullable().optional(),
+  id_estado_sot: z.number().nullable().optional(),
+  fecha_real_inst: z.string().nullable().optional(),
+  fecha_rechazo: z.string().nullable().optional(),
+  comentario_gestion: z.string().nullable().optional(),
+  solicitud_correccion: z.boolean().default(false),
+  audio_subido: z.boolean().default(false),
+  id_estado_audios: z.number().nullable().optional(),
+  observacion_audios: z.string().nullable().optional(),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+// ── Helpers UI ────────────────────────────────────────────────────────────────
+function FieldLabel({
+  children,
+  required,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+}) {
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-zinc-500">{label}</p>
-      <div className="flex min-h-9 items-center gap-2 rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-        <Lock className="h-3 w-3 shrink-0 text-zinc-300" />
-        <span>{value || <span className="text-zinc-400 italic">—</span>}</span>
+    <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-1.5">
+      {children}
+      {required && <span className="text-destructive ml-1">*</span>}
+    </p>
+  );
+}
+
+function ReadonlyField({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-muted/50 border border-border min-h-[44px]">
+        <Lock size={12} className="text-muted-foreground shrink-0" />
+        <span className="text-sm font-sans text-foreground/80 leading-snug">
+          {value ?? <span className="text-muted-foreground/50">—</span>}
+        </span>
       </div>
     </div>
   );
 }
 
-// ── Reproductor de audio inline ───────────────────────────────────────────────
-function AudioItem({ audio, index }: { audio: AudioVenta; index: number }) {
-  const conforme = audio.conforme;
+function TextInput({
+  label,
+  error,
+  required,
+  className,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  error?: string;
+  required?: boolean;
+}) {
+  return (
+    <div className={className}>
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <input
+        {...props}
+        className={cn(
+          "w-full h-11 px-3.5 rounded-xl bg-background border text-sm font-sans text-foreground outline-none transition-all duration-200 focus:ring-4 focus:ring-primary/10",
+          error
+            ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+            : "border-border focus:border-primary",
+        )}
+      />
+      {error && (
+        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+          <AlertTriangle size={10} /> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Textarea({
+  label,
+  error,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  label: string;
+  error?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className={cn(
+          "w-full px-3.5 py-3 rounded-xl bg-background border text-sm font-sans text-foreground outline-none resize-none transition-all duration-200 focus:ring-4 focus:ring-primary/10",
+          error
+            ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+            : "border-border focus:border-primary",
+        )}
+      />
+      {error && (
+        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+          <AlertTriangle size={10} /> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function NativeSelect({
+  label,
+  error,
+  required,
+  value,
+  onChange,
+  children,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  error?: string;
+  required?: boolean;
+  value: string | number;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className={cn(
+            "w-full h-11 pl-3.5 pr-10 rounded-xl bg-background border text-sm font-sans outline-none appearance-none transition-all duration-200 focus:ring-4 focus:ring-primary/10 cursor-pointer disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70",
+            value ? "text-foreground" : "text-muted-foreground",
+            error
+              ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+              : "border-border focus:border-primary",
+          )}
+        >
+          {placeholder && <option value="">{placeholder}</option>}
+          {children}
+        </select>
+        <ChevronDown
+          size={14}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+        />
+      </div>
+      {error && (
+        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+          <AlertTriangle size={10} /> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Toggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200",
+        checked
+          ? "bg-primary/10 border-primary/30"
+          : "bg-card border-border hover:bg-muted",
+      )}
+    >
+      <div>
+        <p
+          className={cn(
+            "text-sm font-medium",
+            checked ? "text-primary" : "text-foreground",
+          )}
+        >
+          {label}
+        </p>
+        {description && (
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {description}
+          </p>
+        )}
+      </div>
+      <div
+        className={cn(
+          "w-11 h-6 rounded-full relative transition-colors shrink-0",
+          checked ? "bg-primary" : "bg-muted-foreground/30",
+        )}
+      >
+        <div
+          className={cn(
+            "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+            checked ? "left-6" : "left-1",
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div
       className={cn(
-        "rounded-lg border p-3 transition-colors",
-        conforme === true
-          ? "border-emerald-200 bg-emerald-50/50"
-          : conforme === false
-            ? "border-red-200 bg-red-50/50"
-            : "border-zinc-200 bg-white",
+        "flex items-center gap-2 mb-4 pb-2 border-b border-border/50",
+        className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-600">
+      <p className="font-mono text-[11px] tracking-widest uppercase font-semibold text-primary">
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="h-px bg-border my-6" />;
+}
+
+// ── AudioPlayer item para QA (AHORA NOTIFICA AL PADRE) ──────────────────────
+function AudioItemQA({
+  audio,
+  index,
+  onQAUpdate,
+}: {
+  audio: any;
+  index: number;
+  onQAUpdate: (id: number, conforme: boolean, motivo: string) => void;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+
+  const isConforme = audio.conforme === true;
+  const isNoConforme = audio.conforme === false;
+
+  const togglePlay = () => {
+    if (!audioEl) {
+      const el = new Audio(audio.url_audio);
+      el.onended = () => setPlaying(false);
+      el.play();
+      setAudioEl(el);
+      setPlaying(true);
+    } else {
+      if (playing) {
+        audioEl.pause();
+        setPlaying(false);
+      } else {
+        audioEl.play();
+        setPlaying(true);
+      }
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "p-4 rounded-xl border transition-all duration-200",
+        isConforme
+          ? "bg-emerald-500/5 border-emerald-500/20"
+          : isNoConforme
+            ? "bg-destructive/5 border-destructive/20"
+            : "bg-card border-border",
+      )}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <span
+            className={cn(
+              "inline-flex items-center justify-center w-6 h-6 rounded-full border text-[10px] font-mono font-bold shrink-0",
+              isConforme
+                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-500"
+                : isNoConforme
+                  ? "bg-destructive/20 border-destructive/40 text-destructive"
+                  : "bg-muted border-border text-muted-foreground",
+            )}
+          >
             {index + 1}
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-zinc-700">
+          <div className="flex-1 truncate">
+            <p className="text-[13px] font-sans text-foreground/80 leading-snug truncate flex items-center gap-2">
               {audio.nombre_etiqueta}
+              {audio.corregido && (
+                <span className="text-[9px] font-mono text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded-full uppercase tracking-widest border border-cyan-500/20">
+                  Corregido
+                </span>
+              )}
             </p>
-            {audio.motivo && (
-              <p className="text-xs text-red-600 mt-0.5">Obs: {audio.motivo}</p>
-            )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {conforme === true && (
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          )}
-          {conforme === false && <XCircle className="h-4 w-4 text-red-500" />}
-          {conforme === null && <Volume2 className="h-4 w-4 text-zinc-400" />}
-          <a
-            href={audio.url_audio}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
+
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={togglePlay}
+            className={cn(
+              "flex items-center justify-center w-8 h-8 rounded-full border transition-all shrink-0",
+              playing
+                ? "bg-primary/20 border-primary/40 text-primary"
+                : "bg-background border-border text-muted-foreground hover:bg-muted",
+            )}
+            title={playing ? "Pausar" : "Reproducir"}
           >
-            <Play className="h-3 w-3" />
-            Escuchar
-          </a>
+            {playing ? (
+              <Pause size={14} />
+            ) : (
+              <Play size={14} className="ml-0.5" />
+            )}
+          </button>
+
+          <div className="flex gap-1.5 bg-background p-1 rounded-full border border-border">
+            <button
+              type="button"
+              onClick={() => onQAUpdate(audio.id, true, "")}
+              className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center transition-all",
+                isConforme
+                  ? "bg-emerald-500/20 text-emerald-500"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+              title="Conforme"
+            >
+              <CheckCircle2 size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onQAUpdate(audio.id, false, audio.motivo || "")}
+              className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center transition-all",
+                isNoConforme
+                  ? "bg-destructive/20 text-destructive"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+              title="No conforme"
+            >
+              <XCircle size={16} />
+            </button>
+          </div>
         </div>
       </div>
-      {/* Mini reproductor nativo como fallback */}
-      <audio
-        controls
-        src={audio.url_audio}
-        className="mt-2 h-8 w-full"
-        preload="none"
-      />
+
+      {isNoConforme && (
+        <div className="mt-3 pl-9">
+          <input
+            type="text"
+            placeholder="Motivo de no conformidad (obligatorio)…"
+            value={audio.motivo || ""}
+            onChange={(e) => onQAUpdate(audio.id, false, e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 text-destructive text-xs font-sans outline-none focus:border-destructive/50 transition-colors"
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+const TABS = [
+  { id: "gestion", label: "Gestión", icon: Settings },
+  { id: "cliente", label: "Cliente", icon: User },
+  { id: "audios", label: "Audios", icon: FileAudio },
+];
 
 interface VentaFormBackofficeProps {
   open: boolean;
@@ -136,771 +441,776 @@ export function VentaFormBackoffice({
   onClose,
   venta,
 }: VentaFormBackofficeProps) {
-  const { mutateAsync: actualizarVenta, isPending } = useUpdateVenta(venta.id);
+  const [tab, setTab] = useState("gestion");
+
+  const { mutateAsync: updateVenta, isPending } = useUpdateVentaBackoffice(
+    venta.id,
+  );
   const { data: estadosSOT = [] } = useEstadosSOT();
   const { data: subEstados = [] } = useSubEstadosSOT();
   const { data: estadosAudio = [] } = useEstadosAudio();
 
-  const estadoActualCodigo = venta.codigo_estado?.toUpperCase() ?? "";
-  const estaEnEjecucion = estadoActualCodigo === "EJECUCION";
-  const estaEnAtendido = estadoActualCodigo === "ATENDIDO";
-  const estaRechazado = estadoActualCodigo === "RECHAZADO";
-  // Es reingresada si el backend registró una venta_origen
-  const esReingresada = !!venta.venta_origen;
+  // Guardamos un clon de los audios localmente para modificar `conforme` y `motivo`
+  const [audiosQA, setAudiosQA] = useState<any[]>([]);
 
-  // Como el componente recibe key={venta.id} desde el padre,
-  // se remonta limpio cada vez que cambia la venta.
-  // defaultValues se aplican correctamente al montar.
-  const form = useForm<UpdateVentaBackofficeValues>({
-    resolver: zodResolver(updateVentaBackofficeSchema),
+  useEffect(() => {
+    if (venta && open) {
+      // Clonamos para no mutar directamente las props
+      setAudiosQA(venta.audios ? JSON.parse(JSON.stringify(venta.audios)) : []);
+    }
+  }, [venta, open]);
+
+  const esPrimeraGestion =
+    venta.id_estado_sot === null && !venta.solicitud_correccion;
+  const esReingreso = !!venta.venta_origen && venta.id_estado_sot === null;
+
+  // Regla estricta SOT: Si es primera vez, solo puede ir a EJECUCION.
+  const estadosSotPermitidos =
+    esPrimeraGestion || esReingreso
+      ? estadosSOT.filter((e) => e.codigo.toUpperCase() === "EJECUCION")
+      : estadosSOT.filter((e) =>
+          ["EJECUCION", "ATENDIDO", "RECHAZADO"].includes(
+            e.codigo.toUpperCase(),
+          ),
+        );
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
-      // Si es reingreso, pre-cargamos los códigos de la venta origen para que backoffice los vea
-      codigo_sec: venta.codigo_sec ?? venta.codigo_sec_origen ?? "",
-      codigo_sot: venta.codigo_sot ?? venta.codigo_sot_origen ?? "",
-      fecha_visita_programada: venta.fecha_visita_programada ?? "",
+      codigo_sec: venta.codigo_sec ?? "",
+      codigo_sot: venta.codigo_sot ?? "",
+      fecha_visita_programada: venta.fecha_visita_programada ?? null,
       bloque_horario: venta.bloque_horario ?? "",
-      id_sub_estado_sot: venta.id_sub_estado_sot ?? undefined,
-      id_estado_sot: venta.id_estado_sot ?? undefined,
-      fecha_real_inst: venta.fecha_real_inst?.split("T")[0] ?? "",
-      fecha_rechazo: venta.fecha_rechazo?.split("T")[0] ?? "",
+      id_sub_estado_sot: venta.id_sub_estado_sot ?? null,
+      id_estado_sot:
+        typeof venta.id_estado_sot === "object"
+          ? (venta.id_estado_sot as any)?.id
+          : venta.id_estado_sot,
+      fecha_real_inst: venta.fecha_real_inst
+        ? venta.fecha_real_inst.split("T")[0]
+        : null,
+      fecha_rechazo: venta.fecha_rechazo
+        ? venta.fecha_rechazo.split("T")[0]
+        : null,
       comentario_gestion: venta.comentario_gestion ?? "",
-      id_estado_audios: venta.id_estado_audios ?? undefined,
+      solicitud_correccion: venta.solicitud_correccion ?? false,
+      audio_subido: venta.audio_subido ?? false,
+      id_estado_audios:
+        typeof venta.id_estado_audios === "object"
+          ? (venta.id_estado_audios as any)?.id
+          : venta.id_estado_audios,
       observacion_audios: venta.observacion_audios ?? "",
-      _codigo_estado_destino: estadoActualCodigo,
     },
   });
 
-  const estadoSotSeleccionadoId = form.watch("id_estado_sot");
-  const estadoDestino = estadosSOT.find(
-    (e) => e.id === estadoSotSeleccionadoId,
+  const watchEstadoId = form.watch("id_estado_sot");
+  const watchSolicitud = form.watch("solicitud_correccion");
+  const watchEstadoAudioId = form.watch("id_estado_audios");
+
+  const estadoSeleccionado = estadosSOT.find(
+    (e) => e.id === Number(watchEstadoId),
   );
-  const codigoEstadoDestino = estadoDestino?.codigo?.toUpperCase() ?? "";
-  const esRechazando = codigoEstadoDestino === "RECHAZADO";
-  const esAtendiendo = codigoEstadoDestino === "ATENDIDO";
+  const estadoAudioSeleccionado = estadosAudio.find(
+    (e) => e.id === Number(watchEstadoAudioId),
+  );
+
+  const esRechazado = estadoSeleccionado?.codigo.toUpperCase() === "RECHAZADO";
+  const esEjecucion = estadoSeleccionado?.codigo.toUpperCase() === "EJECUCION";
+  const esAtendido = estadoSeleccionado?.codigo.toUpperCase() === "ATENDIDO";
+  const audioEsRechazado =
+    estadoAudioSeleccionado?.codigo.toUpperCase() === "RECHAZADO";
 
   useEffect(() => {
-    form.setValue("_codigo_estado_destino", codigoEstadoDestino);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [codigoEstadoDestino]);
+    if (esRechazado && !watchSolicitud) {
+      form.setValue("solicitud_correccion", false);
+    }
+  }, [esRechazado, watchSolicitud, form]);
 
-  const onSubmit = async (values: UpdateVentaBackofficeValues) => {
-    try {
-      const payload: Record<string, unknown> = {};
-      if (values.codigo_sec !== undefined)
-        payload.codigo_sec = values.codigo_sec;
-      if (values.codigo_sot !== undefined)
-        payload.codigo_sot = values.codigo_sot;
-      if (values.fecha_visita_programada)
-        payload.fecha_visita_programada = values.fecha_visita_programada;
-      if (values.bloque_horario) payload.bloque_horario = values.bloque_horario;
-      if (values.id_sub_estado_sot !== undefined)
-        payload.id_sub_estado_sot = values.id_sub_estado_sot;
-      if (values.id_estado_sot !== undefined)
-        payload.id_estado_sot = values.id_estado_sot;
-      if (values.fecha_real_inst)
-        payload.fecha_real_inst = values.fecha_real_inst;
-      if (values.fecha_rechazo) payload.fecha_rechazo = values.fecha_rechazo;
-      if (values.comentario_gestion !== undefined)
-        payload.comentario_gestion = values.comentario_gestion;
-      if (values.id_estado_audios !== undefined)
-        payload.id_estado_audios = values.id_estado_audios;
-      if (values.observacion_audios !== undefined)
-        payload.observacion_audios = values.observacion_audios;
-
-      await actualizarVenta(payload as never);
-      toast.success("Venta actualizada correctamente");
-      onClose();
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: Record<string, unknown> } };
-      if (err?.response?.data) {
-        const errores = err.response.data;
-        const primerError = Object.values(errores)[0];
-        toast.error(
-          Array.isArray(primerError) ? primerError[0] : String(primerError),
+  // Si hay algún audio rechazado, obligamos a devolver al asesor
+  useEffect(() => {
+    const hayRechazados = audiosQA.some((a) => a.conforme === false);
+    if (hayRechazados && !watchSolicitud) {
+      form.setValue("solicitud_correccion", true);
+      if (!form.watch("comentario_gestion")) {
+        form.setValue(
+          "comentario_gestion",
+          "Existen audios marcados como No Conformes. Revisa la pestaña de audios para ver los motivos.",
         );
-      } else {
-        toast.error("Error al actualizar la venta");
       }
     }
+  }, [audiosQA, watchSolicitud, form]);
+
+  // Función que llama el hijo (AudioItemQA) para actualizar el estado del Padre
+  const handleQAUpdate = (id: number, conforme: boolean, motivo: string) => {
+    setAudiosQA((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, conforme, motivo } : a)),
+    );
   };
 
-  const estadoColorHex =
-    estadosSOT.find((e) => e.id === venta.id_estado_sot)?.color_hex ??
-    "#6b7280";
+  const onSubmit = form.handleSubmit(async (values) => {
+    // 1. SI VA A DEVOLVER AL ASESOR (CORRECCIÓN)
+    if (values.solicitud_correccion) {
+      if (!values.comentario_gestion?.trim()) {
+        form.setError("comentario_gestion", {
+          message: "Obligatorio para solicitar corrección",
+        });
+        setTab("gestion");
+        return toast.error("Debe indicar qué debe corregir el asesor.");
+      }
+
+      // Asegurar que los audios no conformes tengan motivo
+      const audioRechazadoSinMotivo = audiosQA.find(
+        (a) => a.conforme === false && !a.motivo?.trim(),
+      );
+      if (audioRechazadoSinMotivo) {
+        setTab("audios");
+        return toast.error(
+          `El audio '${audioRechazadoSinMotivo.nombre_etiqueta}' está marcado como No Conforme, debe escribir un motivo.`,
+        );
+      }
+    } else {
+      // 2. SI VA A PROCESAR LA VENTA (NO ES CORRECCIÓN)
+      if (!values.id_estado_sot) {
+        setTab("gestion");
+        return toast.error(
+          "Debe seleccionar un Estado SOT (ej: EJECUCIÓN) para procesar.",
+        );
+      }
+
+      // Validaciones operativas si no se está rechazando
+      if (!esRechazado) {
+        if (!values.codigo_sot)
+          return toast.error("El Código SOT es obligatorio para procesar.");
+        if (!values.codigo_sec)
+          return toast.error("El Código SEC es obligatorio para procesar.");
+        if (!values.fecha_visita_programada)
+          return toast.error("La Fecha de visita es obligatoria.");
+        if (!values.bloque_horario)
+          return toast.error("El Bloque horario es obligatorio.");
+        if (!values.id_estado_audios)
+          return toast.error("Debe evaluar el estado de los audios en Claro.");
+      }
+
+      if (audioEsRechazado && !values.observacion_audios?.trim()) {
+        form.setError("observacion_audios", {
+          message: "Obligatorio al rechazar audios",
+        });
+        return toast.error(
+          "Debe detallar el motivo del rechazo de los audios en Claro.",
+        );
+      }
+    }
+
+    // Validaciones lógicas de fechas
+    const fVenta = venta.fecha_venta ? new Date(venta.fecha_venta) : null;
+    const fVisita = values.fecha_visita_programada
+      ? new Date(values.fecha_visita_programada)
+      : null;
+    const fInst = values.fecha_real_inst
+      ? new Date(values.fecha_real_inst)
+      : null;
+    const fRechazo = values.fecha_rechazo
+      ? new Date(values.fecha_rechazo)
+      : null;
+
+    if (fVenta && fVisita && fVisita < fVenta)
+      return toast.error("La visita no puede ser antes de la venta");
+    if (fVisita && fInst && fInst < fVisita)
+      return toast.error("La instalación no puede ser antes de la visita");
+    if (fVenta && fRechazo && fRechazo < fVenta)
+      return toast.error("El rechazo no puede ser antes de la venta");
+
+    // Mapear audiosQA para el backend
+    const audiosPayload = audiosQA.map((a) => ({
+      id: a.id,
+      nombre_etiqueta: a.nombre_etiqueta,
+      url_audio: a.url_audio,
+      conforme: a.conforme,
+      motivo: a.motivo,
+    }));
+
+    try {
+      await updateVenta({
+        codigo_sec: values.codigo_sec || undefined,
+        codigo_sot: values.codigo_sot || undefined,
+        fecha_visita_programada: values.fecha_visita_programada || null,
+        bloque_horario: values.bloque_horario || null,
+        id_sub_estado_sot: values.id_sub_estado_sot ?? null,
+        id_estado_sot: values.id_estado_sot ?? null,
+        fecha_real_inst: values.fecha_real_inst || null,
+        fecha_rechazo: values.fecha_rechazo || null,
+        comentario_gestion: values.comentario_gestion || null,
+        solicitud_correccion: values.solicitud_correccion,
+        audio_subido: values.audio_subido,
+        id_estado_audios: values.id_estado_audios ?? null,
+        observacion_audios: values.observacion_audios || null,
+        audios: audiosPayload, // <-- ¡AQUÍ VIAJA LA CALIFICACIÓN DE LOS AUDIOS!
+      });
+      toast.success(
+        values.solicitud_correccion
+          ? "Devuelto al asesor para corrección"
+          : "Venta procesada con éxito",
+      );
+      onClose();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data
+          ? (Object.values(err.response.data)[0] as string)
+          : "Error al procesar la venta",
+      );
+    }
+  });
+
+  if (!open) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-hidden p-0">
-        {/* ── HEADER ─────────────────────────────────────────────────────── */}
-        <DialogHeader className="border-b border-zinc-100 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg font-semibold">
-              Venta #{venta.id}
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              {esReingresada && (
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                  Reingresada
-                </Badge>
-              )}
-              <EstadoBadge
-                estado={
-                  venta.codigo_estado
-                    ? {
-                        nombre: venta.nombre_estado ?? venta.codigo_estado,
-                        codigo: venta.codigo_estado,
-                        color_hex: estadoColorHex,
-                      }
-                    : null
-                }
-              />
-            </div>
-          </div>
+    <>
+      <div
+        onClick={onClose}
+        className="fixed inset-0  z-[100] animate-in fade-in duration-300"
+      />
 
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-zinc-500">
-            <span>
-              Asesor:{" "}
-              <span className="font-medium text-zinc-700">
-                {venta.nombre_asesor}
-              </span>
-            </span>
-            <span>
-              Supervisor:{" "}
-              <span className="font-medium text-zinc-700">
-                {venta.nombre_supervisor}
-              </span>
-            </span>
-            {venta.fecha_venta && (
-              <span>
-                Fecha venta:{" "}
-                <span className="font-medium text-zinc-700">
-                  {new Date(venta.fecha_venta).toLocaleDateString("es-PE")}
-                </span>
-              </span>
-            )}
-          </div>
-
-          {/* Info reingreso */}
-          {esReingresada && (
-            <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 p-2.5">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <div className="text-xs text-amber-700 space-y-0.5">
-                <p>
-                  <span className="font-semibold">
-                    ⚠️ Reingreso de venta #{venta.venta_origen}.
+      <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-2xl bg-card border-l border-border z-[101] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        {/* ── HEADER ── */}
+        <div className="p-6 border-b border-border shrink-0 bg-card/50">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(esPrimeraGestion || esReingreso) && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <Clock size={10} />{" "}
+                    {esReingreso ? "Nuevo Reingreso" : "Primera Gestión"}
                   </span>
-                </p>
-                <p>
-                  Los códigos SEC/SOT de la gestión anterior están pre-cargados.
-                  Puedes mantenerlos o cambiarlos.
-                </p>
-                {(venta.codigo_sec_origen || venta.codigo_sot_origen) && (
-                  <p className="font-mono">
-                    {venta.codigo_sec_origen && (
-                      <span>SEC anterior: {venta.codigo_sec_origen} </span>
-                    )}
-                    {venta.codigo_sot_origen && (
-                      <span>SOT anterior: {venta.codigo_sot_origen}</span>
-                    )}
-                  </p>
                 )}
+                {venta.venta_origen && !esReingreso && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20">
+                    <RefreshCw size={10} /> Origen #{venta.venta_origen}
+                  </span>
+                )}
+                {venta.solicitud_correccion && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                    <AlertTriangle size={10} /> En Corrección
+                  </span>
+                )}
+              </div>
+              <h2 className="font-serif text-2xl font-bold text-foreground leading-tight mb-1 truncate">
+                {venta.cliente_nombre}
+              </h2>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                <span>#{venta.id}</span>
+                <span className="font-sans text-foreground/70">
+                  {venta.nombre_asesor}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors shrink-0"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          {venta.comentario_gestion && !venta.solicitud_correccion && (
+            <div className="flex gap-2 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+              <MessageSquare
+                size={14}
+                className="text-cyan-500 shrink-0 mt-0.5"
+              />
+              <p className="text-xs text-cyan-600 dark:text-cyan-400 leading-snug">
+                <strong className="font-semibold">Nota previa:</strong>{" "}
+                {venta.comentario_gestion}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── TABS ── */}
+        <div className="flex px-6 border-b border-border shrink-0 bg-background">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const activo = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-3.5 border-b-2 text-sm font-medium transition-all -mb-px",
+                  activo
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+                )}
+              >
+                <Icon size={16} /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── CONTENIDO ── */}
+        <div className="flex-1 overflow-y-auto p-6 bg-background">
+          {/* TAB GESTIÓN */}
+          {tab === "gestion" && (
+            <form
+              id="backoffice-form"
+              onSubmit={onSubmit}
+              className="space-y-6 animate-in fade-in duration-300"
+            >
+              {(esPrimeraGestion || esReingreso) && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-sm font-bold text-amber-500 dark:text-amber-400 mb-1">
+                    {esReingreso
+                      ? "Reingreso por gestionar"
+                      : "Primera gestión de esta venta"}
+                  </p>
+                  <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
+                    Se exige ingresar SOT, SEC, fecha de visita y evaluar los
+                    audios para ponerla en EJECUCIÓN.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <SectionTitle>Códigos Operativos</SectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="codigo_sec"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Código SEC"
+                        placeholder="SEC-XXXXX"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="codigo_sot"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Código SOT"
+                        placeholder="SOT-XXXXX"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+              <Divider />
+
+              <div>
+                <SectionTitle>Programación de Visita</SectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="fecha_visita_programada"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Fecha de visita"
+                        type="date"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="bloque_horario"
+                    render={({ field }) => (
+                      <NativeSelect
+                        label="Bloque horario"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder="Seleccionar"
+                      >
+                        {[
+                          "08:00 - 10:00",
+                          "10:00 - 12:00",
+                          "12:00 - 14:00",
+                          "14:00 - 16:00",
+                          "16:00 - 18:00",
+                          "18:00 - 20:00",
+                        ].map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    )}
+                  />
+                </div>
+              </div>
+              <Divider />
+
+              <div>
+                <SectionTitle>Gestión de Audios en Claro</SectionTitle>
+                <div className="space-y-4">
+                  <Controller
+                    control={form.control}
+                    name="audio_subido"
+                    render={({ field }) => (
+                      <Toggle
+                        label="Audios subidos al operador"
+                        description="Confirma que ya subiste los audios al sistema de Claro."
+                        checked={field.value}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Controller
+                      control={form.control}
+                      name="id_estado_audios"
+                      render={({ field }) => (
+                        <NativeSelect
+                          label="Estado de los audios"
+                          value={field.value ?? ""}
+                          onChange={(v) => field.onChange(v ? Number(v) : null)}
+                          placeholder="Seleccionar estado"
+                          error={
+                            form.formState.errors.id_estado_audios?.message
+                          }
+                        >
+                          {estadosAudio.map((e) => (
+                            <option key={e.id} value={e.id}>
+                              {e.nombre}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      )}
+                    />
+                    {audioEsRechazado && (
+                      <Controller
+                        control={form.control}
+                        name="observacion_audios"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Motivo de rechazo en Claro"
+                            required
+                            placeholder="Falta audio de DNI..."
+                            {...field}
+                            value={field.value ?? ""}
+                            error={
+                              form.formState.errors.observacion_audios?.message
+                            }
+                          />
+                        )}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              <Divider />
+
+              <div>
+                <SectionTitle>Estado de la Venta</SectionTitle>
+                <div className="space-y-4">
+                  <Controller
+                    control={form.control}
+                    name="id_estado_sot"
+                    render={({ field }) => (
+                      <NativeSelect
+                        label="Estado SOT"
+                        value={field.value ?? ""}
+                        onChange={(v) => field.onChange(v ? Number(v) : null)}
+                        placeholder="Seleccionar"
+                        disabled={
+                          !!(
+                            venta.id_estado_sot &&
+                            !esPrimeraGestion &&
+                            !esReingreso &&
+                            !watchSolicitud &&
+                            venta.codigo_estado?.toUpperCase() !== "EJECUCION"
+                          )
+                        }
+                      >
+                        {estadosSotPermitidos.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.nombre}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    )}
+                  />
+                  {esEjecucion && (
+                    <Controller
+                      control={form.control}
+                      name="id_sub_estado_sot"
+                      render={({ field }) => (
+                        <NativeSelect
+                          label="Sub-estado (opcional)"
+                          value={field.value ?? ""}
+                          onChange={(v) => field.onChange(v ? Number(v) : null)}
+                          placeholder="Sin sub-estado"
+                        >
+                          {subEstados.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.nombre}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      )}
+                    />
+                  )}
+                  {esAtendido && (
+                    <Controller
+                      control={form.control}
+                      name="fecha_real_inst"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Fecha real de instalación"
+                          type="date"
+                          required
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(e.target.value || null)
+                          }
+                        />
+                      )}
+                    />
+                  )}
+                  {esRechazado && (
+                    <Controller
+                      control={form.control}
+                      name="fecha_rechazo"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Fecha de rechazo"
+                          type="date"
+                          required
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(e.target.value || null)
+                          }
+                        />
+                      )}
+                    />
+                  )}
+                </div>
+              </div>
+              <Divider />
+
+              <div>
+                <SectionTitle>Comentario & Corrección</SectionTitle>
+                <div className="space-y-4">
+                  <Controller
+                    control={form.control}
+                    name="solicitud_correccion"
+                    render={({ field }) => (
+                      <div
+                        onClick={() => field.onChange(!field.value)}
+                        className={cn(
+                          "flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all border",
+                          field.value
+                            ? "bg-orange-500/10 border-orange-500/30"
+                            : "bg-card border-border hover:bg-muted",
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle
+                            size={18}
+                            className={
+                              field.value
+                                ? "text-orange-500"
+                                : "text-muted-foreground"
+                            }
+                          />
+                          <div>
+                            <p
+                              className={cn(
+                                "text-sm font-bold",
+                                field.value
+                                  ? "text-orange-500"
+                                  : "text-foreground",
+                              )}
+                            >
+                              Solicitar corrección al Asesor
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {field.value
+                                ? "Devuelve la venta para que el asesor la edite"
+                                : "Activa esto para devolver la venta"}
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          className={cn(
+                            "w-11 h-6 rounded-full relative transition-colors",
+                            field.value
+                              ? "bg-orange-500"
+                              : "bg-muted-foreground/30",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+                              field.value ? "left-6" : "left-1",
+                            )}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="comentario_gestion"
+                    render={({ field }) => (
+                      <Textarea
+                        label="Comentario de gestión"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder={
+                          watchSolicitud
+                            ? "Describe qué debe corregir el asesor…"
+                            : "Observaciones opcionales…"
+                        }
+                        rows={3}
+                        error={
+                          form.formState.errors.comentario_gestion?.message
+                        }
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* TAB CLIENTE */}
+          {tab === "cliente" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <SectionTitle>Producto & Documento</SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ReadonlyField
+                  label="Plan / Producto"
+                  value={venta.nombre_producto}
+                />
+                <ReadonlyField label="Tecnología" value={venta.tecnologia} />
+                <ReadonlyField
+                  label="Tipo documento"
+                  value={`Tipo ${venta.codigo_tipo_documento}`}
+                />
+                <ReadonlyField
+                  label="Número documento"
+                  value={venta.cliente_numero_doc}
+                />
+              </div>
+              <Divider />
+              <SectionTitle>Datos Personales</SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ReadonlyField
+                  label="Nombre completo"
+                  value={venta.cliente_nombre}
+                />
+                <ReadonlyField
+                  label="Teléfono"
+                  value={venta.cliente_telefono}
+                />
+                <ReadonlyField label="Email" value={venta.cliente_email} />
+                <ReadonlyField
+                  label="Fecha nacimiento"
+                  value={venta.cliente_fecha_nacimiento?.split("T")[0]}
+                />
+                <ReadonlyField
+                  label="Nombre del padre"
+                  value={venta.cliente_papa}
+                />
+                <ReadonlyField
+                  label="Nombre de la madre"
+                  value={venta.cliente_mama}
+                />
+                <ReadonlyField label="Tipo venta" value={venta.tipo_venta} />
+              </div>
+              <Divider />
+              <SectionTitle className="text-blue-500">
+                Ubicación de Instalación
+              </SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ReadonlyField
+                  label="Dirección"
+                  value={venta.direccion_detalle}
+                />
+                <ReadonlyField label="Plano" value={venta.plano} />
+                <ReadonlyField label="GPS" value={venta.coordenadas_gps} />
+                <ReadonlyField label="Referencias" value={venta.referencias} />
+                <ReadonlyField
+                  label="Full Claro"
+                  value={venta.es_full_claro ? "Sí" : "No"}
+                />
+                <ReadonlyField
+                  label="Score crediticio"
+                  value={venta.score_crediticio}
+                />
               </div>
             </div>
           )}
-        </DialogHeader>
 
-        {/* ── TABS: Gestión / Datos cliente / Audios ─────────────────────── */}
-        <div className="max-h-[calc(92vh-160px)] overflow-y-auto">
-          <Tabs defaultValue="gestion" className="w-full">
-            <TabsList className="mx-6 mt-4 grid w-[calc(100%-3rem)] grid-cols-3">
-              <TabsTrigger value="gestion">Gestión</TabsTrigger>
-              <TabsTrigger value="cliente">Datos del Cliente</TabsTrigger>
-              <TabsTrigger value="audios">
-                Audios
-                {venta.audios?.length > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="ml-1.5 h-5 px-1.5 text-xs"
-                  >
-                    {venta.audios.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            {/* ══ TAB GESTIÓN ══════════════════════════════════════════════ */}
-            <TabsContent value="gestion" className="px-6 pb-6 pt-4">
-              <FormProvider {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-6"
-                >
-                  {/* Alerta RECHAZADO */}
-                  {estaRechazado && (
-                    <div className="flex items-start gap-3 rounded-lg border border-red-100 bg-red-50 p-4">
-                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-                      <div>
-                        <p className="font-medium text-red-700">
-                          Venta Rechazada — Cerrada definitivamente
-                        </p>
-                        {venta.comentario_gestion && (
-                          <p className="mt-1 text-sm text-red-600">
-                            <span className="font-medium">Motivo:</span>{" "}
-                            {venta.comentario_gestion}
-                          </p>
-                        )}
-                        {venta.fecha_rechazo && (
-                          <p className="text-sm text-red-600">
-                            <span className="font-medium">Fecha:</span>{" "}
-                            {new Date(venta.fecha_rechazo).toLocaleDateString(
-                              "es-PE",
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ATENDIDO — solo lectura */}
-                  {estaEnAtendido && (
-                    <div className="flex items-start gap-3 rounded-lg border border-emerald-100 bg-emerald-50 p-4">
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                      <div>
-                        <p className="font-medium text-emerald-700">
-                          Instalación completada
-                        </p>
-                        <p className="text-sm text-emerald-600">
-                          Fecha:{" "}
-                          {venta.fecha_real_inst
-                            ? new Date(
-                                venta.fecha_real_inst,
-                              ).toLocaleDateString("es-PE")
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!estaRechazado && !estaEnAtendido && (
-                    <>
-                      {/* CÓDIGOS SEC / SOT */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                          Códigos de Operación
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="codigo_sec"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Código SEC</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="SEC-XXXXXX" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="codigo_sot"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Código SOT</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="SOT-XXXXXX" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        {!estaEnEjecucion && (
-                          <p className="mt-1.5 flex items-center gap-1 text-xs text-blue-600">
-                            <Info className="h-3 w-3" />
-                            Al guardar ambos códigos la venta pasa
-                            automáticamente a EJECUCIÓN
-                          </p>
-                        )}
-                      </div>
-
-                      <Separator />
-
-                      {/* AGENDA */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                          Agenda
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="fecha_visita_programada"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>
-                                  Fecha de visita programada
-                                </FormLabel>
-                                <FormControl>
-                                  <Input type="date" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="bloque_horario"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Bloque horario</FormLabel>
-                                <Select
-                                  onValueChange={field.onChange}
-                                  value={field.value ?? ""}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Selecciona..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="MAÑANA">
-                                      Mañana (8am–12pm)
-                                    </SelectItem>
-                                    <SelectItem value="TARDE">
-                                      Tarde (12pm–6pm)
-                                    </SelectItem>
-                                    <SelectItem value="NOCHE">
-                                      Noche (6pm–10pm)
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Sub-estado (solo si EJECUCION) */}
-                      {estaEnEjecucion && (
-                        <>
-                          <Separator />
-                          <div>
-                            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                              Sub-Estado
-                            </h3>
-                            <FormField
-                              control={form.control}
-                              name="id_sub_estado_sot"
-                              render={({ field }) => (
-                                <FormItem className="max-w-xs">
-                                  <FormLabel>Sub-estado SOT</FormLabel>
-                                  <Select
-                                    onValueChange={(v) =>
-                                      field.onChange(Number(v))
-                                    }
-                                    value={
-                                      field.value
-                                        ? String(field.value)
-                                        : undefined
-                                    }
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Selecciona..." />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {subEstados.map((se) => (
-                                        <SelectItem
-                                          key={se.id}
-                                          value={String(se.id)}
-                                        >
-                                          <span className="flex items-center gap-2">
-                                            <span
-                                              className="h-2 w-2 rounded-full"
-                                              style={{
-                                                backgroundColor: se.color_hex,
-                                              }}
-                                            />
-                                            {se.nombre}
-                                          </span>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      <Separator />
-
-                      {/* CAMBIO DE ESTADO */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                          Cambio de Estado
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="id_estado_sot"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Estado SOT</FormLabel>
-                                <Select
-                                  onValueChange={(v) =>
-                                    field.onChange(Number(v))
-                                  }
-                                  value={
-                                    field.value
-                                      ? String(field.value)
-                                      : undefined
-                                  }
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Selecciona..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {estadosSOT.map((e) => (
-                                      <SelectItem
-                                        key={e.id}
-                                        value={String(e.id)}
-                                      >
-                                        <span className="flex items-center gap-2">
-                                          <span
-                                            className="h-2 w-2 rounded-full"
-                                            style={{
-                                              backgroundColor: e.color_hex,
-                                            }}
-                                          />
-                                          {e.nombre}
-                                        </span>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          {esAtendiendo && (
-                            <FormField
-                              control={form.control}
-                              name="fecha_real_inst"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>
-                                    Fecha real de instalación{" "}
-                                    <span className="text-red-500">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="date"
-                                      {...field}
-                                      value={field.value ?? ""}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          )}
-
-                          {esRechazando && (
-                            <FormField
-                              control={form.control}
-                              name="fecha_rechazo"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>
-                                    Fecha de rechazo{" "}
-                                    <span className="text-red-500">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="date"
-                                      {...field}
-                                      value={field.value ?? ""}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          )}
-                        </div>
-
-                        {esRechazando && (
-                          <div className="mt-4">
-                            <FormField
-                              control={form.control}
-                              name="comentario_gestion"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>
-                                    Comentario de gestión{" "}
-                                    <span className="text-red-500">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="Motivo del rechazo — el asesor verá este mensaje..."
-                                      rows={3}
-                                      {...field}
-                                      value={field.value ?? ""}
-                                      className="border-red-200 bg-red-50 focus:border-red-400"
-                                    />
-                                  </FormControl>
-                                  <FormDescription className="text-xs text-red-500">
-                                    Obligatorio. Explica el motivo claramente.
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      <Separator />
-
-                      {/* AUDIOS */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                          Estado de Audios
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="id_estado_audios"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Estado</FormLabel>
-                                <Select
-                                  onValueChange={(v) =>
-                                    field.onChange(Number(v))
-                                  }
-                                  value={
-                                    field.value
-                                      ? String(field.value)
-                                      : undefined
-                                  }
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Selecciona..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {estadosAudio.map((ea) => (
-                                      <SelectItem
-                                        key={ea.id}
-                                        value={String(ea.id)}
-                                      >
-                                        {ea.nombre}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="mt-3">
-                          <FormField
-                            control={form.control}
-                            name="observacion_audios"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Observación de audios</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    rows={2}
-                                    {...field}
-                                    value={field.value ?? ""}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Footer */}
-                  <div className="flex justify-end gap-3 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                      {estaRechazado || estaEnAtendido ? "Cerrar" : "Cancelar"}
-                    </Button>
-                    {!estaRechazado && !estaEnAtendido && (
-                      <Button type="submit" disabled={isPending}>
-                        {isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Guardando...
-                          </>
-                        ) : (
-                          "Guardar Cambios"
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </form>
-              </FormProvider>
-            </TabsContent>
-
-            {/* ══ TAB DATOS DEL CLIENTE ════════════════════════════════════ */}
-            <TabsContent value="cliente" className="px-6 pb-6 pt-4">
-              <div className="space-y-6">
+          {/* TAB AUDIOS */}
+          {tab === "audios" && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50 border border-border mb-2">
                 <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                    <Lock className="h-3.5 w-3.5" /> Datos personales
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <Campo
-                      label="Nombre / Razón social"
-                      value={venta.cliente_nombre}
-                    />
-                    <Campo
-                      label="N° Documento"
-                      value={venta.cliente_numero_doc}
-                    />
-                    <Campo label="Teléfono" value={venta.cliente_telefono} />
-                    <Campo label="Email" value={venta.cliente_email} />
-                    <Campo
-                      label="Apellido paterno"
-                      value={venta.cliente_papa}
-                    />
-                    <Campo
-                      label="Apellido materno"
-                      value={venta.cliente_mama}
-                    />
-                    <Campo
-                      label="Fecha de nacimiento"
-                      value={
-                        venta.cliente_fecha_nacimiento
-                          ? new Date(
-                              venta.cliente_fecha_nacimiento,
-                            ).toLocaleDateString("es-PE")
-                          : undefined
-                      }
-                    />
-                    <Campo
-                      label="N° Instalación"
-                      value={venta.numero_instalacion}
-                    />
-                    <Campo label="Tipo venta" value={venta.tipo_venta} />
-                  </div>
-                </div>
-
-                {(venta.representante_legal_dni ||
-                  venta.representante_legal_nombre) && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-amber-500">
-                        Representante Legal
-                      </h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Campo
-                          label="DNI del representante"
-                          value={venta.representante_legal_dni}
-                        />
-                        <Campo
-                          label="Nombre del representante"
-                          value={venta.representante_legal_nombre}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <Separator />
-
-                <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
-                    <Lock className="h-3.5 w-3.5" /> Instalación
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <Campo label="Plan" value={venta.nombre_producto} />
-                    <Campo label="Tecnología" value={venta.tecnologia} />
-                    <Campo
-                      label="Full Claro"
-                      value={venta.es_full_claro ? "Sí" : "No"}
-                    />
-                    <Campo label="Dirección" value={venta.direccion_detalle} />
-                    <Campo label="Plano" value={venta.plano} />
-                    <Campo
-                      label="Score crediticio"
-                      value={venta.score_crediticio}
-                    />
-                    <Campo
-                      label="Coordenadas GPS"
-                      value={venta.coordenadas_gps}
-                    />
-                    <Campo label="Referencias" value={venta.referencias} />
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* ══ TAB AUDIOS ═══════════════════════════════════════════════ */}
-            <TabsContent value="audios" className="px-6 pb-6 pt-4">
-              {!venta.audios || venta.audios.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-12 text-zinc-400">
-                  <Volume2 className="h-10 w-10" />
-                  <p className="text-sm">
-                    No hay audios registrados en esta venta
+                  <p className="text-sm font-bold text-foreground mb-0.5">
+                    {audiosQA.length} audios subidos
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Reproduce y marca. Si rechazas uno, se exigirá corrección.
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm text-zinc-500">
-                      {venta.audios.length} audio(s) registrados
-                    </p>
-                    {venta.id_estado_audios && (
-                      <Badge variant="outline" className="text-xs">
-                        Estado audios:{" "}
-                        {estadosAudio.find(
-                          (e) => e.id === venta.id_estado_audios,
-                        )?.nombre ?? "—"}
-                      </Badge>
-                    )}
-                  </div>
-                  {venta.audios.map((audio, idx) => (
-                    <AudioItem
-                      key={audio.id ?? idx}
-                      audio={audio}
-                      index={idx}
-                    />
-                  ))}
-                  {venta.observacion_audios && (
-                    <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 p-3">
-                      <p className="text-xs font-medium text-amber-700">
-                        Observación de audios:
-                      </p>
-                      <p className="mt-1 text-sm text-amber-800">
-                        {venta.observacion_audios}
-                      </p>
-                    </div>
-                  )}
+              </div>
+
+              {audiosQA.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground">
+                  <FileAudio size={40} className="mx-auto mb-4 opacity-20" />
+                  <p className="text-sm">No hay audios registrados.</p>
                 </div>
+              ) : (
+                audiosQA.map((audio, i) => (
+                  <AudioItemQA
+                    key={audio.id ?? i}
+                    audio={audio}
+                    index={i}
+                    onQAUpdate={handleQAUpdate}
+                  />
+                ))
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* ── FOOTER ── */}
+        <div className="p-4 border-t border-border bg-card shrink-0 flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1 h-12 rounded-xl bg-transparent hover:bg-muted"
+            onClick={onClose}
+          >
+            Cancelar
+          </Button>
+          {tab === "gestion" && (
+            <Button
+              onClick={onSubmit}
+              disabled={isPending}
+              className={cn(
+                "flex-1 h-12 rounded-xl font-bold shadow-lg transition-all",
+                watchSolicitud
+                  ? "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20"
+                  : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20",
+              )}
+            >
+              {isPending ? (
+                <Loader2 className="animate-spin mr-2" size={18} />
+              ) : null}
+              {watchSolicitud ? "Devolver al Asesor" : "Procesar Venta"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

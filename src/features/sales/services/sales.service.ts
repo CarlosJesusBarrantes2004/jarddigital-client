@@ -1,8 +1,10 @@
 import { api } from "@/api/axios";
+
 import type {
   Venta,
   CreateVentaPayload,
-  UpdateVentaPayload,
+  UpdateVentaAsesorPayload,
+  UpdateVentaBackofficePayload,
   VentaFiltros,
   PaginatedResponse,
   EstadoSOT,
@@ -16,18 +18,104 @@ import type {
   Distrito,
 } from "../types/sales.types";
 
+// ── Normalizar respuesta paginada o lista simple ──────────────────────────────
 function normalizeList<T>(data: unknown): PaginatedResponse<T> {
-  if (Array.isArray(data)) {
+  if (Array.isArray(data))
     return {
       count: data.length,
       next: null,
       previous: null,
       results: data as T[],
     };
-  }
   const paged = data as PaginatedResponse<T>;
-  if (paged.results !== undefined) return paged;
+  if (paged?.results !== undefined) return paged;
   return { count: 0, next: null, previous: null, results: [] };
+}
+
+// ==========================================
+// CLOUDINARY — Upload de audios
+// Recomendado sobre AWS S3 para este caso:
+// ✓ SDK simple (solo un POST a una URL pública)
+// ✓ Sin presigned URLs ni IAM roles complejos
+// ✓ Free tier generoso (25GB/mes)
+// ✓ URL inmutable por hash del contenido
+// ✓ Soporte nativo para audio/mp3
+// Para usar: crear cuenta en cloudinary.com,
+// ir a Settings > Upload > Add upload preset (unsigned)
+// ==========================================
+
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? "";
+const CLOUDINARY_UPLOAD_PRESET =
+  import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ?? "";
+
+export interface CloudinaryUploadResult {
+  url: string;
+  public_id: string;
+  secure_url: string;
+}
+
+/**
+ * Sube un archivo de audio a Cloudinary y devuelve la URL segura.
+ * @param file El archivo MP3 a subir
+ * @param onProgress Callback de progreso (0-100)
+ */
+export async function uploadAudioToCloudinary(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<string> {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error(
+      "Configura VITE_CLOUDINARY_CLOUD_NAME y VITE_CLOUDINARY_UPLOAD_PRESET en tu .env",
+    );
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("resource_type", "video"); // Cloudinary trata audios como "video"
+  formData.append("folder", "audios_ventas");
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(
+      "POST",
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`,
+    );
+
+    if (onProgress) {
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+    }
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const result: CloudinaryUploadResult = JSON.parse(xhr.responseText);
+        resolve(result.secure_url);
+      } else {
+        reject(
+          new Error(`Error Cloudinary: ${xhr.status} ${xhr.responseText}`),
+        );
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Error de red al subir a Cloudinary"));
+    xhr.send(formData);
+  });
+}
+
+/**
+ * Elimina un audio de Cloudinary dado su public_id.
+ * Nota: requiere firma del servidor para delete — se recomienda
+ * exponer un endpoint Django que llame a cloudinary.uploader.destroy()
+ */
+export async function deleteAudioFromCloudinary(
+  publicId: string,
+): Promise<void> {
+  // El borrado firmado se delega al backend para no exponer el API Secret
+  await api.post("/sales/audios/delete-cloudinary/", { public_id: publicId });
 }
 
 // ==========================================
@@ -60,16 +148,20 @@ export const salesService = {
     return data;
   },
 
-  updateVenta: async (
+  updateVentaAsesor: async (
     id: number,
-    payload: UpdateVentaPayload,
+    payload: UpdateVentaAsesorPayload,
   ): Promise<Venta> => {
     const { data } = await api.patch<Venta>(`/sales/ventas/${id}/`, payload);
     return data;
   },
 
-  deleteVenta: async (id: number): Promise<void> => {
-    await api.delete(`/sales/ventas/${id}/`);
+  updateVentaBackoffice: async (
+    id: number,
+    payload: UpdateVentaBackofficePayload,
+  ): Promise<Venta> => {
+    const { data } = await api.patch<Venta>(`/sales/ventas/${id}/`, payload);
+    return data;
   },
 };
 
@@ -94,8 +186,14 @@ export const catalogosService = {
     const { data } = await api.get("/sales/productos/?activo=true");
     return normalizeList<Producto>(data).results;
   },
-  getGrabadores: async (): Promise<GrabadorAudio[]> => {
-    const { data } = await api.get("/sales/grabadores/");
+  // Actualiza solo esta función dentro de catalogosService
+  getGrabadores: async (
+    includeId?: number | null,
+  ): Promise<GrabadorAudio[]> => {
+    const url = includeId
+      ? `/sales/grabadores/?include_id=${includeId}`
+      : "/sales/grabadores/";
+    const { data } = await api.get(url);
     return normalizeList<GrabadorAudio>(data).results;
   },
   getTiposDocumento: async (): Promise<TipoDocumento[]> => {
@@ -106,9 +204,6 @@ export const catalogosService = {
 
 // ==========================================
 // UBIGEO
-// El backend filtra así:
-//   provincias: ?id_departamento=X   (nombre del FK en el modelo)
-//   distritos:  ?id_provincia=X
 // ==========================================
 
 export const ubigeoService = {
@@ -116,25 +211,18 @@ export const ubigeoService = {
     const { data } = await api.get("/ubigeo/departamentos/");
     return normalizeList<Departamento>(data).results;
   },
-
-  // Filtra por el nombre exacto del FK: id_departamento
   getProvincias: async (departamentoId: number): Promise<Provincia[]> => {
     const { data } = await api.get(
       `/ubigeo/provincias/?id_departamento=${departamentoId}`,
     );
     return normalizeList<Provincia>(data).results;
   },
-
-  // Filtra por el nombre exacto del FK: id_provincia
   getDistritos: async (provinciaId: number): Promise<Distrito[]> => {
     const { data } = await api.get(
       `/ubigeo/distritos/?id_provincia=${provinciaId}`,
     );
     return normalizeList<Distrito>(data).results;
   },
-
-  // Para pre-llenar la cascada en edición:
-  // Dado un distrito_id, devuelve el distrito con su provincia e id_departamento
   getDistritoConPadres: async (
     distritoId: number,
   ): Promise<{
@@ -143,11 +231,9 @@ export const ubigeoService = {
     distritoId: number;
   } | null> => {
     try {
-      // 1. Obtenemos el distrito (tiene id_provincia)
       const { data: distrito } = await api.get<Distrito>(
         `/ubigeo/distritos/${distritoId}/`,
       );
-      // 2. Obtenemos la provincia (tiene id_departamento)
       const { data: provincia } = await api.get<Provincia>(
         `/ubigeo/provincias/${distrito.id_provincia}/`,
       );

@@ -5,10 +5,10 @@ import {
   ubigeoService,
 } from "../services/sales.service";
 import type {
-  Venta,
   VentaFiltros,
   CreateVentaPayload,
-  UpdateVentaPayload,
+  UpdateVentaAsesorPayload,
+  UpdateVentaBackofficePayload,
   EstadisticasAsesor,
 } from "../types/sales.types";
 
@@ -47,7 +47,7 @@ export function useVentas(filtros?: VentaFiltros) {
   return useQuery({
     queryKey: salesKeys.list(filtros),
     queryFn: () => salesService.getVentas(filtros),
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 30, // 30s
   });
 }
 
@@ -55,34 +55,38 @@ export function useVenta(id: number, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: salesKeys.detail(id),
     queryFn: () => salesService.getVenta(id),
-    enabled: !!id,
-    ...options,
+    enabled: !!id && (options?.enabled ?? true),
+    staleTime: 1000 * 60,
   });
 }
 
 // ==========================================
-// ESTADÍSTICAS ASESOR (calculadas del query)
+// ESTADÍSTICAS ASESOR
 // ==========================================
 
 export function useEstadisticasAsesor(): {
   stats: EstadisticasAsesor;
   isLoading: boolean;
 } {
+  // Trae todas las ventas sin filtros (el backend ya filtra por asesor)
   const { data, isLoading } = useVentas();
-
   const ventas = data?.results ?? [];
+
   const stats: EstadisticasAsesor = {
     total: data?.count ?? 0,
-    atendidas: ventas.filter(
-      (v) => v.codigo_estado?.toUpperCase() === "ATENDIDO",
+    pendientes: ventas.filter(
+      (v) => v.id_estado_sot === null && !v.solicitud_correccion,
     ).length,
     en_ejecucion: ventas.filter(
       (v) => v.codigo_estado?.toUpperCase() === "EJECUCION",
     ).length,
+    atendidas: ventas.filter(
+      (v) => v.codigo_estado?.toUpperCase() === "ATENDIDO",
+    ).length,
     rechazadas: ventas.filter(
       (v) => v.codigo_estado?.toUpperCase() === "RECHAZADO",
     ).length,
-    pendientes: ventas.filter((v) => v.id_estado_sot === null).length,
+    en_correccion: ventas.filter((v) => v.solicitud_correccion).length,
   };
 
   return { stats, isLoading };
@@ -99,28 +103,32 @@ export function useCreateVenta() {
       salesService.createVenta(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.lists() });
+      qc.invalidateQueries({ queryKey: salesKeys.catalogos.grabadores }); // <-- ESTO BORRA EL CACHÉ
     },
   });
 }
 
-export function useUpdateVenta(id: number) {
+export function useUpdateVentaAsesor(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdateVentaPayload) =>
-      salesService.updateVenta(id, payload),
+    mutationFn: (payload: UpdateVentaAsesorPayload) =>
+      salesService.updateVentaAsesor(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.lists() });
       qc.invalidateQueries({ queryKey: salesKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: salesKeys.catalogos.grabadores }); // <-- ESTO BORRA EL CACHÉ
     },
   });
 }
 
-export function useDeleteVenta() {
+export function useUpdateVentaBackoffice(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => salesService.deleteVenta(id),
+    mutationFn: (payload: UpdateVentaBackofficePayload) =>
+      salesService.updateVentaBackoffice(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.lists() });
+      qc.invalidateQueries({ queryKey: salesKeys.detail(id) });
     },
   });
 }
@@ -157,15 +165,15 @@ export function useProductos() {
   return useQuery({
     queryKey: salesKeys.catalogos.productos,
     queryFn: catalogosService.getProductos,
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
   });
 }
 
-export function useGrabadores() {
+export function useGrabadores(includeId?: number | null) {
   return useQuery({
-    queryKey: salesKeys.catalogos.grabadores,
-    queryFn: catalogosService.getGrabadores,
-    staleTime: 1000 * 60 * 5, // 5 min
+    queryKey: [...salesKeys.catalogos.grabadores, includeId],
+    queryFn: () => catalogosService.getGrabadores(includeId),
+    staleTime: 1000 * 60 * 5,
   });
 }
 
@@ -178,7 +186,7 @@ export function useTiposDocumento() {
 }
 
 // ==========================================
-// UBIGEO QUERIES (cascada)
+// UBIGEO QUERIES
 // ==========================================
 
 export function useDepartamentos() {
@@ -210,8 +218,18 @@ export function useDistritos(provinciaId: number | null | undefined) {
 export function useDistritoById(distritoId: number | null | undefined) {
   return useQuery({
     queryKey: salesKeys.ubigeo.distritoById(distritoId!),
-    queryFn: () => ubigeoService.getDistritoById(distritoId!),
+    queryFn: () => ubigeoService.getDistritoConPadres(distritoId!),
     enabled: !!distritoId,
     staleTime: Infinity,
+  });
+}
+
+export function useDeleteVentaAsesor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/sales/ventas/${id}/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: salesKeys.lists() });
+    },
   });
 }

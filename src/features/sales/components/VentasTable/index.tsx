@@ -1,18 +1,9 @@
 import {
-  useReactTable,
-  getCoreRowModel,
   flexRender,
+  getCoreRowModel,
+  useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Loader2, PackageOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DataTableProps<TData> {
@@ -22,11 +13,28 @@ interface DataTableProps<TData> {
   emptyMessage?: string;
 }
 
+function SkeletonRow({ cols }: { cols: number }) {
+  return (
+    <tr className="border-b border-border">
+      {Array.from({ length: cols }).map((_, i) => (
+        <td key={i} className="p-4 align-middle">
+          <div
+            className={cn(
+              "h-3 rounded-md bg-muted animate-pulse",
+              i === 0 ? "w-12" : i % 2 === 0 ? "w-[65%]" : "w-[45%]",
+            )}
+          />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 export function DataTable<TData>({
   columns,
   data,
-  isLoading = false,
-  emptyMessage = "No hay registros",
+  isLoading,
+  emptyMessage = "Sin resultados",
 }: DataTableProps<TData>) {
   const table = useReactTable({
     data,
@@ -35,71 +43,59 @@ export function DataTable<TData>({
   });
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow
-              key={headerGroup.id}
-              className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50"
-            >
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  className="text-xs font-semibold uppercase tracking-wider text-zinc-500"
-                  style={{ width: header.column.columnDef.size }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="py-12 text-center">
-                <div className="flex flex-col items-center gap-2 text-zinc-400">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="text-sm">Cargando ventas...</span>
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : table.getRowModel().rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="py-12 text-center">
-                <div className="flex flex-col items-center gap-2 text-zinc-400">
-                  <PackageOpen className="h-8 w-8" />
-                  <span className="text-sm">{emptyMessage}</span>
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className={cn(
-                  "border-zinc-100 transition-colors hover:bg-zinc-50",
-                  row.original &&
-                    (row.original as { activo?: boolean }).activo === false &&
-                    "opacity-50",
-                )}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-3 text-sm">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
+    <div className="rounded-2xl overflow-hidden border border-border bg-card/50 shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead className="bg-muted/30 border-b border-border">
+            {table.getHeaderGroups().map((hg) => (
+              <tr key={hg.id}>
+                {hg.headers.map((h) => (
+                  <th
+                    key={h.id}
+                    className="px-5 py-3.5 text-left text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap"
+                  >
+                    {h.isPlaceholder
+                      ? null
+                      : flexRender(h.column.columnDef.header, h.getContext())}
+                  </th>
                 ))}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+              </tr>
+            ))}
+          </thead>
+          <tbody className="divide-y divide-border">
+            {isLoading ? (
+              Array.from({ length: 7 }).map((_, i) => (
+                <SkeletonRow key={i} cols={columns.length} />
+              ))
+            ) : table.getRowModel().rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="py-20 text-center text-sm font-sans text-muted-foreground/60"
+                >
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="transition-colors hover:bg-muted/40 group bg-card"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-5 py-3.5 align-middle">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

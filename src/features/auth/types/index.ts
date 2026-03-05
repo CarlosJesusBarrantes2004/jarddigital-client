@@ -1,18 +1,14 @@
-import type { RoleCode } from "@/features/core/types";
+import type { RoleCode, Role } from "@/features/core/types";
 
-export interface Role {
-  id: number;
-  codigo: RoleCode;
-  nombre: string;
-  nivel_jerarquia: number;
-  activo: boolean;
-}
+export type { RoleCode, Role };
 
-export interface Branch {
+export interface Workspace {
+  id_modalidad_sede: number;
   id_sucursal: number;
   nombre_sucursal: string;
   id_modalidad: number;
   nombre_modalidad: string;
+  etiqueta: string;
 }
 
 export interface User {
@@ -21,6 +17,15 @@ export interface User {
   nombre_completo: string;
   email: string;
   rol: Role;
-  sucursales: Branch[];
+  sucursales: Workspace[];
   activo: boolean;
+}
+
+export interface ActiveWorkspace {
+  id_modalidad_sede: number;
+  id_sucursal: number;
+  nombre_sucursal: string;
+  id_modalidad: number;
+  nombre_modalidad: string;
+  etiqueta: string;
 }

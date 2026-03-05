@@ -1,9 +1,5 @@
-import { Edit2, Trash2 } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-
+import { Edit2, Trash2, Building2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Branch } from "../../types";
 
 interface BranchesTableProps {
@@ -19,90 +15,123 @@ export const BranchesTable = ({
 }: BranchesTableProps) => {
   if (branches.length === 0)
     return (
-      <Card className="p-8 text-center text-muted-foreground border-dashed">
-        No se encontraron sucursales.
-      </Card>
+      <div className="py-16 text-center flex flex-col items-center justify-center text-muted-foreground bg-card">
+        <Building2 size={32} className="mb-3 opacity-50" />
+        <p className="text-sm font-medium">No hay sucursales registradas.</p>
+      </div>
     );
 
   return (
-    <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-primary/10 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Nombre
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Dirección
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Modalidades
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">
-                Estado
-              </th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {branches.map((sucursal) => (
-              <tr
-                key={sucursal.id}
-                className="hover:bg-muted/50 transition-colors"
-              >
-                <td className="px-6 py-3 text-sm font-medium">
-                  {sucursal.nombre}
-                </td>
-                <td className="px-6 py-3 text-sm text-muted-foreground">
-                  {sucursal.direccion}
-                </td>
-                <td className="px-6 py-3 text-sm">
-                  <div className="flex flex-wrap gap-1">
-                    {sucursal.modalidades?.map((m) => (
-                      <Badge key={m.id} variant="secondary" className="text-xs">
-                        {m.nombre}
-                      </Badge>
-                    ))}
-                    {(!sucursal.modalidades ||
-                      sucursal.modalidades.length === 0) && (
-                      <span className="text-xs text-muted-foreground">
-                        Sin modalidades
-                      </span>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left font-sans">
+        <thead className="bg-muted/50 border-b border-border">
+          <tr>
+            <th className="px-6 py-3.5 text-left font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+              Sede Operativa
+            </th>
+            <th className="px-6 py-3.5 text-left font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground whitespace-nowrap hidden sm:table-cell">
+              Dirección
+            </th>
+            <th className="px-6 py-3.5 text-left font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+              Modalidades
+            </th>
+            <th className="px-6 py-3.5 text-left font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+              Estado
+            </th>
+            <th className="px-6 py-3.5 text-center font-mono text-[10px] font-medium uppercase tracking-widest text-muted-foreground whitespace-nowrap w-24">
+              Acciones
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {branches.map((sucursal) => (
+            <tr
+              key={sucursal.id}
+              className="hover:bg-muted/30 transition-colors group bg-card"
+            >
+              <td className="px-6 py-4 align-middle">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 transition-colors">
+                    <Building2 size={16} />
+                  </div>
+                  <span className="font-semibold text-[14px] text-foreground tracking-tight">
+                    {sucursal.nombre}
+                  </span>
+                </div>
+              </td>
+
+              <td className="px-6 py-4 align-middle hidden sm:table-cell">
+                <span className="text-[12px] text-muted-foreground font-mono">
+                  {sucursal.direccion || "—"}
+                </span>
+              </td>
+
+              <td className="px-6 py-4 align-middle">
+                <div className="flex flex-wrap gap-1.5">
+                  {sucursal.modalidades?.map((m) => (
+                    <span
+                      key={m.id}
+                      className="px-2.5 py-0.5 rounded-md bg-muted border border-border text-[10px] font-mono text-muted-foreground uppercase tracking-widest"
+                    >
+                      {m.nombre}
+                    </span>
+                  ))}
+                  {(!sucursal.modalidades ||
+                    sucursal.modalidades.length === 0) && (
+                    <span className="text-[11px] text-muted-foreground/50 italic">
+                      Sin modalidades
+                    </span>
+                  )}
+                </div>
+              </td>
+
+              <td className="px-6 py-4 align-middle">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full shrink-0",
+                      sucursal.activo
+                        ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                        : "bg-muted-foreground/40",
                     )}
-                  </div>
-                </td>
-                <td className="px-6 py-3 text-sm">
-                  <Badge variant={sucursal.activo ? "default" : "secondary"}>
-                    {sucursal.activo ? "Activo" : "Inactivo"}
-                  </Badge>
-                </td>
-                <td className="px-6 py-3">
-                  <div className="flex justify-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onEdit(sucursal)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onDelete(sucursal.id)}
-                      className="text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+                  />
+                  <span
+                    className={cn(
+                      "text-[11px] font-semibold uppercase tracking-widest",
+                      sucursal.activo
+                        ? "text-foreground/80"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {sucursal.activo ? "Activa" : "Inactiva"}
+                  </span>
+                </div>
+              </td>
+
+              <td className="px-6 py-4 align-middle text-center">
+                <div className="flex justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(sucursal)}
+                    title="Editar"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-500/30 border border-transparent transition-all"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(sucursal.id)}
+                    title="Desactivar"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 border border-transparent transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };

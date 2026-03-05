@@ -63,47 +63,51 @@ export function RolesManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border shadow-sm">
+      {/* ── Toolbar ── */}
+      <div className="bg-card/50 border border-border rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
             Catálogo de Roles
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-[13px] text-muted-foreground font-light">
             Define los permisos y jerarquías del sistema.
           </p>
         </div>
         <Button
           onClick={() => handleOpenSheet(null)}
-          className="w-full sm:w-auto gap-2 shadow-sm"
+          className="w-full sm:w-auto gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-10 px-5 shadow-[0_4px_16px_rgba(var(--primary),0.2)] hover:-translate-y-[1px] transition-all active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4" />
-          Nuevo Rol
+          <Plus size={16} /> <span className="font-semibold">Nuevo Rol</span>
         </Button>
       </div>
 
+      {/* ── Tabla ── */}
       {loading ? (
         <GlobalLoader
           fullScreen={false}
           message="Cargando roles del sistema..."
         />
       ) : (
-        <RolesTable
-          roles={roles}
-          onEdit={(role) => handleOpenSheet(role)}
-          onDelete={setRoleToDelete}
-        />
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+          <RolesTable
+            roles={roles}
+            onEdit={(role) => handleOpenSheet(role)}
+            onDelete={setRoleToDelete}
+          />
+        </div>
       )}
 
+      {/* ── Sheet Form ── */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-md overflow-y-auto border-l shadow-2xl"
+          className="w-full sm:max-w-md overflow-y-auto p-0 bg-background border-l border-border"
         >
-          <SheetHeader>
-            <SheetTitle className="text-xl">
+          <SheetHeader className="px-6 py-6 border-b border-border bg-card/50">
+            <SheetTitle className="font-serif text-xl text-foreground">
               {selectedRole ? "Editar Rol" : "Nuevo Rol"}
             </SheetTitle>
-            <SheetDescription>
+            <SheetDescription className="text-sm text-muted-foreground">
               {selectedRole
                 ? "Modifica la estructura o jerarquía de este rol."
                 : "Agrega un nuevo rol de acceso para los empleados."}
@@ -118,25 +122,28 @@ export function RolesManager() {
         </SheetContent>
       </Sheet>
 
+      {/* ── Dialog Delete ── */}
       <AlertDialog
         open={!!roleToDelete}
         onOpenChange={() => setRoleToDelete(null)}
       >
-        <AlertDialogContent className="sm:max-w-[425px]">
+        <AlertDialogContent className="bg-background border border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+            <AlertDialogTitle className="font-serif text-foreground">
               ¿Eliminar rol del sistema?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600">
+            <AlertDialogDescription className="text-muted-foreground text-sm">
               Esta acción no se puede deshacer. Los usuarios asignados a este
               rol perderán todos sus privilegios operativos inmediatamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0 mt-4">
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border border-border text-foreground hover:bg-muted rounded-xl">
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-destructive text-white hover:bg-destructive/90 shadow-sm"
+              className="bg-destructive/10 border border-destructive/30 text-destructive hover:bg-destructive/20 hover:text-destructive rounded-xl"
             >
               Sí, eliminar
             </AlertDialogAction>

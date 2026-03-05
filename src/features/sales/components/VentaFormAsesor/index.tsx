@@ -1,36 +1,277 @@
 import { useState, useEffect, useCallback } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  Loader2,
+  User,
+  MapPin,
+  Mic,
+  AlertTriangle,
+  ChevronDown,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-
-import {
-  createVentaSchema,
-  type CreateVentaFormValues,
-} from "../../schemas/venta.schema";
 import {
   useCreateVenta,
+  useUpdateVentaAsesor,
   useTiposDocumento,
-  useDistritoById,
+  useProductos,
+  useGrabadores,
 } from "../../hooks/useSales";
 import type { Venta } from "../../types/sales.types";
-import { StepDatosCliente } from "./StepDatosCliente";
-import { StepUbicacion } from "./StepUbicacion";
-import { StepAudios } from "./StepAudios";
+import {
+  ETIQUETAS_AUDIO_DNI as ETIQUETAS_DNI,
+  ETIQUETAS_AUDIO_RUC as ETIQUETAS_RUC,
+} from "../../types/sales.types";
+import { UbigeoCascada } from "./UbigeoCascada";
+import { AudioUploadField } from "./AudioUploadField";
+import { Button } from "@/components/ui/button";
 
+// ── Zod schema ────────────────────────────────────────────────────────────────
+const schema = z
+  .object({
+    id_producto: z.number({ required_error: "Selecciona un producto" }),
+    tecnologia: z.string().min(1, "Selecciona tecnología"),
+    id_tipo_documento: z.number({
+      required_error: "Selecciona tipo de documento",
+    }),
+    cliente_numero_doc: z.string().min(1, "Número de documento requerido"),
+    cliente_nombre: z.string().min(2, "Nombre requerido"),
+    cliente_telefono: z.string().min(7, "Teléfono requerido"),
+    cliente_email: z.string().email("Email inválido"),
+    cliente_fecha_nacimiento: z
+      .string()
+      .min(1, "Fecha de nacimiento requerida"),
+    cliente_papa: z.string().min(2, "Nombre del padre requerido"),
+    cliente_mama: z.string().min(2, "Nombre de la madre requerido"),
+    numero_instalacion: z.string().min(1, "Número de instalación requerido"),
+    cant_decos_adicionales: z.number().min(0).default(0),
+    cant_repetidores_adicionales: z.number().min(0).default(0),
+    representante_legal_dni: z.string().nullable().optional(),
+    representante_legal_nombre: z.string().nullable().optional(),
+
+    // Ubigeo instalación
+    dep_inst_id: z.number().nullable(),
+    prov_inst_id: z.number().nullable(),
+    id_distrito_instalacion: z
+      .number({ required_error: "Selecciona distrito de instalación" })
+      .nullable(),
+
+    // Ubigeo nacimiento
+    dep_nac_id: z.number().nullable(),
+    prov_nac_id: z.number().nullable(),
+    id_distrito_nacimiento: z.number().nullable(),
+
+    referencias: z.string().optional(),
+    plano: z.string().min(1, "Número de plano requerido"),
+    direccion_detalle: z.string().min(5, "Dirección requerida"),
+    coordenadas_gps: z.string().optional(),
+    es_full_claro: z.boolean().default(false),
+    score_crediticio: z.string().optional(),
+    id_grabador_audios: z.number({ required_error: "Selecciona grabador" }),
+    audio_urls: z.array(z.string()).default([]),
+  })
+  .refine((d) => d.id_distrito_instalacion !== null, {
+    message: "Selecciona el distrito de instalación",
+    path: ["id_distrito_instalacion"],
+  });
+
+type FormValues = z.infer<typeof schema>;
+
+// ── Pasos ─────────────────────────────────────────────────────────────────────
 const PASOS = [
-  { label: "Datos del Cliente" },
-  { label: "Instalación" },
-  { label: "Audios" },
+  { id: "cliente", label: "Cliente", icon: User },
+  { id: "ubicacion", label: "Ubicación", icon: MapPin },
+  { id: "audios", label: "Audios", icon: Mic },
 ];
+
+// ── Helpers UI ────────────────────────────────────────────────────────────────
+function FieldLabel({
+  children,
+  required,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-1.5">
+      {children}
+      {required && <span className="text-destructive ml-1">*</span>}
+    </p>
+  );
+}
+
+function TextInput({
+  label,
+  error,
+  required,
+  disabled,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <input
+        {...props}
+        disabled={disabled}
+        className={cn(
+          "w-full px-3.5 py-2.5 rounded-xl bg-background border text-sm font-sans text-foreground outline-none transition-all duration-200 focus:ring-4 focus:ring-primary/10",
+          disabled
+            ? "bg-muted opacity-60 cursor-not-allowed text-muted-foreground"
+            : "hover:border-primary/50",
+          error
+            ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+            : "border-border focus:border-primary",
+        )}
+      />
+      {error && (
+        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+          <AlertTriangle size={10} /> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function NativeSelect({
+  label,
+  error,
+  required,
+  value,
+  onChange,
+  children,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  error?: string;
+  required?: boolean;
+  value: string | number;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className={cn(
+            "w-full h-10 pl-3.5 pr-10 rounded-xl bg-background border text-sm font-sans outline-none appearance-none transition-all duration-200 focus:ring-4 focus:ring-primary/10",
+            disabled
+              ? "cursor-not-allowed bg-muted opacity-60"
+              : "cursor-pointer hover:border-primary/50",
+            value ? "text-foreground" : "text-muted-foreground",
+            error
+              ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+              : "border-border focus:border-primary",
+          )}
+        >
+          {placeholder && <option value="">{placeholder}</option>}
+          {children}
+        </select>
+        <ChevronDown
+          size={14}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+        />
+      </div>
+      {error && (
+        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+          <AlertTriangle size={10} /> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Toggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200",
+        checked
+          ? "bg-primary/10 border-primary/30"
+          : "bg-card border-border hover:bg-muted",
+      )}
+    >
+      <div>
+        <p
+          className={cn(
+            "text-sm font-medium",
+            checked ? "text-primary" : "text-foreground",
+          )}
+        >
+          {label}
+        </p>
+        {description && (
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {description}
+          </p>
+        )}
+      </div>
+      <div
+        className={cn(
+          "w-11 h-6 rounded-full relative transition-colors shrink-0",
+          checked ? "bg-primary" : "bg-muted-foreground/30",
+        )}
+      >
+        <div
+          className={cn(
+            "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+            checked ? "left-6" : "left-1",
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("mb-4 pb-2 border-b border-border/50", className)}>
+      <p className="font-mono text-[11px] tracking-widest uppercase font-bold text-primary">
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="h-px bg-border my-6" />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface VentaFormAsesorProps {
   open: boolean;
@@ -38,312 +279,859 @@ interface VentaFormAsesorProps {
   ventaOrigen?: Venta | null;
 }
 
-const EMPTY: Partial<CreateVentaFormValues> = {
-  es_full_claro: false,
-  audios: [],
-  _codigo_tipo_doc: "",
-  dep_nacimiento_id: null,
-  prov_nacimiento_id: null,
-  id_distrito_nacimiento: null,
-  dep_instalacion_id: null,
-  prov_instalacion_id: null,
-};
-
 export function VentaFormAsesor({
   open,
   onClose,
   ventaOrigen,
 }: VentaFormAsesorProps) {
   const [paso, setPaso] = useState(0);
-  const { mutateAsync: crearVenta, isPending } = useCreateVenta();
+  const esEdicion = !!ventaOrigen;
+
+  console.log(ventaOrigen);
+
+  const { mutateAsync: crearVenta, isPending: creando } = useCreateVenta();
+  const { mutateAsync: editarVenta, isPending: editando } =
+    useUpdateVentaAsesor(ventaOrigen?.id ?? 0);
+  const isPending = creando || editando;
+
   const { data: tiposDoc = [] } = useTiposDocumento();
+  const { data: productos = [] } = useProductos();
 
-  // Resolvemos padres ubigeo. Las queries se lanzan en cuanto hay un ID,
-  // incluso antes de abrir el modal — cuando lleguen, buildValues las usará.
-  const { data: padresInst, isLoading: loadingInst } = useDistritoById(
-    ventaOrigen?.id_distrito_instalacion ?? null,
-  );
-  const { data: padresNac, isLoading: loadingNac } = useDistritoById(
-    ventaOrigen?.id_distrito_nacimiento ?? null,
-  );
+  const grabadorActualId = ventaOrigen
+    ? typeof ventaOrigen.id_grabador_audios === "object"
+      ? (ventaOrigen.id_grabador_audios as any).id
+      : ventaOrigen.id_grabador_audios
+    : null;
 
-  const esReingreso = !!ventaOrigen;
+  const { data: grabadores = [] } = useGrabadores(grabadorActualId);
 
-  // Esperamos a que TODOS los datos async estén listos
-  const cargandoUbigeo =
-    esReingreso &&
-    (loadingInst || (!!ventaOrigen?.id_distrito_nacimiento && loadingNac));
+  console.log(grabadores);
 
-  const form = useForm<CreateVentaFormValues>({
-    resolver: zodResolver(createVentaSchema),
-    defaultValues: EMPTY as CreateVentaFormValues,
+  const [audioIds, setAudioIds] = useState<(number | undefined)[]>([]);
+  const [audioUrls, setAudioUrls] = useState<(string | null)[]>([]);
+  const [audioUploading, setAudioUploading] = useState<boolean[]>([]);
+  const [audioErrors, setAudioErrors] = useState<(string | null)[]>([]);
+
+  const [audioRechazados, setAudioRechazados] = useState<boolean[]>([]);
+  const [audioMotivos, setAudioMotivos] = useState<(string | null)[]>([]);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      cant_decos_adicionales: 0,
+      cant_repetidores_adicionales: 0,
+      es_full_claro: false,
+      audio_urls: [],
+      dep_inst_id: null,
+      prov_inst_id: null,
+      id_distrito_instalacion: null,
+      dep_nac_id: null,
+      prov_nac_id: null,
+      id_distrito_nacimiento: null,
+    },
   });
 
-  const buildValues = useCallback((): CreateVentaFormValues => {
-    if (!ventaOrigen) return EMPTY as CreateVentaFormValues;
+  console.log(form);
 
-    const tipoDoc = tiposDoc.find(
-      (t) => t.id === ventaOrigen.id_tipo_documento,
-    );
+  const tipoDocId = form.watch("id_tipo_documento");
+  const tipoDoc = tiposDoc.find((t) => t.id === tipoDocId);
+  const esRUC = tipoDoc?.codigo?.toUpperCase() === "RUC";
+  const etiquetasAudio = esRUC ? ETIQUETAS_RUC : ETIQUETAS_DNI;
 
-    return {
-      id_producto: ventaOrigen.id_producto,
-      tecnologia: ventaOrigen.tecnologia,
-      id_tipo_documento: ventaOrigen.id_tipo_documento,
-      _codigo_tipo_doc: tipoDoc?.codigo ?? "",
-      cliente_numero_doc: ventaOrigen.cliente_numero_doc,
-      cliente_nombre: ventaOrigen.cliente_nombre,
-      cliente_telefono: ventaOrigen.cliente_telefono,
-      cliente_email: ventaOrigen.cliente_email ?? "",
-      cliente_papa: ventaOrigen.cliente_papa,
-      cliente_mama: ventaOrigen.cliente_mama,
-      cliente_fecha_nacimiento:
-        ventaOrigen.cliente_fecha_nacimiento?.split("T")[0] ?? "",
-      numero_instalacion: ventaOrigen.numero_instalacion,
-      representante_legal_dni: ventaOrigen.representante_legal_dni ?? "",
-      representante_legal_nombre: ventaOrigen.representante_legal_nombre ?? "",
-
-      // Ubigeo — con padres ya resueltos
-      dep_instalacion_id: padresInst?.departamentoId ?? null,
-      prov_instalacion_id: padresInst?.provinciaId ?? null,
-      id_distrito_instalacion: ventaOrigen.id_distrito_instalacion,
-
-      dep_nacimiento_id: padresNac?.departamentoId ?? null,
-      prov_nacimiento_id: padresNac?.provinciaId ?? null,
-      id_distrito_nacimiento: ventaOrigen.id_distrito_nacimiento ?? null,
-
-      referencias: ventaOrigen.referencias ?? "",
-      plano: ventaOrigen.plano,
-      direccion_detalle: ventaOrigen.direccion_detalle,
-      coordenadas_gps: ventaOrigen.coordenadas_gps ?? "",
-      es_full_claro: ventaOrigen.es_full_claro,
-      score_crediticio: ventaOrigen.score_crediticio ?? "",
-      id_grabador_audios: ventaOrigen.id_grabador_audios,
-
-      // Audios: copiamos solo etiqueta+url (el resto lo pone el backend)
-      audios: (ventaOrigen.audios ?? []).map((a) => ({
-        nombre_etiqueta: a.nombre_etiqueta,
-        url_audio: a.url_audio,
-      })),
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventaOrigen?.id, padresInst, padresNac, tiposDoc.length]);
-
-  // Reset cuando: abre el modal Y los datos ubigeo ya llegaron
   useEffect(() => {
-    if (!open) return;
-    if (cargandoUbigeo) return;
-    form.reset(buildValues());
-    setPaso(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, cargandoUbigeo]);
+    const n = etiquetasAudio.length;
+    setAudioUrls(Array(n).fill(null));
+    setAudioIds(Array(n).fill(undefined));
+    setAudioUploading(Array(n).fill(false));
+    setAudioErrors(Array(n).fill(null));
+    setAudioRechazados(Array(n).fill(false));
+    setAudioMotivos(Array(n).fill(null));
+  }, [etiquetasAudio.length]);
 
-  const irSiguiente = async () => {
-    let campos: (keyof CreateVentaFormValues)[] = [];
-    if (paso === 0) {
-      campos = [
-        "id_producto",
-        "tecnologia",
-        "id_tipo_documento",
-        "cliente_numero_doc",
-        "cliente_nombre",
-        "cliente_papa",
-        "cliente_mama",
-        "cliente_telefono",
-        "cliente_email",
-        "cliente_fecha_nacimiento",
-        "numero_instalacion",
-      ];
-    } else if (paso === 1) {
-      campos = [
-        "dep_instalacion_id",
-        "prov_instalacion_id",
-        "id_distrito_instalacion",
-        "plano",
-        "direccion_detalle",
-        "coordenadas_gps",
-        "score_crediticio",
-      ];
-    }
-    const ok = await form.trigger(campos);
-    if (ok) setPaso((p) => p + 1);
-  };
+  useEffect(() => {
+    if (!ventaOrigen || !open) return;
+    const v = ventaOrigen;
+    form.reset({
+      id_producto: v.id_producto,
+      tecnologia: v.tecnologia,
+      id_tipo_documento: v.id_tipo_documento,
+      cliente_numero_doc: v.cliente_numero_doc,
+      cliente_nombre: v.cliente_nombre,
+      cliente_telefono: v.cliente_telefono,
+      cliente_email: v.cliente_email,
+      cliente_fecha_nacimiento: v.cliente_fecha_nacimiento?.split("T")[0] ?? "",
+      cliente_papa: v.cliente_papa,
+      cliente_mama: v.cliente_mama,
+      numero_instalacion: v.numero_instalacion,
+      cant_decos_adicionales: v.cant_decos_adicionales ?? 0,
+      cant_repetidores_adicionales: v.cant_repetidores_adicionales ?? 0,
+      representante_legal_dni: v.representante_legal_dni ?? "",
+      representante_legal_nombre: v.representante_legal_nombre ?? "",
+      referencias: v.referencias ?? "",
+      plano: v.plano,
+      direccion_detalle: v.direccion_detalle,
+      coordenadas_gps: v.coordenadas_gps ?? "",
+      es_full_claro: v.es_full_claro,
+      score_crediticio: v.score_crediticio ?? "",
+      id_grabador_audios: v.id_grabador_audios,
+      dep_inst_id: null,
+      prov_inst_id: null,
+      id_distrito_instalacion: v.id_distrito_instalacion,
+      dep_nac_id: null,
+      prov_nac_id: null,
+      id_distrito_nacimiento: v.id_distrito_nacimiento ?? null,
+      audio_urls: [],
+    });
 
-  const onSubmit = async (values: CreateVentaFormValues) => {
-    try {
-      await crearVenta({
-        id_producto: values.id_producto,
-        tecnologia: values.tecnologia,
-        id_tipo_documento: values.id_tipo_documento,
-        cliente_numero_doc: values.cliente_numero_doc,
-        cliente_nombre: values.cliente_nombre,
-        cliente_telefono: values.cliente_telefono,
-        cliente_email: values.cliente_email,
-        id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-        cliente_papa: values.cliente_papa,
-        cliente_mama: values.cliente_mama,
-        numero_instalacion: values.numero_instalacion,
-        cliente_fecha_nacimiento: values.cliente_fecha_nacimiento,
-        representante_legal_dni: values.representante_legal_dni || null,
-        representante_legal_nombre: values.representante_legal_nombre || null,
-        id_distrito_instalacion: values.id_distrito_instalacion,
-        referencias: values.referencias ?? "",
-        plano: values.plano,
-        direccion_detalle: values.direccion_detalle,
-        coordenadas_gps: values.coordenadas_gps,
-        es_full_claro: values.es_full_claro,
-        score_crediticio: values.score_crediticio,
-        id_grabador_audios: values.id_grabador_audios,
-        audios: values.audios,
-        // Pasamos la referencia a la venta rechazada para que el backend la registre
-        ...(esReingreso && ventaOrigen ? { venta_origen: ventaOrigen.id } : {}),
-      });
-      toast.success(
-        esReingreso
-          ? "Venta reingresada exitosamente"
-          : "Venta registrada exitosamente",
-      );
-      handleClose();
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: Record<string, unknown> } };
-      if (err?.response?.data) {
-        const errores = err.response.data;
-        const primerError = Object.values(errores)[0];
-        toast.error(
-          Array.isArray(primerError) ? primerError[0] : String(primerError),
-        );
-      } else {
-        toast.error("Error al registrar la venta");
+    const newUrls = Array(etiquetasAudio.length).fill(null);
+    const newIds = Array(etiquetasAudio.length).fill(undefined);
+    const newRechazados = Array(etiquetasAudio.length).fill(false);
+    const newMotivos = Array(etiquetasAudio.length).fill(null);
+
+    etiquetasAudio.forEach((etiqueta, i) => {
+      // Buscamos si la venta original tenía este audio
+      const audioDB = v.audios.find((a) => a.nombre_etiqueta === etiqueta);
+      if (audioDB) {
+        newUrls[i] = audioDB.url_audio;
+        newIds[i] = audioDB.id;
+        // Si conforme es exactamente false, significa que el Backoffice lo rechazó
+        newRechazados[i] = audioDB.conforme === false;
+        newMotivos[i] = audioDB.motivo;
       }
-    }
-  };
+    });
+
+    setAudioUrls(newUrls);
+    setAudioIds(newIds);
+    setAudioRechazados(newRechazados);
+    setAudioMotivos(newMotivos);
+    setAudioUploading(Array(etiquetasAudio.length).fill(false));
+    setAudioErrors(Array(etiquetasAudio.length).fill(null));
+  }, [ventaOrigen, open, form, etiquetasAudio]);
 
   const handleClose = () => {
-    form.reset(EMPTY as CreateVentaFormValues);
+    form.reset();
     setPaso(0);
+    setAudioUrls([]);
     onClose();
   };
 
-  const mostrarLoader = esReingreso && cargandoUbigeo;
+  const handleAudioUploaded = useCallback((i: number, url: string) => {
+    setAudioUrls((prev) => {
+      const n = [...prev];
+      n[i] = url;
+      return n;
+    });
+    setAudioUploading((prev) => {
+      const n = [...prev];
+      n[i] = false;
+      return n;
+    });
+    setAudioErrors((prev) => {
+      const n = [...prev];
+      n[i] = null;
+      return n;
+    });
+  }, []);
+
+  const handleAudioRemove = useCallback((i: number) => {
+    setAudioUrls((prev) => {
+      const n = [...prev];
+      n[i] = null;
+      return n;
+    });
+    setAudioRechazados((prev) => {
+      const n = [...prev];
+      n[i] = false;
+      return n;
+    });
+  }, []);
+
+  const handleAudioStart = useCallback((i: number) => {
+    setAudioUploading((prev) => {
+      const n = [...prev];
+      n[i] = true;
+      return n;
+    });
+    setAudioErrors((prev) => {
+      const n = [...prev];
+      n[i] = null;
+      return n;
+    });
+  }, []);
+
+  const handleAudioError = useCallback((i: number, err: string) => {
+    setAudioUploading((prev) => {
+      const n = [...prev];
+      n[i] = false;
+      return n;
+    });
+    setAudioErrors((prev) => {
+      const n = [...prev];
+      n[i] = err;
+      return n;
+    });
+  }, []);
+
+  const todosAudiosListos =
+    audioUrls.length > 0 && audioUrls.every((u) => u !== null && u !== "");
+  const algunoSubiendo = audioUploading.some(Boolean);
+
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!todosAudiosListos) {
+      toast.error(`Debes subir los ${etiquetasAudio.length} audios requeridos`);
+      setPaso(2);
+      return;
+    }
+    if (algunoSubiendo) {
+      toast.error("Espera a que terminen de subir los audios");
+      return;
+    }
+
+    const audiosPayload = etiquetasAudio.map((etiqueta, i) => ({
+      id: audioIds[i],
+      nombre_etiqueta: etiqueta,
+      url_audio: audioUrls[i]!,
+    }));
+
+    try {
+      if (esEdicion) {
+        await editarVenta({
+          ...values,
+          representante_legal_dni: esRUC
+            ? (values.representante_legal_dni ?? null)
+            : null,
+          representante_legal_nombre: esRUC
+            ? (values.representante_legal_nombre ?? null)
+            : null,
+          id_distrito_instalacion: values.id_distrito_instalacion!,
+          id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+          audios: audiosPayload,
+        });
+        toast.success("Venta actualizada y enviada al Backoffice");
+      } else {
+        await crearVenta({
+          ...values,
+          representante_legal_dni: esRUC
+            ? (values.representante_legal_dni ?? null)
+            : null,
+          representante_legal_nombre: esRUC
+            ? (values.representante_legal_nombre ?? null)
+            : null,
+          id_distrito_instalacion: values.id_distrito_instalacion!,
+          id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+          audios: audiosPayload,
+        });
+        toast.success("Venta creada correctamente");
+      }
+      handleClose();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data
+          ? (Object.values(err.response.data)[0] as string)
+          : "Error al guardar la venta",
+      );
+    }
+  });
+
+  if (!open) return null;
+  const errorsObj = form.formState.errors;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden p-0">
-        {/* ── HEADER ── */}
-        <DialogHeader className="border-b border-zinc-100 px-6 py-4">
-          <DialogTitle className="text-lg font-semibold">
-            {esReingreso ? (
-              <span>
-                Reingresar Venta{" "}
-                <span className="ml-1 rounded bg-amber-100 px-2 py-0.5 text-sm text-amber-700">
-                  Basada en #{ventaOrigen?.id}
-                </span>
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
+        className="fixed inset-0 z-[1000] animate-in fade-in duration-300"
+      />
+
+      {/* Sheet */}
+      <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-3xl bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        {/* ── Header ── */}
+        <div className="p-6 border-b border-border bg-card/50 flex items-start justify-between shrink-0">
+          <div>
+            {esEdicion && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/30 mb-2">
+                <AlertTriangle size={10} /> CORRECCIÓN SOLICITADA
               </span>
-            ) : (
-              "Nueva Venta"
             )}
-          </DialogTitle>
-
-          {!mostrarLoader && (
-            <div className="mt-3 flex items-center">
-              {PASOS.map((p, idx) => (
-                <div key={idx} className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => idx < paso && setPaso(idx)}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors",
-                      idx === paso
-                        ? "bg-zinc-900 text-white"
-                        : idx < paso
-                          ? "cursor-pointer text-zinc-600 hover:bg-zinc-100"
-                          : "cursor-not-allowed text-zinc-300",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold",
-                        idx === paso
-                          ? "bg-white text-zinc-900"
-                          : idx < paso
-                            ? "bg-emerald-500 text-white"
-                            : "bg-zinc-200 text-zinc-400",
-                      )}
-                    >
-                      {idx < paso ? <Check className="h-3 w-3" /> : idx + 1}
-                    </span>
-                    {p.label}
-                  </button>
-                  {idx < PASOS.length - 1 && (
-                    <ChevronRight className="h-4 w-4 text-zinc-300" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </DialogHeader>
-
-        {/* ── LOADER mientras esperamos ubigeo ── */}
-        {mostrarLoader ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-zinc-400">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <p className="text-sm">Cargando datos de la venta...</p>
+            <h2 className="font-serif text-2xl font-bold text-foreground leading-tight tracking-tight">
+              {esEdicion ? "Corregir Venta" : "Nueva Venta Claro"}
+            </h2>
+            {esEdicion && ventaOrigen?.comentario_gestion && (
+              <p className="text-xs text-orange-500/80 mt-1 max-w-lg leading-relaxed">
+                💬 {ventaOrigen.comentario_gestion}
+              </p>
+            )}
+            {!esEdicion && (
+              <p className="text-sm text-muted-foreground font-light mt-1">
+                Registra los datos del cliente y sube los audios
+                correspondientes.
+              </p>
+            )}
           </div>
-        ) : (
-          <FormProvider {...form}>
-            {/* Usamos div en lugar de form para evitar submit nativo accidental */}
-            <div>
-              <div className="max-h-[calc(90vh-200px)] overflow-y-auto px-6 py-5">
-                {paso === 0 && <StepDatosCliente />}
-                {paso === 1 && <StepUbicacion />}
-                {paso === 2 && <StepAudios />}
+          <button
+            onClick={handleClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* ── Stepper ── */}
+        <div className="flex border-b border-border px-6 bg-background shrink-0">
+          {PASOS.map((p, i) => {
+            const Icon = p.icon;
+            const activo = paso === i;
+            const completo = paso > i;
+            return (
+              <button
+                key={p.id}
+                onClick={() => setPaso(i)}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm transition-all -mb-px",
+                  activo
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent font-medium hover:border-border",
+                  completo
+                    ? "text-emerald-500"
+                    : !activo && "text-muted-foreground",
+                )}
+              >
+                {completo ? <Check size={16} /> : <Icon size={16} />}
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Contenido ── */}
+        <div className="flex-1 overflow-y-auto p-6 bg-background">
+          <form id="venta-form" onSubmit={onSubmit} className="space-y-6">
+            {/* PASO 0: CLIENTE */}
+            <div
+              className={cn(
+                "space-y-8 animate-in fade-in duration-300",
+                paso !== 0 && "hidden",
+              )}
+            >
+              <div>
+                <SectionTitle>Plan y Tecnología</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="id_producto"
+                    render={({ field }) => (
+                      <NativeSelect
+                        label="Producto"
+                        required
+                        value={field.value ?? ""}
+                        onChange={(v) =>
+                          field.onChange(v ? Number(v) : undefined)
+                        }
+                        placeholder="Seleccione producto"
+                        error={errorsObj.id_producto?.message}
+                      >
+                        {productos.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre_plan}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="tecnologia"
+                    render={({ field }) => (
+                      <NativeSelect
+                        label="Tecnología"
+                        required
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder="Seleccionar"
+                        error={errorsObj.tecnologia?.message}
+                      >
+                        {["FIBRA", "HFC", "DSL", "WIRELESS"].map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    )}
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between border-t border-zinc-100 px-6 py-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={
-                    paso === 0 ? handleClose : () => setPaso((p) => p - 1)
-                  }
-                >
-                  {paso === 0 ? (
-                    "Cancelar"
-                  ) : (
-                    <>
-                      <ChevronLeft className="mr-1 h-4 w-4" />
-                      Anterior
-                    </>
-                  )}
-                </Button>
+              <Divider />
 
-                {paso < PASOS.length - 1 ? (
-                  <Button type="button" onClick={irSiguiente}>
-                    Siguiente <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => form.handleSubmit(onSubmit)()}
-                  >
-                    {isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : esReingreso ? (
-                      "Reingresar Venta"
-                    ) : (
-                      "Registrar Venta"
+              <div>
+                <SectionTitle>Datos del Cliente</SectionTitle>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Controller
+                      control={form.control}
+                      name="id_tipo_documento"
+                      render={({ field }) => (
+                        <NativeSelect
+                          label="Tipo Documento"
+                          required
+                          value={field.value ?? ""}
+                          onChange={(v) =>
+                            field.onChange(v ? Number(v) : undefined)
+                          }
+                          placeholder="Seleccionar"
+                          error={errorsObj.id_tipo_documento?.message}
+                        >
+                          {tiposDoc.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.codigo}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="cliente_numero_doc"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Número de documento"
+                          required
+                          placeholder={esRUC ? "20XXXXXXXXX" : "12345678"}
+                          {...field}
+                          error={errorsObj.cliente_numero_doc?.message}
+                        />
+                      )}
+                    />
+                  </div>
+                  <Controller
+                    control={form.control}
+                    name="cliente_nombre"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Nombre completo / Razón Social"
+                        required
+                        placeholder="Ej: JUAN PEREZ"
+                        {...field}
+                        error={errorsObj.cliente_nombre?.message}
+                      />
                     )}
-                  </Button>
-                )}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Controller
+                      control={form.control}
+                      name="cliente_telefono"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Teléfono"
+                          required
+                          type="tel"
+                          placeholder="9XXXXXXXX"
+                          {...field}
+                          error={errorsObj.cliente_telefono?.message}
+                        />
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="cliente_email"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Email"
+                          required
+                          type="email"
+                          placeholder="cliente@correo.com"
+                          {...field}
+                          error={errorsObj.cliente_email?.message}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Controller
+                      control={form.control}
+                      name="cliente_fecha_nacimiento"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Fecha Nacimiento"
+                          required
+                          type="date"
+                          {...field}
+                          error={errorsObj.cliente_fecha_nacimiento?.message}
+                        />
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="numero_instalacion"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Número Instalación"
+                          required
+                          placeholder="Ej: 12345"
+                          {...field}
+                          error={errorsObj.numero_instalacion?.message}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Controller
+                      control={form.control}
+                      name="cliente_papa"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Nombre del Padre"
+                          required
+                          placeholder="Ej: CARLOS"
+                          {...field}
+                          error={errorsObj.cliente_papa?.message}
+                        />
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="cliente_mama"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Nombre de la Madre"
+                          required
+                          placeholder="Ej: MARIA"
+                          {...field}
+                          error={errorsObj.cliente_mama?.message}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {esRUC && (
+                <>
+                  <Divider />
+                  <div>
+                    <SectionTitle className="text-purple-500">
+                      Representante Legal (RUC)
+                    </SectionTitle>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Controller
+                        control={form.control}
+                        name="representante_legal_dni"
+                        render={({ field }) => (
+                          <TextInput
+                            label="DNI Representante"
+                            required
+                            placeholder="12345678"
+                            {...field}
+                            value={field.value ?? ""}
+                            error={errorsObj.representante_legal_dni?.message}
+                          />
+                        )}
+                      />
+                      <Controller
+                        control={form.control}
+                        name="representante_legal_nombre"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Nombre Representante"
+                            required
+                            placeholder="NOMBRES APELLIDOS"
+                            {...field}
+                            value={field.value ?? ""}
+                            error={
+                              errorsObj.representante_legal_nombre?.message
+                            }
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <Divider />
+
+              <div>
+                <SectionTitle>Equipos & Grabador</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <Controller
+                    control={form.control}
+                    name="cant_decos_adicionales"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Decos adicionales"
+                        type="number"
+                        min="0"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        value={field.value ?? 0}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="cant_repetidores_adicionales"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Repetidores adicionales"
+                        type="number"
+                        min="0"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        value={field.value ?? 0}
+                      />
+                    )}
+                  />
+                </div>
+                <Controller
+                  control={form.control}
+                  name="id_grabador_audios"
+                  render={({ field }) => (
+                    <NativeSelect
+                      label="Grabador Asignado"
+                      required
+                      value={field.value ?? ""}
+                      onChange={(v) =>
+                        field.onChange(v ? Number(v) : undefined)
+                      }
+                      placeholder="Seleccione el responsable"
+                      error={errorsObj.id_grabador_audios?.message}
+                    >
+                      {grabadores.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.nombre_completo}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  )}
+                />
               </div>
             </div>
-          </FormProvider>
-        )}
-      </DialogContent>
-    </Dialog>
+
+            {/* PASO 1: UBICACIÓN */}
+            <div
+              className={cn(
+                "space-y-8 animate-in fade-in duration-300",
+                paso !== 1 && "hidden",
+              )}
+            >
+              <div>
+                <SectionTitle>Ubigeo de Instalación</SectionTitle>
+                <Controller
+                  control={form.control}
+                  name="id_distrito_instalacion"
+                  render={({ field }) => (
+                    <UbigeoCascada
+                      label=""
+                      required
+                      depId={form.watch("dep_inst_id")}
+                      provId={form.watch("prov_inst_id")}
+                      distId={field.value}
+                      onDepChange={(v) => form.setValue("dep_inst_id", v)}
+                      onProvChange={(v) => form.setValue("prov_inst_id", v)}
+                      onDistChange={(v) => field.onChange(v)}
+                      error={errorsObj.id_distrito_instalacion?.message}
+                    />
+                  )}
+                />
+                <div className="mt-4 space-y-4">
+                  <Controller
+                    control={form.control}
+                    name="direccion_detalle"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Dirección Detallada"
+                        required
+                        placeholder="Ej: AV LOS INCAS 123 PISO 2"
+                        {...field}
+                        error={errorsObj.direccion_detalle?.message}
+                      />
+                    )}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Controller
+                      control={form.control}
+                      name="plano"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Nro Plano"
+                          required
+                          placeholder="PL-XXXXX"
+                          {...field}
+                          error={errorsObj.plano?.message}
+                        />
+                      )}
+                    />
+                    <Controller
+                      control={form.control}
+                      name="referencias"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Referencias"
+                          placeholder="Cerca al parque..."
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      )}
+                    />
+                  </div>
+                  <Controller
+                    control={form.control}
+                    name="coordenadas_gps"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Coordenadas GPS"
+                        placeholder="-12.0464, -77.0428"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+
+              <Divider />
+
+              <div>
+                <SectionTitle>Ubigeo de Nacimiento</SectionTitle>
+                <Controller
+                  control={form.control}
+                  name="id_distrito_nacimiento"
+                  render={({ field }) => (
+                    <UbigeoCascada
+                      label=""
+                      depId={form.watch("dep_nac_id")}
+                      provId={form.watch("prov_nac_id")}
+                      distId={field.value}
+                      onDepChange={(v) => form.setValue("dep_nac_id", v)}
+                      onProvChange={(v) => form.setValue("prov_nac_id", v)}
+                      onDistChange={(v) => field.onChange(v)}
+                    />
+                  )}
+                />
+              </div>
+
+              <Divider />
+
+              <div>
+                <SectionTitle>Evaluación</SectionTitle>
+                <div className="space-y-4">
+                  <Controller
+                    control={form.control}
+                    name="es_full_claro"
+                    render={({ field }) => (
+                      <Toggle
+                        label="Es Full Claro"
+                        description="Cliente activará todos los servicios asociados."
+                        checked={field.value}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="score_crediticio"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Score Crediticio"
+                        placeholder="Ej: A / B / C"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* PASO 2: AUDIOS */}
+            <div
+              className={cn(
+                "space-y-6 animate-in fade-in duration-300",
+                paso !== 2 && "hidden",
+              )}
+            >
+              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex flex-col gap-1">
+                <p className="text-sm font-bold text-primary">
+                  {esRUC
+                    ? "14 audios requeridos (RUC)"
+                    : "12 audios requeridos (DNI/CE)"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Sube los archivos en formato .mp3 correspondientes al guión.
+                  Usa Drag & Drop.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {etiquetasAudio.map((etiqueta, i) => (
+                  <AudioUploadField
+                    key={i}
+                    etiqueta={etiqueta}
+                    index={i}
+                    url={audioUrls[i] ?? null}
+                    uploading={audioUploading[i] ?? false}
+                    error={audioErrors[i] ?? null}
+                    isRechazado={audioRechazados[i]} // <-- NUEVA PROP
+                    motivoRechazo={audioMotivos[i]} // <-- NUEVA PROP
+                    onUploaded={(url) => handleAudioUploaded(i, url)}
+                    onRemove={() => handleAudioRemove(i)}
+                    onUploadStart={() => handleAudioStart(i)}
+                    onUploadError={(err) => handleAudioError(i, err)}
+                  />
+                ))}
+              </div>
+
+              <div className="p-4 rounded-xl bg-card border border-border flex items-center justify-between mt-4">
+                <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                  Progreso de Audios
+                </span>
+                <span
+                  className={cn(
+                    "text-sm font-mono font-bold",
+                    todosAudiosListos ? "text-emerald-500" : "text-primary",
+                  )}
+                >
+                  {audioUrls.filter(Boolean).length} / {etiquetasAudio.length}
+                </span>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* ── Footer Controles ── */}
+        <div className="p-5 border-t border-border bg-card shrink-0 flex items-center justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-xl px-5 gap-2"
+            onClick={paso > 0 ? () => setPaso(paso - 1) : handleClose}
+          >
+            <ChevronLeft size={16} /> {paso > 0 ? "Atrás" : "Cancelar"}
+          </Button>
+
+          {paso < PASOS.length - 1 ? (
+            <Button
+              type="button"
+              className="h-11 rounded-xl px-6 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+              onClick={() => setPaso(paso + 1)}
+            >
+              Siguiente <ChevronRight size={16} />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={onSubmit}
+              disabled={isPending || algunoSubiendo}
+              className="h-11 rounded-xl px-6 gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20 disabled:opacity-50"
+            >
+              {isPending && <Loader2 size={16} className="animate-spin" />}
+              {esEdicion ? "Guardar Corrección" : "Confirmar Venta"}{" "}
+              <Check size={16} />
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

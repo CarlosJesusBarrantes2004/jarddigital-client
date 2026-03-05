@@ -1,26 +1,24 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Form,
   FormControl,
   FormDescription,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { cn } from "@/lib/utils";
 
 import {
   branchFormSchema,
   type BranchFormData,
 } from "../../schemas/branchSchema";
-
 import type { Branch, Modality } from "../../types";
 
 interface BranchFormProps {
@@ -49,149 +47,213 @@ export const BranchForm = ({
   });
 
   useEffect(() => {
-    if (branch)
+    if (branch) {
       form.reset({
         nombre: branch.nombre,
         direccion: branch.direccion,
         activo: branch.activo,
         ids_modalidades: branch.modalidades.map((m) => m.id),
       });
-    else
+    } else {
       form.reset({
         nombre: "",
         direccion: "",
         activo: true,
         ids_modalidades: [],
       });
+    }
   }, [branch, form]);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSave)} className="space-y-6 p-6">
-        <FormField
-          control={form.control}
-          name="nombre"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nombre de la Sucursal</FormLabel>
-              <FormControl>
-                <Input placeholder="Ej: Jard Digital - Centro" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <form
+        onSubmit={form.handleSubmit(onSave)}
+        className="flex flex-col gap-6 p-6 font-sans"
+      >
+        {/* ── Datos Generales ── */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground mb-4">
+            Datos Generales
+          </p>
+          <div className="flex flex-col gap-4">
+            <FormField
+              control={form.control}
+              name="nombre"
+              render={({ field }) => (
+                <FormItem className="flex flex-col gap-1.5 space-y-0">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
+                    Nombre de la Sucursal
+                  </label>
+                  <FormControl>
+                    <input
+                      placeholder="Ej: Jard Digital - Centro"
+                      className={cn(
+                        "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                        form.formState.errors.nombre
+                          ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+                          : "border-border",
+                      )}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-[11px] text-destructive" />
+                </FormItem>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="direccion"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Dirección Física</FormLabel>
-              <FormControl>
-                <Input placeholder="Av. Principal 123, Chiclayo" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name="direccion"
+              render={({ field }) => (
+                <FormItem className="flex flex-col gap-1.5 space-y-0">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
+                    Dirección Física
+                  </label>
+                  <FormControl>
+                    <input
+                      placeholder="Av. Principal 123, Chiclayo"
+                      className={cn(
+                        "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                        form.formState.errors.direccion
+                          ? "border-destructive"
+                          : "border-border",
+                      )}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-[11px] text-destructive" />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
-        <FormField
-          control={form.control}
-          name="ids_modalidades"
-          render={() => (
-            <FormItem>
-              <div className="mb-4">
-                <FormLabel className="text-base">
-                  Modalidades Operativas
-                </FormLabel>
-                <FormDescription>
-                  Seleccione los tipos de operaciones permitidas en esta sede.
-                </FormDescription>
-              </div>
-              <div className="grid grid-cols-1 gap-3 border rounded-lg p-4 bg-slate-50/50">
-                {modalities.map((item) => (
-                  <FormField
-                    key={item.id}
-                    control={form.control}
-                    name="ids_modalidades"
-                    render={({ field }) => {
-                      return (
-                        <FormItem
-                          key={item.id}
-                          className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
-                        >
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(item.id)}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([...field.value, item.id])
-                                  : field.onChange(
-                                      field.value?.filter(
-                                        (value) => value !== item.id,
-                                      ),
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal cursor-pointer flex-1 text-sm">
-                            {item.nombre}
-                          </FormLabel>
-                        </FormItem>
-                      );
-                    }}
+        {/* ── Modalidades ── */}
+        <div className="bg-card border-l-4 border-l-primary border-y border-r border-y-border border-r-border rounded-2xl p-5 shadow-sm">
+          <div className="mb-4">
+            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground m-0">
+              Modalidades Operativas
+            </p>
+            <FormDescription className="text-[12px] mt-1">
+              Seleccione los tipos de operaciones permitidas en esta sede.
+            </FormDescription>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="ids_modalidades"
+            render={() => (
+              <FormItem>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {modalities.map((item) => (
+                    <FormField
+                      key={item.id}
+                      control={form.control}
+                      name="ids_modalidades"
+                      render={({ field }) => {
+                        const isChecked = field.value?.includes(item.id);
+                        return (
+                          <div
+                            onClick={() => {
+                              const newValue = isChecked
+                                ? field.value?.filter((val) => val !== item.id)
+                                : [...(field.value || []), item.id];
+                              field.onChange(newValue);
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all duration-200",
+                              isChecked
+                                ? "bg-primary/10 border-primary/30 shadow-sm"
+                                : "bg-background border-border hover:bg-muted hover:border-primary/20",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors",
+                                isChecked
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-muted-foreground/30 bg-card",
+                              )}
+                            >
+                              {isChecked && <Check size={12} strokeWidth={3} />}
+                            </div>
+                            <span
+                              className={cn(
+                                "text-[13px] font-medium font-sans transition-colors",
+                                isChecked ? "text-primary" : "text-foreground",
+                              )}
+                            >
+                              {item.nombre}
+                            </span>
+                          </div>
+                        );
+                      }}
+                    />
+                  ))}
+                </div>
+                <FormMessage className="text-[11px] text-destructive flex items-center gap-1 mt-2">
+                  {form.formState.errors.ids_modalidades && (
+                    <>
+                      <AlertCircle size={11} />{" "}
+                      {form.formState.errors.ids_modalidades.message}
+                    </>
+                  )}
+                </FormMessage>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* ── Estado ── */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+          <FormField
+            control={form.control}
+            name="activo"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between space-y-0">
+                <div>
+                  <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground m-0">
+                    Estado de Operación
+                  </p>
+                  <FormDescription className="text-[12px] mt-1">
+                    Determina si los asesores pueden loguearse en esta sede.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
                   />
-                ))}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
 
-        <FormField
-          control={form.control}
-          name="activo"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 bg-slate-50/50">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel>Sucursal Activa</FormLabel>
-                <FormDescription>
-                  Determina si los asesores pueden operar en esta sede.
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
-        />
-
-        <div className="flex gap-3 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="flex-1"
-          >
-            Cancelar
-          </Button>
+        {/* ── Acciones ── */}
+        <div className="flex gap-3 pt-2">
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 bg-primary text-primary-foreground"
+            className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_4px_16px_rgba(var(--primary),0.2)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <>
+                <Loader2 size={16} className="animate-spin" /> Guardando...
+              </>
             ) : branch ? (
               "Guardar Cambios"
             ) : (
               "Crear Sucursal"
             )}
+          </Button>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={onCancel}
+            className="flex-1 h-11 bg-transparent border border-border text-muted-foreground hover:bg-muted hover:text-foreground font-sans font-medium text-sm rounded-xl transition-all"
+          >
+            Cancelar
           </Button>
         </div>
       </form>

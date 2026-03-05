@@ -1,28 +1,60 @@
-import type {
-  User as AuthUser,
-  Role,
-  Branch as AuthBranch,
-} from "@/features/auth/types";
+// ─────────────────────────────────────────────
+// Users — Domain Types
+// ─────────────────────────────────────────────
 
-export type { Role };
+import type { RoleCode } from "@/features/auth/types";
 
-export interface AdminBranch extends AuthBranch {
+export type { RoleCode };
+
+export interface Role {
+  id: number;
+  codigo: RoleCode;
+  nombre: string;
+  nivel_jerarquia: number;
+  activo: boolean;
+}
+
+/** Workspace asignado a un usuario (permisos_acceso × modalidades_sede) */
+export interface UserWorkspace {
   id_modalidad_sede: number;
+  id_sucursal: number;
+  nombre_sucursal: string;
+  id_modalidad: number;
+  nombre_modalidad: string;
+  etiqueta: string;
 }
 
-export interface User extends Omit<AuthUser, "rol" | "sucursales"> {
-  id_rol: number;
-  sucursales: AdminBranch[];
-}
-
-export interface UserPayload {
+export interface User {
+  id: number;
   username: string;
   nombre_completo: string;
   email: string;
   id_rol: number;
+  /** Detalle del rol — solo en el GET del backend */
+  rol?: Role;
+  sucursales: UserWorkspace[];
+  activo: boolean;
+}
+
+// ── Payloads ──────────────────────────────────
+
+export interface CreateUserPayload {
+  username: string;
+  nombre_completo: string;
+  email: string;
+  password: string;
+  id_rol: number;
   ids_modalidades_sede?: number[];
   activo?: boolean;
+}
+
+export interface UpdateUserPayload {
+  nombre_completo?: string;
+  email?: string;
   password?: string;
+  id_rol?: number;
+  ids_modalidades_sede?: number[];
+  activo?: boolean;
 }
 
 export interface SupervisorAssignmentPayload {
@@ -32,12 +64,17 @@ export interface SupervisorAssignmentPayload {
   activo: boolean;
 }
 
+// ── Filtros ───────────────────────────────────
+
 export interface UserFilters {
   search?: string;
   id_rol?: number;
+  id_modalidad_sede?: number;
 }
 
-export interface BranchModalityOption {
+// ── Opción de workspace para selects ─────────
+
+export interface WorkspaceOption {
   id: number;
   etiqueta: string;
 }

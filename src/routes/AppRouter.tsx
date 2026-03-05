@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { LoginPage } from "@/features/auth/pages/LoginPage";
-import { SelectBranchePage } from "@/features/auth/pages/SelectBranchePage";
+import { SelectWorkspacePage } from "@/features/auth/pages/SelectWorkspacePage";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { SalesPage } from "@/features/sales/pages/SalesPage";
 import { UsersPage } from "@/features/users/pages/UsersPage";
@@ -19,7 +19,10 @@ export const AppRouter = () => {
 
       {/* Private Routes */}
       <Route element={<PrivateRoute />}>
-        <Route path="/auth/select-branch" element={<SelectBranchePage />} />
+        <Route
+          path="/auth/select-workspace"
+          element={<SelectWorkspacePage />}
+        />
 
         {/* Routes with sidebar and header */}
         <Route element={<MainLayout />}>

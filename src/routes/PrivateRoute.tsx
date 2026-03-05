@@ -4,9 +4,9 @@ import { useAuth } from "@/features/auth/context/useAuth";
 import { GlobalLoader } from "@/components/GlobalLoader";
 
 export const PrivateRoute = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  if (loading) return <GlobalLoader message="Verificando sesión..." />;
+  if (isLoading) return <GlobalLoader message="Verificando sesión..." />;
 
   return isAuthenticated ? <Outlet /> : <Navigate to={"/auth/login"} replace />;
 };

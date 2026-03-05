@@ -1,121 +1,217 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { LogOut, Menu, X, ChevronDown, Smartphone } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  LogOut,
+  Menu,
+  X,
+  ChevronDown,
+  LayoutDashboard,
+  Users,
+  Settings,
+  ShoppingBag,
+  Building2,
+  Check,
+  Moon,
+  Sun,
+  Laptop,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sidebarSections } from "@/lib/sidebar-routes";
-import { useAuth } from "@/features/auth/context/useAuth";
 
-interface SectionItemProps {
+import { useAuth } from "@/features/auth/context/useAuth";
+import { useTheme } from "@/components/ThemeProvider"; // Ajusta la ruta a tu ThemeProvider
+import type { RoleCode, Workspace } from "@/features/auth/types";
+
+// ─────────────────────────────────────────────
+// Rutas (Mismo código que tenías)
+// ─────────────────────────────────────────────
+interface RouteItem {
   label: string;
   href: string;
+  roles: RoleCode[];
   disabled?: boolean;
-  expanded?: boolean;
-  onClickItem?: () => void;
+}
+interface RouteSection {
+  title: string;
+  Icon: React.FC<{ size?: number; className?: string }>;
+  collapsible: boolean;
+  items: RouteItem[];
 }
 
-const SectionItem: React.FC<SectionItemProps> = ({
+const SECTIONS: RouteSection[] = [
+  {
+    title: "Operaciones",
+    Icon: LayoutDashboard,
+    collapsible: false,
+    items: [
+      {
+        label: "Dashboard",
+        href: "/dashboard",
+        roles: ["DUENO", "SUPERVISOR", "RRHH", "BACKOFFICE", "ASESOR"],
+      },
+    ],
+  },
+  {
+    title: "Comercial",
+    Icon: ShoppingBag,
+    collapsible: true,
+    items: [
+      { label: "Mis Ventas", href: "/sales", roles: ["ASESOR"] },
+      {
+        label: "Gestión de Ventas",
+        href: "/sales",
+        roles: ["BACKOFFICE", "SUPERVISOR", "DUENO"],
+      },
+    ],
+  },
+  {
+    title: "Capital Humano",
+    Icon: Users,
+    collapsible: true,
+    items: [
+      {
+        label: "Colaboradores",
+        href: "/users",
+        roles: ["DUENO", "SUPERVISOR", "RRHH"],
+      },
+      {
+        label: "Asistencia",
+        href: "/attendance",
+        roles: ["DUENO", "RRHH"],
+        disabled: true,
+      },
+    ],
+  },
+  {
+    title: "Configuración",
+    Icon: Settings,
+    collapsible: true,
+    items: [
+      {
+        label: "Sucursales",
+        href: "/configuracion/sucursales",
+        roles: ["DUENO"],
+      },
+      {
+        label: "Modalidades",
+        href: "/configuracion/modalidades",
+        roles: ["DUENO"],
+      },
+      { label: "Roles", href: "/configuracion/roles", roles: ["DUENO"] },
+    ],
+  },
+];
+
+const NavItem = ({
   label,
   href,
   disabled,
   expanded,
-  onClickItem,
+  onClick,
+}: {
+  label: string;
+  href: string;
+  disabled?: boolean;
+  expanded: boolean;
+  onClick?: () => void;
 }) => {
+  const { pathname } = useLocation();
+  const isActive = pathname === href || pathname.startsWith(href + "/");
+
   if (disabled) {
     return (
-      <div
-        className={cn(
-          "w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-sidebar-foreground/50 opacity-50 cursor-not-allowed",
-          "relative",
-        )}
-      >
-        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
-        {expanded && <span className="flex-1">{label}</span>}
+      <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed">
+        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-50" />
         {expanded && (
-          <Badge variant="outline" className="text-xs">
-            Pronto
-          </Badge>
+          <>
+            <span className="flex-1 truncate">{label}</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+              Pronto
+            </span>
+          </>
         )}
       </div>
     );
   }
-
   return (
-    <Link to={href} onClick={onClickItem}>
-      <div className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
-        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
-        {expanded && <span className="flex-1">{label}</span>}
-      </div>
+    <Link
+      to={href}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        isActive &&
+          "bg-primary/10 text-primary font-medium hover:text-primary hover:bg-primary/15",
+      )}
+    >
+      <span
+        className={cn(
+          "w-1.5 h-1.5 rounded-full shrink-0 transition-colors",
+          isActive ? "bg-primary" : "bg-current opacity-50",
+        )}
+      />
+      {expanded && <span className="flex-1 truncate">{label}</span>}
     </Link>
   );
 };
 
-// Modificamos SectionProps para recibir el rol del usuario
-interface SectionProps {
-  section: (typeof sidebarSections)[0];
-  isCollapsed: boolean;
-  isExpanded: boolean;
-  userRole: string; // <-- Agregado
-  onClickItem?: () => void;
-}
-
-const Section: React.FC<SectionProps> = ({
+const NavSection = ({
   section,
-  isExpanded,
-  userRole,
+  roleCode,
+  expanded,
   onClickItem,
+}: {
+  section: RouteSection;
+  roleCode: RoleCode;
+  expanded: boolean;
+  onClickItem?: () => void;
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const Icon = section.icon;
-
-  // MAGIA: Filtramos los items permitidos para este rol
-  const allowedItems = section.items.filter((item) =>
-    item.roles.includes(userRole as any),
+  const [open, setOpen] = useState(true);
+  const visibleItems = section.items.filter((item) =>
+    item.roles.includes(roleCode),
   );
-
-  // Si no hay items permitidos en esta sección, no renderizamos la sección entera
-  if (allowedItems.length === 0) {
-    return null;
-  }
+  if (visibleItems.length === 0) return null;
 
   return (
-    <div className="space-y-2">
+    <div className="mb-1 overflow-hidden">
       {section.collapsible ? (
         <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold text-sidebar-foreground hover:bg-sidebar-accent/30 transition-colors group"
+          type="button"
+          className="flex items-center gap-2.5 px-2.5 py-2 w-full rounded-lg bg-transparent hover:bg-sidebar-accent transition-colors text-muted-foreground hover:text-sidebar-accent-foreground cursor-pointer"
+          onClick={() => setOpen((v) => !v)}
         >
-          <Icon className="w-5 h-5 flex-shrink-0" />
-          {isExpanded && (
+          <section.Icon size={16} className="shrink-0" />
+          {expanded && (
             <>
-              <span className="flex-1 text-left">{section.title}</span>
+              <span className="flex-1 text-left text-[11px] font-semibold uppercase tracking-wider font-mono truncate">
+                {section.title}
+              </span>
               <ChevronDown
+                size={13}
                 className={cn(
-                  "w-4 h-4 transition-transform",
-                  isOpen && "rotate-180",
+                  "transition-transform duration-200 shrink-0",
+                  open && "rotate-180",
                 )}
               />
             </>
           )}
         </button>
       ) : (
-        <div className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold text-sidebar-foreground">
-          <Icon className="w-5 h-5 flex-shrink-0" />
-          {isExpanded && (
-            <span className="flex-1 text-left">{section.title}</span>
+        <div className="flex items-center gap-2.5 px-2.5 py-2 w-full text-muted-foreground">
+          <section.Icon size={16} className="shrink-0" />
+          {expanded && (
+            <span className="flex-1 text-left text-[11px] font-semibold uppercase tracking-wider font-mono truncate">
+              {section.title}
+            </span>
           )}
         </div>
       )}
-
-      {isOpen && (
-        <div className="space-y-1 pl-2">
-          {allowedItems.map((item) => (
-            <SectionItem
-              key={item.href}
+      {open && (
+        <div className="pl-2 mt-0.5 flex flex-col gap-[1px]">
+          {visibleItems.map((item) => (
+            <NavItem
+              key={item.href + item.label}
               {...item}
-              expanded={isExpanded}
-              onClickItem={onClickItem}
+              expanded={expanded}
+              onClick={onClickItem}
             />
           ))}
         </div>
@@ -124,105 +220,242 @@ const Section: React.FC<SectionProps> = ({
   );
 };
 
-export function Sidebar() {
+const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
+  const { user, activeWorkspace, selectWorkspace } = useAuth();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const workspaces: Workspace[] = user?.sucursales ?? [];
 
-  const userRoleCode = user?.rol?.codigo || "ASESOR";
+  if (workspaces.length === 0) return null;
 
-  const handleLogout = async () => {
-    await logout();
+  const handleSelect = (ws: Workspace) => {
+    selectWorkspace(ws);
+    setOpen(false);
+    navigate(0);
   };
 
-  const handleChangeModality = () => {
-    navigate("/auth/select-branch"); // Corregido para que apunte bien a tu ruta
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className={cn(
+          "w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground transition-all duration-150 overflow-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          open &&
+            "border-primary/30 bg-primary/5 text-primary hover:text-primary hover:bg-primary/5",
+        )}
+        onClick={() => setOpen((v) => !v)}
+        title={!expanded ? activeWorkspace?.nombre_sucursal : undefined}
+      >
+        <Building2 size={14} className="shrink-0" />
+        {expanded && (
+          <>
+            <div className="flex-1 overflow-hidden text-left">
+              <span className="block text-[13px] font-medium text-sidebar-foreground truncate leading-snug">
+                {activeWorkspace?.nombre_sucursal ?? "Sin sede"}
+              </span>
+              <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate">
+                {activeWorkspace?.nombre_modalidad ?? "—"}
+              </span>
+            </div>
+            <ChevronDown
+              size={12}
+              className={cn(
+                "shrink-0 transition-transform duration-200",
+                open && "rotate-180",
+              )}
+            />
+          </>
+        )}
+      </button>
+
+      {open && expanded && (
+        <div className="absolute bottom-[calc(100%+6px)] left-0 w-full bg-popover border border-border rounded-xl p-2 shadow-xl animate-in slide-in-from-bottom-2 duration-200 z-50">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground px-2 pt-1 pb-2 m-0">
+            Cambiar sede
+          </p>
+          {workspaces.map((ws) => {
+            const isActive =
+              ws.id_modalidad_sede === activeWorkspace?.id_modalidad_sede;
+            return (
+              <button
+                key={ws.id_modalidad_sede}
+                type="button"
+                className={cn(
+                  "w-full p-2.5 rounded-lg border-none flex items-center gap-2 text-left transition-colors hover:bg-muted text-popover-foreground",
+                  isActive && "bg-primary/10 text-primary hover:bg-primary/15",
+                )}
+                onClick={() => handleSelect(ws)}
+              >
+                <div className="flex-1 overflow-hidden">
+                  <span className="block text-[13px] font-medium truncate">
+                    {ws.nombre_sucursal}
+                  </span>
+                  <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate">
+                    {ws.nombre_modalidad}
+                  </span>
+                </div>
+                {isActive && (
+                  <Check size={14} className="text-primary shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// Sidebar principal
+// Recibe props para controlar su estado desde el Layout
+// ─────────────────────────────────────────────
+
+interface SidebarProps {
+  expanded: boolean;
+  setExpanded: (val: boolean) => void;
+  mobileOpen: boolean;
+  setMobileOpen: (val: boolean) => void;
+}
+
+export const Sidebar = ({
+  expanded,
+  setExpanded,
+  mobileOpen,
+  setMobileOpen,
+}: SidebarProps) => {
+  const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const roleCode = (user?.rol?.codigo ?? "ASESOR") as RoleCode;
+
+  // Lógica para alternar temas (Claro -> Oscuro -> Sistema)
+  const cycleTheme = () => {
+    if (theme === "light") setTheme("dark");
+    else if (theme === "dark") setTheme("system");
+    else setTheme("light");
+  };
+
+  const getThemeIcon = () => {
+    if (theme === "light") return <Sun size={14} className="shrink-0" />;
+    if (theme === "dark") return <Moon size={14} className="shrink-0" />;
+    return <Laptop size={14} className="shrink-0" />;
+  };
+
+  const getThemeLabel = () => {
+    if (theme === "light") return "Modo Claro";
+    if (theme === "dark") return "Modo Oscuro";
+    return "Tema del Sistema";
   };
 
   return (
     <>
-      <button
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-sidebar text-sidebar-foreground"
-      >
-        {isMobileOpen ? (
-          <X className="w-6 h-6" />
-        ) : (
-          <Menu className="w-6 h-6" />
-        )}
-      </button>
+      {/* ── Overlay Mobile ── */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-background/80 z-40 backdrop-blur-sm lg:hidden transition-opacity duration-300"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
 
+      {/* ── Sidebar ── */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground transition-all duration-300 z-40",
-          isExpanded ? "w-64" : "w-20",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border z-50 flex flex-col font-sans transition-all duration-300 ease-in-out overflow-hidden shadow-2xl lg:shadow-none",
+          expanded ? "w-[240px]" : "w-[72px]", // Aumenté a 72px cuando está cerrado para que respire más
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className="h-20 flex items-center justify-between px-4 border-b border-sidebar-border">
-          {isExpanded && (
-            <h1 className="text-xl font-bold text-sidebar-primary">
-              Jard Digital
-            </h1>
-          )}
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="hidden lg:flex p-2 hover:bg-sidebar-accent rounded-lg transition-colors"
+        {/* Header */}
+        <div className="h-[64px] flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
+          <div
+            className={cn(
+              "flex items-center gap-3 overflow-hidden transition-all duration-300",
+              !expanded && "mx-auto",
+            )}
           >
-            <Menu className="w-5 h-5" />
+            <div className="w-[32px] h-[32px] rounded-lg bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center font-serif font-bold text-[15px] text-primary-foreground shadow-sm shrink-0">
+              J
+            </div>
+            {expanded && (
+              <span className="text-[15px] font-bold text-sidebar-foreground truncate tracking-tight">
+                Jard Digital
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="w-8 h-8 rounded-md border border-transparent bg-transparent hidden lg:flex items-center justify-center text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0"
+            onClick={() => setExpanded(!expanded)}
+          >
+            <Menu size={16} />
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 space-y-4">
-          {sidebarSections.map((section) => (
-            <Section
+        {/* User info */}
+        {user && (
+          <div
+            className={cn(
+              "p-4 border-b border-sidebar-border flex items-center gap-3 overflow-hidden shrink-0",
+              !expanded && "justify-center",
+            )}
+          >
+            <div className="w-[32px] h-[32px] rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-[12px] font-bold text-primary shrink-0">
+              {user.nombre_completo.substring(0, 2).toUpperCase()}
+            </div>
+            {expanded && (
+              <div className="overflow-hidden flex-1">
+                <span className="block text-[13px] font-semibold text-sidebar-foreground truncate">
+                  {user.nombre_completo}
+                </span>
+                <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate mt-0.5">
+                  {user.rol?.codigo}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
+          {SECTIONS.map((section) => (
+            <NavSection
               key={section.title}
               section={section}
-              isCollapsed={!isExpanded}
-              isExpanded={isExpanded}
-              userRole={userRoleCode} // <-- Pasamos el rol aquí
-              onClickItem={() => setIsMobileOpen(false)}
+              roleCode={roleCode}
+              expanded={expanded}
+              onClickItem={() => setMobileOpen(false)}
             />
           ))}
         </nav>
 
-        <div className="border-t border-sidebar-border p-4 space-y-2">
-          {/* El botón de cambiar modalidad solo debería verse si no es DUEÑO */}
-          {userRoleCode !== "DUENO" && (
-            <Button
-              onClick={handleChangeModality}
-              variant="outline"
-              className={cn(
-                "w-full flex items-center gap-3 border-sidebar-border text-sidebar-foreground hover:bg-primary/10 hover:text-primary",
-                !isExpanded && "justify-center",
-              )}
-              title="Cambiar modalidad de trabajo"
-            >
-              <Smartphone className="w-5 h-5" />
-              {isExpanded && "Cambiar Modalidad"}
-            </Button>
-          )}
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            className={cn(
-              "w-full flex items-center gap-3 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive",
-              !isExpanded && "justify-center",
-            )}
+        {/* Bottom */}
+        <div className="border-t border-sidebar-border p-3 flex flex-col gap-2 shrink-0">
+          <WorkspaceSwitcher expanded={expanded} />
+
+          {/* Botón Theme */}
+          <button
+            type="button"
+            className="group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap"
+            onClick={cycleTheme}
           >
-            <LogOut className="w-5 h-5" />
-            {isExpanded && "Cerrar sesión"}
-          </Button>
+            {getThemeIcon()}
+            {expanded && <span>{getThemeLabel()}</span>}
+          </button>
+
+          {/* Logout */}
+          <button
+            type="button"
+            className="group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap"
+            onClick={logout}
+          >
+            <LogOut
+              size={14}
+              className="shrink-0 group-hover:-translate-x-0.5 transition-transform"
+            />
+            {expanded && "Cerrar sesión"}
+          </button>
         </div>
       </aside>
-
-      {isMobileOpen && (
-        <button
-          onClick={() => setIsMobileOpen(false)}
-          className="lg:hidden fixed inset-0 bg-black/50 z-30"
-        />
-      )}
     </>
   );
-}
+};

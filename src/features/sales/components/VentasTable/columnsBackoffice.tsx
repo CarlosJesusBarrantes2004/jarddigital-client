@@ -1,11 +1,38 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Settings, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Eye, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
+import { cn } from "@/lib/utils";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
+
+function ActionBtn({
+  onClick,
+  title,
+  variant = "default",
+  children,
+}: {
+  onClick: () => void;
+  title?: string;
+  variant?: "default" | "primary";
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold font-sans transition-all duration-200 tracking-wider uppercase",
+        variant === "default" &&
+          "bg-transparent border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+        variant === "primary" &&
+          "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function buildColumnsBackoffice(
   estadosSOT: EstadoSOT[],
@@ -15,121 +42,127 @@ export function buildColumnsBackoffice(
     {
       accessorKey: "id",
       header: "ID",
-      cell: ({ row }) => {
-        const v = row.original;
-        return (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-mono text-xs text-zinc-500">#{v.id}</span>
-            {!!v.venta_origen && (
-              <Badge
-                className="bg-amber-100 px-1.5 py-0 text-[10px] font-bold text-amber-700 hover:bg-amber-100"
-                title={`Reingreso de venta #${v.venta_origen}`}
-              >
-                ↩ REINGRESADA
-              </Badge>
-            )}
-          </div>
-        );
-      },
-      size: 80,
+      cell: ({ row }) => (
+        <span className="font-mono text-[11px] text-muted-foreground/60">
+          #{row.original.id}
+        </span>
+      ),
+      size: 60,
     },
     {
       accessorKey: "nombre_asesor",
       header: "Asesor",
       cell: ({ row }) => (
-        <span className="text-sm font-medium">
-          {row.original.nombre_asesor}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "cliente_nombre",
-      header: "Cliente",
-      cell: ({ row }) => (
-        <div>
-          <p className="font-medium text-zinc-800">
-            {row.original.cliente_nombre}
+        <div className="flex flex-col gap-0.5">
+          <p className="text-[13px] font-medium text-foreground/90">
+            {row.original.nombre_asesor}
           </p>
-          <p className="text-xs text-zinc-500">
-            {row.original.cliente_numero_doc}
+          <p className="text-[11px] text-muted-foreground/60">
+            {row.original.nombre_supervisor}
           </p>
         </div>
       ),
     },
     {
-      accessorKey: "nombre_producto",
-      header: "Plan",
-    },
-    {
-      accessorKey: "codigo_sec",
-      header: "SEC / SOT",
+      accessorKey: "cliente_nombre",
+      header: "Cliente",
       cell: ({ row }) => {
-        const {
-          codigo_sec,
-          codigo_sot,
-          codigo_sec_origen,
-          codigo_sot_origen,
-          venta_origen,
-        } = row.original;
-        // Mostramos el código propio si ya existe, o el de origen entre paréntesis
-        const secMostrar =
-          codigo_sec || (venta_origen ? codigo_sec_origen : null);
-        const sotMostrar =
-          codigo_sot || (venta_origen ? codigo_sot_origen : null);
-        const sonDeOrigen =
-          !codigo_sec &&
-          !codigo_sot &&
-          !!(codigo_sec_origen || codigo_sot_origen);
+        const v = row.original;
         return (
-          <div className="space-y-0.5">
-            {secMostrar ? (
-              <p
-                className={`font-mono text-xs ${sonDeOrigen ? "text-amber-600" : ""}`}
-              >
-                <span className="text-zinc-400">SEC:</span> {secMostrar}
-                {sonDeOrigen && (
-                  <span className="ml-1 text-[10px]">(anterior)</span>
-                )}
+          <div className="flex flex-col gap-1 items-start">
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-[13px] text-foreground leading-none">
+                {v.cliente_nombre}
               </p>
-            ) : (
-              <p className="text-xs text-zinc-400 italic">SEC pendiente</p>
-            )}
-            {sotMostrar ? (
-              <p
-                className={`font-mono text-xs ${sonDeOrigen ? "text-amber-600" : ""}`}
-              >
-                <span className="text-zinc-400">SOT:</span> {sotMostrar}
-                {sonDeOrigen && (
-                  <span className="ml-1 text-[10px]">(anterior)</span>
-                )}
-              </p>
-            ) : (
-              <p className="text-xs text-zinc-400 italic">SOT pendiente</p>
-            )}
+              {v.venta_origen && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full border border-primary/20 uppercase tracking-widest">
+                  <RefreshCw size={9} /> Reingreso
+                </span>
+              )}
+            </div>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {v.cliente_numero_doc}
+            </p>
           </div>
         );
       },
     },
     {
+      accessorKey: "nombre_producto",
+      header: "Plan",
+      cell: ({ row }) => (
+        <div className="flex flex-col items-start gap-1">
+          <p className="text-[13px] font-medium text-foreground/80">
+            {row.original.nombre_producto}
+          </p>
+          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-widest">
+            {row.original.tecnologia}
+          </span>
+        </div>
+      ),
+    },
+    {
       accessorKey: "id_estado_sot",
-      header: "Estado SOT",
+      header: "Estado",
       cell: ({ row }) => {
-        const estadoData = estadosSOT.find(
-          (e) => e.id === row.original.id_estado_sot,
-        );
+        const v = row.original;
+        const estadoData = estadosSOT.find((e) => e.id === v.id_estado_sot);
+        const enCorreccion = v.solicitud_correccion;
+
         return (
-          <EstadoBadge
-            estado={
-              estadoData
-                ? {
-                    nombre: estadoData.nombre,
-                    codigo: estadoData.codigo,
-                    color_hex: estadoData.color_hex,
-                  }
-                : null
-            }
-            esReingresada={!!row.original.venta_origen}
-          />
+          <div className="flex flex-col gap-1.5 items-start">
+            {enCorreccion ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold tracking-widest bg-orange-500/10 border border-orange-500/30 text-orange-500 uppercase">
+                <AlertTriangle size={11} /> En corrección
+              </span>
+            ) : (
+              <EstadoBadge
+                estado={
+                  estadoData
+                    ? {
+                        nombre: estadoData.nombre,
+                        codigo: estadoData.codigo,
+                        color_hex: estadoData.color_hex,
+                      }
+                    : null
+                }
+              />
+            )}
+
+            {v.comentario_gestion &&
+              !enCorreccion &&
+              v.id_estado_sot !== null && (
+                <span className="text-[10px] font-mono text-muted-foreground/60 flex items-center gap-1 mt-0.5">
+                  💬 Tiene comentario
+                </span>
+              )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "codigos",
+      header: "SOT / SEC",
+      cell: ({ row }) => {
+        const v = row.original;
+        return (
+          <div className="flex flex-col gap-0.5">
+            {v.codigo_sot && (
+              <span className="font-mono text-[11px] text-foreground/70">
+                {v.codigo_sot}
+              </span>
+            )}
+            {v.codigo_sec && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {v.codigo_sec}
+              </span>
+            )}
+            {!v.codigo_sot && !v.codigo_sec && (
+              <span className="text-[10px] text-muted-foreground/40">
+                Sin asignar
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -138,49 +171,57 @@ export function buildColumnsBackoffice(
       header: "Visita",
       cell: ({ row }) =>
         row.original.fecha_visita_programada ? (
-          <div>
-            <p className="text-sm">
-              {format(
-                new Date(row.original.fecha_visita_programada),
-                "dd MMM yyyy",
-                { locale: es },
-              )}
-            </p>
-            {row.original.bloque_horario && (
-              <p className="text-xs text-zinc-500">
-                {row.original.bloque_horario}
-              </p>
+          <span className="text-[13px] text-foreground/80">
+            {format(
+              new Date(row.original.fecha_visita_programada),
+              "dd MMM yyyy",
+              { locale: es },
             )}
-          </div>
+          </span>
         ) : (
-          <span className="text-xs text-zinc-400">Sin programar</span>
+          <span className="text-[10px] text-muted-foreground/40">
+            Sin programar
+          </span>
         ),
     },
     {
-      accessorKey: "solicitud_correccion",
-      header: "Corrección",
-      cell: ({ row }) =>
-        row.original.solicitud_correccion ? (
-          <div className="flex items-center gap-1 text-amber-600">
-            <AlertCircle className="h-3.5 w-3.5" />
-            <span className="text-xs font-medium">Pendiente corrección</span>
-          </div>
-        ) : null,
+      accessorKey: "fecha_creacion",
+      header: "Fecha",
+      cell: ({ row }) => (
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {format(new Date(row.original.fecha_creacion), "dd/MM/yy HH:mm")}
+        </span>
+      ),
     },
     {
       id: "acciones",
       header: "",
-      cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs"
-          onClick={() => onGestionar(row.original)}
-        >
-          <Settings className="h-3.5 w-3.5" />
-          Gestionar
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const v = row.original;
+
+        console.log(v);
+
+        const esAtendida = v.codigo_estado.toUpperCase() === "ATENDIDO";
+
+        if (esAtendida) {
+          return (
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">
+              <CheckCircle2 size={12} /> Finalizada
+            </div>
+          );
+        }
+
+        return (
+          <ActionBtn
+            onClick={() => onGestionar(row.original)}
+            variant="primary"
+            title="Gestionar venta"
+          >
+            <Eye size={14} /> Gestionar
+          </ActionBtn>
+        );
+      },
+      size: 110,
     },
   ];
 }

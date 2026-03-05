@@ -2,11 +2,6 @@
 // CATÁLOGOS
 // ==========================================
 
-export interface RolSistema {
-  codigo: "ASESOR" | "BACKOFFICE" | "SUPERVISOR" | "DUENO";
-  nombre: string;
-}
-
 export interface EstadoSOT {
   id: number;
   codigo: string;
@@ -34,6 +29,9 @@ export interface EstadoAudio {
 
 export interface Producto {
   id: number;
+  nombre_campana: string;
+  tipo_solucion: string;
+  nombre_paquete: string;
   nombre_plan: string;
   es_alto_valor: boolean;
   costo_fijo_plan: string;
@@ -52,17 +50,12 @@ export interface GrabadorAudio {
 
 export interface TipoDocumento {
   id: number;
-  codigo: string; // "DNI" | "RUC" | "CE" | etc.
+  codigo: string; // "DNI" | "RUC" | "CE" etc.
   nombre: string;
 }
 
-export interface ModalidadSede {
-  id: number;
-  // Expandir según tu modelo core
-}
-
 // ==========================================
-// UBIGEO - Cascada
+// UBIGEO
 // ==========================================
 
 export interface Departamento {
@@ -86,7 +79,7 @@ export interface Distrito {
 }
 
 // ==========================================
-// AUDIO DE VENTA
+// AUDIO
 // ==========================================
 
 export interface AudioVenta {
@@ -96,12 +89,49 @@ export interface AudioVenta {
   conforme: boolean | null;
   motivo: string | null;
   corregido: boolean;
+  // Estado local para el form (no se envía al backend)
+  _file?: File | null;
+  _uploading?: boolean;
+  _error?: string | null;
 }
 
 export interface AudioVentaForm {
   nombre_etiqueta: string;
   url_audio: string;
 }
+
+// Etiquetas de audios según tipo de documento
+export const ETIQUETAS_AUDIO_DNI: string[] = [
+  "1. Nombre completo del cliente",
+  "2. Número de documento (DNI)",
+  "3. Lugar y fecha de nacimiento",
+  "4. Dirección de instalación",
+  "5. Nombre del padre y madre",
+  "6. Teléfono de contacto",
+  "7. Correo electrónico",
+  "8. NO (sin deudas)",
+  "9. SI (acepta contrato)",
+  "10. SI ACEPTO (términos)",
+  "11. SI AUTORIZO (datos personales)",
+  "12. SI ACEPTO (conformidad final)",
+];
+
+export const ETIQUETAS_AUDIO_RUC: string[] = [
+  "1. Nombre completo del cliente",
+  "2. Número de documento (RUC)",
+  "3. Lugar y fecha de nacimiento",
+  "4. Dirección de instalación",
+  "5. Nombre del padre y madre",
+  "6. Teléfono de contacto",
+  "7. Correo electrónico",
+  "8. NO (sin deudas)",
+  "9. SI (acepta contrato)",
+  "10. SI ACEPTO (términos)",
+  "11. SI AUTORIZO (datos personales)",
+  "12. SI ACEPTO (conformidad final)",
+  "13. RUC del representante legal",
+  "14. Nombre del representante legal",
+];
 
 // ==========================================
 // VENTA PRINCIPAL
@@ -127,6 +157,8 @@ export interface Venta {
   cliente_telefono: string;
   cliente_email: string;
   id_distrito_nacimiento: number | null;
+  cant_decos_adicionales: number;
+  cant_repetidores_adicionales: number;
   cliente_papa: string;
   cliente_mama: string;
   numero_instalacion: string;
@@ -145,7 +177,11 @@ export interface Venta {
   es_full_claro: boolean;
   score_crediticio: string;
 
-  // Control
+  /**
+   * TRUE → El Backoffice pidió corrección al Asesor.
+   * El Asesor puede editar la venta.
+   * FALSE → La venta está en manos del Backoffice (bloqueada).
+   */
   solicitud_correccion: boolean;
 
   // Operativo
@@ -166,7 +202,7 @@ export interface Venta {
   codigo_estado: string | null;
   comentario_gestion: string | null;
 
-  // Segmentación automática
+  // Segmentación
   tipo_venta: string | null;
 
   // Audios
@@ -186,10 +222,10 @@ export interface Venta {
   fecha_modificacion: string;
   activo: boolean;
 
-  // Rastreo de reingreso
-  venta_origen: number | null; // ID de la venta RECHAZADA que originó este reingreso
-  codigo_sec_origen: string | null; // SEC de la venta origen (para pre-cargar en backoffice)
-  codigo_sot_origen: string | null; // SOT de la venta origen
+  // Reingreso
+  venta_origen: number | null;
+  codigo_sec_origen: string | null;
+  codigo_sot_origen: string | null;
 }
 
 // ==========================================
@@ -205,6 +241,8 @@ export interface CreateVentaPayload {
   cliente_telefono: string;
   cliente_email: string;
   id_distrito_nacimiento: number | null;
+  cant_decos_adicionales: number;
+  cant_repetidores_adicionales: number;
   cliente_papa: string;
   cliente_mama: string;
   numero_instalacion: string;
@@ -215,30 +253,16 @@ export interface CreateVentaPayload {
   referencias?: string;
   plano: string;
   direccion_detalle: string;
-  coordenadas_gps: string;
+  coordenadas_gps?: string;
   es_full_claro: boolean;
-  score_crediticio: string;
+  score_crediticio?: string;
   id_grabador_audios: number;
   audios: AudioVentaForm[];
-  // Si es reingreso, referencia a la venta rechazada original
   venta_origen?: number | null;
 }
 
-export interface UpdateVentaPayload {
-  codigo_sec?: string;
-  codigo_sot?: string;
-  fecha_visita_programada?: string;
-  bloque_horario?: string;
-  id_sub_estado_sot?: number | null;
-  id_estado_sot?: number | null;
-  fecha_real_inst?: string | null;
-  fecha_rechazo?: string | null;
-  comentario_gestion?: string | null;
-  id_estado_audios?: number | null;
-  observacion_audios?: string | null;
-  audio_subido?: boolean;
-  audios?: Partial<AudioVenta>[];
-  // Campos editables en corrección
+export interface UpdateVentaAsesorPayload {
+  // Solo campos permitidos para edición en corrección
   id_producto?: number;
   tecnologia?: string;
   id_tipo_documento?: number;
@@ -247,6 +271,8 @@ export interface UpdateVentaPayload {
   cliente_telefono?: string;
   cliente_email?: string;
   id_distrito_nacimiento?: number | null;
+  cant_decos_adicionales?: number;
+  cant_repetidores_adicionales?: number;
   cliente_papa?: string;
   cliente_mama?: string;
   numero_instalacion?: string;
@@ -260,6 +286,25 @@ export interface UpdateVentaPayload {
   coordenadas_gps?: string;
   es_full_claro?: boolean;
   score_crediticio?: string;
+  id_grabador_audios?: number;
+  audios?: Partial<AudioVenta>[];
+}
+
+export interface UpdateVentaBackofficePayload {
+  codigo_sec?: string;
+  codigo_sot?: string;
+  fecha_visita_programada?: string | null;
+  bloque_horario?: string | null;
+  id_sub_estado_sot?: number | null;
+  id_estado_sot?: number | null;
+  fecha_real_inst?: string | null;
+  fecha_rechazo?: string | null;
+  comentario_gestion?: string | null;
+  solicitud_correccion?: boolean;
+  id_estado_audios?: number | null;
+  observacion_audios?: string | null;
+  audio_subido?: boolean;
+  audios?: Partial<AudioVenta>[];
 }
 
 // ==========================================
@@ -271,10 +316,13 @@ export interface VentaFiltros {
   id_sub_estado_sot?: number | string;
   id_estado_audios?: number | string;
   id_producto?: number | string;
+  id_origen_venta?: number | string;
   tecnologia?: string;
   es_full_claro?: boolean;
+  solicitud_correccion?: boolean;
   search?: string;
   ordering?: string;
+  page?: number;
 }
 
 export interface PaginatedResponse<T> {
@@ -290,10 +338,11 @@ export interface PaginatedResponse<T> {
 
 export interface EstadisticasAsesor {
   total: number;
-  atendidas: number;
-  en_ejecucion: number;
-  rechazadas: number;
-  pendientes: number; // estado_sot null
+  pendientes: number; // id_estado_sot = null
+  en_ejecucion: number; // codigo = EJECUCION
+  atendidas: number; // codigo = ATENDIDO
+  rechazadas: number; // codigo = RECHAZADO
+  en_correccion: number; // solicitud_correccion = true
 }
 
 // ==========================================

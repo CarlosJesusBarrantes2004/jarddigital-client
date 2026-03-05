@@ -1,15 +1,5 @@
 import { useState } from "react";
-import { Search, RefreshCw, Filter, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { Search, RefreshCw, Filter, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -23,6 +13,64 @@ import { DataTable } from "../components/VentasTable";
 import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 
+// ── Componentes de UI Internos ──
+function FilterChip({
+  label,
+  active,
+  colorClass,
+  bgClass,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  colorClass: string;
+  bgClass: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-4 py-1.5 rounded-full text-xs font-sans transition-all duration-200 border whitespace-nowrap",
+        active
+          ? cn(bgClass, colorClass, "border-current/30 font-semibold shadow-sm")
+          : "bg-card border-border text-muted-foreground hover:bg-muted",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Select({
+  value,
+  onChange,
+  children,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-11 bg-background border border-border rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 appearance-none outline-none transition-all cursor-pointer"
+      >
+        <option value="todos">{placeholder}</option>
+        {children}
+      </select>
+      <ChevronDown
+        size={14}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+      />
+    </div>
+  );
+}
+
 export function VentasBackofficePage() {
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
     null,
@@ -30,285 +78,333 @@ export function VentasBackofficePage() {
   const [filtros, setFiltros] = useState<VentaFiltros>({});
   const [busqueda, setBusqueda] = useState("");
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [page, setPage] = useState(1);
 
-  const { data, isLoading, refetch } = useVentas(filtros);
+  const { data, isLoading, refetch } = useVentas({ ...filtros, page });
   const { data: estadosSOT = [] } = useEstadosSOT();
   const { data: estadosAudio = [] } = useEstadosAudio();
   const { data: productos = [] } = useProductos();
 
   const ventas = data?.results ?? [];
 
-  // Contador de filtros activos
   const filtrosActivos = Object.entries(filtros).filter(
-    ([k, v]) => v !== undefined && v !== "" && k !== "search",
+    ([k, v]) => v !== undefined && v !== "" && v !== null && k !== "search",
   ).length;
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
     setFiltros((f) => ({ ...f, search: busqueda }));
-  };
-
-  const handleFiltroEstado = (valor: string) => {
-    setFiltros((f) => ({
-      ...f,
-      id_estado_sot: valor === "todos" ? undefined : valor,
-    }));
-  };
-
-  const handleFiltroAudio = (valor: string) => {
-    setFiltros((f) => ({
-      ...f,
-      id_estado_audios: valor === "todos" ? undefined : valor,
-    }));
-  };
-
-  const handleFiltroProducto = (valor: string) => {
-    setFiltros((f) => ({
-      ...f,
-      id_producto: valor === "todos" ? undefined : valor,
-    }));
+    setPage(1);
   };
 
   const limpiarFiltros = () => {
     setFiltros({});
     setBusqueda("");
+    setPage(1);
   };
+
+  const idEjecucion = estadosSOT.find((e) => e.codigo === "EJECUCION")?.id;
+  const idAtendido = estadosSOT.find((e) => e.codigo === "ATENDIDO")?.id;
+  const idRechazado = estadosSOT.find((e) => e.codigo === "RECHAZADO")?.id;
 
   const columns = buildColumnsBackoffice(estadosSOT, (v) =>
     setVentaSeleccionada(v),
   );
 
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="font-sans min-h-screen bg-background text-foreground transition-colors duration-300">
+      <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* ── HEADER ── */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900">
+            <p className="font-mono text-[11px] tracking-widest uppercase text-primary mb-1.5 font-semibold">
+              Backoffice & Control
+            </p>
+            <h1 className="font-serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-1.5">
               Gestión de Ventas
             </h1>
-            <p className="mt-1 text-sm text-zinc-500">
-              {data?.count !== undefined && (
-                <span>
-                  <span className="font-semibold text-zinc-700">
+            <p className="text-sm text-muted-foreground font-light">
+              {data?.count !== undefined ? (
+                <>
+                  <strong className="text-primary font-mono font-semibold">
                     {data.count}
-                  </span>{" "}
-                  ventas en tu sucursal
-                </span>
+                  </strong>{" "}
+                  ventas encontradas
+                </>
+              ) : (
+                "Cargando…"
               )}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
+          <button
             onClick={() => refetch()}
-            title="Refrescar"
+            className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all shadow-sm"
           >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+            <RefreshCw size={16} /> Refrescar
+          </button>
         </div>
 
-        {/* ── BARRA DE BÚSQUEDA Y FILTROS ── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
+        {/* ── CHIPS RÁPIDOS ── */}
+        <div className="flex flex-wrap gap-2.5">
+          <FilterChip
+            label="Todos"
+            active={Object.keys(filtros).length === 0}
+            colorClass="text-foreground"
+            bgClass="bg-muted"
+            onClick={limpiarFiltros}
+          />
+          <FilterChip
+            label="Pendientes"
+            active={filtros.id_estado_sot === "null"}
+            colorClass="text-amber-500"
+            bgClass="bg-amber-500/10"
+            onClick={() =>
+              setFiltros((f) => ({
+                ...f,
+                id_estado_sot: f.id_estado_sot === "null" ? undefined : "null",
+                solicitud_correccion: undefined,
+              }))
+            }
+          />
+          {idEjecucion && (
+            <FilterChip
+              label="En Ejecución"
+              active={filtros.id_estado_sot === String(idEjecucion)}
+              colorClass="text-blue-500"
+              bgClass="bg-blue-500/10"
+              onClick={() =>
+                setFiltros((f) => ({
+                  ...f,
+                  id_estado_sot:
+                    f.id_estado_sot === String(idEjecucion)
+                      ? undefined
+                      : String(idEjecucion),
+                }))
+              }
+            />
+          )}
+          {idAtendido && (
+            <FilterChip
+              label="Atendidas"
+              active={filtros.id_estado_sot === String(idAtendido)}
+              colorClass="text-emerald-500"
+              bgClass="bg-emerald-500/10"
+              onClick={() =>
+                setFiltros((f) => ({
+                  ...f,
+                  id_estado_sot:
+                    f.id_estado_sot === String(idAtendido)
+                      ? undefined
+                      : String(idAtendido),
+                }))
+              }
+            />
+          )}
+          {idRechazado && (
+            <FilterChip
+              label="Rechazadas"
+              active={filtros.id_estado_sot === String(idRechazado)}
+              colorClass="text-destructive"
+              bgClass="bg-destructive/10"
+              onClick={() =>
+                setFiltros((f) => ({
+                  ...f,
+                  id_estado_sot:
+                    f.id_estado_sot === String(idRechazado)
+                      ? undefined
+                      : String(idRechazado),
+                }))
+              }
+            />
+          )}
+          <FilterChip
+            label="En corrección"
+            active={filtros.solicitud_correccion === true}
+            colorClass="text-orange-500"
+            bgClass="bg-orange-500/10"
+            onClick={() =>
+              setFiltros((f) => ({
+                ...f,
+                solicitud_correccion:
+                  f.solicitud_correccion === true ? undefined : true,
+                id_estado_sot: undefined,
+              }))
+            }
+          />
+        </div>
+
+        {/* ── BÚSQUEDA Y FILTROS AVANZADOS ── */}
+        <div className="flex flex-col gap-3 bg-card border border-border p-3 rounded-2xl shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
             <form
-              className="flex flex-1 items-center gap-2"
               onSubmit={handleBuscar}
+              className="flex-1 w-full relative flex items-center gap-2"
             >
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                <Input
-                  placeholder="Buscar por cliente, DNI, código SOT/SEC..."
-                  className="pl-9"
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                />
-              </div>
-              <Button type="submit" variant="outline" size="icon">
-                <Search className="h-4 w-4" />
-              </Button>
-            </form>
-
-            <Button
-              variant="outline"
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className={cn("gap-2", mostrarFiltros && "bg-zinc-100")}
-            >
-              <Filter className="h-4 w-4" />
-              Filtros
-              {filtrosActivos > 0 && (
-                <Badge className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
-                  {filtrosActivos}
-                </Badge>
-              )}
-            </Button>
-
-            {filtrosActivos > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={limpiarFiltros}
-                className="gap-1 text-xs text-zinc-500"
+              <Search
+                size={16}
+                className="absolute left-4 text-muted-foreground"
+              />
+              <input
+                type="text"
+                placeholder="Buscar por cliente, DNI, SOT, SEC, asesor…"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full h-11 bg-background border border-border rounded-xl pl-11 pr-4 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+              />
+              <button
+                type="submit"
+                className="hidden lg:block h-11 px-6 rounded-xl bg-muted border border-border text-xs font-semibold hover:bg-muted/80 transition-colors"
               >
-                <X className="h-3.5 w-3.5" />
-                Limpiar filtros
-              </Button>
-            )}
+                Buscar
+              </button>
+            </form>
+            <div className="flex w-full sm:w-auto gap-2">
+              <button
+                onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                className={cn(
+                  "flex-1 sm:flex-none h-11 px-5 flex items-center justify-center gap-2 rounded-xl border text-xs font-semibold transition-colors",
+                  mostrarFiltros
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-background border-border text-muted-foreground hover:bg-muted",
+                )}
+              >
+                <Filter size={14} /> Filtros{" "}
+                {filtrosActivos > 0 && (
+                  <span className="w-4 h-4 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px]">
+                    {filtrosActivos}
+                  </span>
+                )}
+              </button>
+              {(filtrosActivos > 0 || busqueda) && (
+                <button
+                  onClick={limpiarFiltros}
+                  className="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-transparent border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
+                >
+                  <X size={14} />{" "}
+                  <span className="hidden sm:inline">Limpiar</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Panel de filtros expandible */}
           {mostrarFiltros && (
-            <div className="grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:grid-cols-3">
-              {/* Estado SOT */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-zinc-500">Estado SOT</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-border animate-in fade-in slide-in-from-top-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
+                  Estado SOT
+                </label>
                 <Select
-                  onValueChange={handleFiltroEstado}
                   value={
                     filtros.id_estado_sot
                       ? String(filtros.id_estado_sot)
                       : "todos"
                   }
+                  onChange={(v) =>
+                    setFiltros({
+                      ...filtros,
+                      id_estado_sot: v === "todos" ? undefined : v,
+                    })
+                  }
+                  placeholder="Todos los estados"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos los estados" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los estados</SelectItem>
-                    <SelectItem value="null">Sin estado (pendiente)</SelectItem>
-                    {estadosSOT.map((e) => (
-                      <SelectItem key={e.id} value={String(e.id)}>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: e.color_hex }}
-                          />
-                          {e.nombre}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  <option value="null">Sin estado (pendiente)</option>
+                  {estadosSOT.map((e) => (
+                    <option key={e.id} value={String(e.id)}>
+                      {e.nombre}
+                    </option>
+                  ))}
                 </Select>
               </div>
-
-              {/* Estado Audios */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-zinc-500">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
                   Estado Audios
-                </p>
+                </label>
                 <Select
-                  onValueChange={handleFiltroAudio}
                   value={
                     filtros.id_estado_audios
                       ? String(filtros.id_estado_audios)
                       : "todos"
                   }
+                  onChange={(v) =>
+                    setFiltros({
+                      ...filtros,
+                      id_estado_audios: v === "todos" ? undefined : v,
+                    })
+                  }
+                  placeholder="Todos"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {estadosAudio.map((ea) => (
-                      <SelectItem key={ea.id} value={String(ea.id)}>
-                        {ea.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  {estadosAudio.map((ea) => (
+                    <option key={ea.id} value={String(ea.id)}>
+                      {ea.nombre}
+                    </option>
+                  ))}
                 </Select>
               </div>
-
-              {/* Producto */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-zinc-500">
-                  Plan/Producto
-                </p>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
+                  Plan / Producto
+                </label>
                 <Select
-                  onValueChange={handleFiltroProducto}
                   value={
                     filtros.id_producto ? String(filtros.id_producto) : "todos"
                   }
+                  onChange={(v) =>
+                    setFiltros({
+                      ...filtros,
+                      id_producto: v === "todos" ? undefined : v,
+                    })
+                  }
+                  placeholder="Todos los planes"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos los planes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los planes</SelectItem>
-                    {productos.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.nombre_plan}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  {productos.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.nombre_plan}
+                    </option>
+                  ))}
                 </Select>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── INDICADORES RÁPIDOS ── */}
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            {
-              label: "Pendientes",
-              fn: () => setFiltros({ id_estado_sot: "null" }),
-              color: "bg-zinc-100 text-zinc-700",
-            },
-            {
-              label: "En Ejecución",
-              fn: () =>
-                setFiltros({
-                  id_estado_sot: String(
-                    estadosSOT.find((e) => e.codigo === "EJECUCION")?.id,
-                  ),
-                }),
-              color: "bg-blue-50 text-blue-700",
-            },
-            {
-              label: "Reingresadas",
-              fn: () => setFiltros({}),
-              color: "bg-amber-50 text-amber-700",
-            },
-          ].map((chip) => (
-            <button
-              key={chip.label}
-              onClick={chip.fn}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:opacity-80",
-                chip.color,
-              )}
-            >
-              {chip.label}
-            </button>
-          ))}
+        {/* ── TABLA ── */}
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden mb-4">
+          <DataTable
+            columns={columns}
+            data={ventas}
+            isLoading={isLoading}
+            emptyMessage="No hay ventas que coincidan con los filtros aplicados"
+          />
         </div>
 
-        {/* ── TABLA ── */}
-        <DataTable
-          columns={columns}
-          data={ventas}
-          isLoading={isLoading}
-          emptyMessage="No hay ventas que coincidan con los filtros aplicados"
-        />
-
-        {/* Paginación */}
+        {/* ── PAGINACIÓN ── */}
         {data && (data.next || data.previous) && (
-          <div className="flex items-center justify-between text-sm text-zinc-500">
-            <span>{data.count} venta(s) en total</span>
+          <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
+            <span>
+              <strong className="text-foreground">{data.count}</strong> ventas
+              en total
+            </span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={!data.previous}>
+              <button
+                disabled={!data.previous}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-4 py-2 rounded-lg bg-card border border-border disabled:opacity-50 hover:bg-muted transition-colors"
+              >
                 Anterior
-              </Button>
-              <Button variant="outline" size="sm" disabled={!data.next}>
+              </button>
+              <button
+                disabled={!data.next}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-4 py-2 rounded-lg bg-card border border-border disabled:opacity-50 hover:bg-muted transition-colors"
+              >
                 Siguiente
-              </Button>
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── MODAL GESTIÓN ── */}
-      {/* key={venta.id} fuerza remount al cambiar de venta */}
+      {/* ── MODAL BACKOFFICE ── */}
       {ventaSeleccionada && (
         <VentaFormBackoffice
           key={ventaSeleccionada.id}

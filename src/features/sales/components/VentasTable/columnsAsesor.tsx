@@ -1,64 +1,51 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RotateCcw, Eye, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Pencil, AlertTriangle, Eye } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
+import { cn } from "@/lib/utils";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
 
-function AccionesAsesor({
-  venta,
-  onReingresar,
-  onVer,
+function ActionBtn({
+  onClick,
+  title,
+  variant = "default",
+  children,
 }: {
-  venta: Venta;
-  onReingresar: (v: Venta) => void;
-  onVer?: (v: Venta) => void;
+  onClick: () => void;
+  title?: string;
+  variant?: "default" | "primary" | "warning";
+  children: React.ReactNode;
 }) {
-  const esRechazada = venta.codigo_estado?.toUpperCase() === "RECHAZADO";
   return (
-    <div className="flex items-center gap-1">
-      {onVer && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-zinc-500 hover:text-zinc-700"
-          onClick={() => onVer(venta)}
-          title="Ver detalle"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </Button>
+    <button
+      onClick={onClick}
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold font-sans transition-all duration-200 tracking-wider uppercase",
+        variant === "default" &&
+          "bg-transparent border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+        variant === "primary" &&
+          "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20",
+        variant === "warning" &&
+          "bg-orange-500/10 border-orange-500/30 text-orange-500 hover:bg-orange-500/20",
       )}
-      {esRechazada && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 px-2 text-xs text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-          onClick={() => onReingresar(venta)}
-          title="Reingresar venta"
-        >
-          <RotateCcw className="h-3 w-3" />
-          Reingresar
-        </Button>
-      )}
-    </div>
+    >
+      {children}
+    </button>
   );
 }
 
 export function buildColumnsAsesor(
   estadosSOT: EstadoSOT[],
-  onReingresar: (v: Venta) => void,
-  onVer?: (v: Venta) => void,
+  onEditar: (v: Venta) => void,
 ): ColumnDef<Venta>[] {
   return [
     {
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-zinc-500">
+        <span className="font-mono text-[11px] text-muted-foreground/60">
           #{row.original.id}
         </span>
       ),
@@ -68,11 +55,11 @@ export function buildColumnsAsesor(
       accessorKey: "cliente_nombre",
       header: "Cliente",
       cell: ({ row }) => (
-        <div>
-          <p className="font-medium text-zinc-800">
+        <div className="flex flex-col gap-0.5">
+          <p className="font-medium text-[13px] text-foreground leading-snug">
             {row.original.cliente_nombre}
           </p>
-          <p className="text-xs text-zinc-500">
+          <p className="font-mono text-[11px] text-muted-foreground">
             {row.original.cliente_numero_doc}
           </p>
         </div>
@@ -80,13 +67,15 @@ export function buildColumnsAsesor(
     },
     {
       accessorKey: "nombre_producto",
-      header: "Plan / Tecnología",
+      header: "Plan",
       cell: ({ row }) => (
-        <div>
-          <p className="text-sm font-medium">{row.original.nombre_producto}</p>
-          <Badge variant="outline" className="mt-0.5 text-xs font-mono">
+        <div className="flex flex-col items-start gap-1">
+          <p className="text-[13px] font-medium text-foreground/80">
+            {row.original.nombre_producto}
+          </p>
+          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-widest">
             {row.original.tecnologia}
-          </Badge>
+          </span>
         </div>
       ),
     },
@@ -95,10 +84,10 @@ export function buildColumnsAsesor(
       header: "Estado",
       cell: ({ row }) => {
         const v = row.original;
-        const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
         const estadoData = estadosSOT.find((e) => e.id === v.id_estado_sot);
+
         return (
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1.5 items-start">
             <EstadoBadge
               estado={
                 estadoData
@@ -110,14 +99,47 @@ export function buildColumnsAsesor(
                   : null
               }
             />
-            {/* Motivo de rechazo visible para el asesor */}
-            {esRechazada && v.comentario_gestion && (
-              <div className="flex items-start gap-1 rounded-md border border-red-100 bg-red-50 px-2 py-1">
-                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
-                <p className="text-xs text-red-700 leading-tight line-clamp-2">
-                  {v.comentario_gestion}
-                </p>
+            {v.solicitud_correccion && (
+              <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-[200px]">
+                <AlertTriangle
+                  size={12}
+                  className="text-orange-500 shrink-0 mt-0.5"
+                />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider leading-none">
+                    En corrección
+                  </span>
+                  {v.comentario_gestion && (
+                    <span className="text-[10px] text-orange-600/70 dark:text-orange-400/70 mt-1 line-clamp-2 leading-tight">
+                      {v.comentario_gestion}
+                    </span>
+                  )}
+                </div>
               </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "codigos",
+      header: "SOT / SEC",
+      cell: ({ row }) => {
+        const v = row.original;
+        return (
+          <div className="flex flex-col gap-0.5">
+            {v.codigo_sot && (
+              <span className="font-mono text-[11px] text-foreground/70">
+                {v.codigo_sot}
+              </span>
+            )}
+            {v.codigo_sec && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {v.codigo_sec}
+              </span>
+            )}
+            {!v.codigo_sot && !v.codigo_sec && (
+              <span className="text-[10px] text-muted-foreground/40">—</span>
             )}
           </div>
         );
@@ -128,7 +150,7 @@ export function buildColumnsAsesor(
       header: "Visita",
       cell: ({ row }) =>
         row.original.fecha_visita_programada ? (
-          <span className="text-sm">
+          <span className="text-[13px] text-foreground/80">
             {format(
               new Date(row.original.fecha_visita_programada),
               "dd MMM yyyy",
@@ -136,29 +158,50 @@ export function buildColumnsAsesor(
             )}
           </span>
         ) : (
-          <span className="text-xs text-zinc-400">Sin programar</span>
+          <span className="text-[10px] text-muted-foreground/40">
+            Sin programar
+          </span>
         ),
     },
     {
       accessorKey: "fecha_creacion",
       header: "Creada",
       cell: ({ row }) => (
-        <span className="text-xs text-zinc-500">
-          {format(new Date(row.original.fecha_creacion), "dd/MM/yyyy HH:mm")}
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {format(new Date(row.original.fecha_creacion), "dd/MM/yy HH:mm")}
         </span>
       ),
     },
     {
       id: "acciones",
       header: "",
-      cell: ({ row }) => (
-        <AccionesAsesor
-          venta={row.original}
-          onReingresar={onReingresar}
-          onVer={onVer}
-        />
-      ),
-      size: 110,
+      cell: ({ row }) => {
+        const v = row.original;
+        const puedeEditar = v.solicitud_correccion;
+        const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
+
+        if (!puedeEditar && !esRechazada) return null;
+
+        return (
+          <div className="flex gap-1.5">
+            {puedeEditar && (
+              <ActionBtn
+                onClick={() => onEditar(v)}
+                variant="warning"
+                title="Corregir venta según indicación"
+              >
+                <Pencil size={12} /> Corregir
+              </ActionBtn>
+            )}
+            {esRechazada && !puedeEditar && (
+              <span className="text-[10px] font-mono text-destructive/60 uppercase tracking-widest">
+                Rechazada
+              </span>
+            )}
+          </div>
+        );
+      },
+      size: 120,
     },
   ];
 }

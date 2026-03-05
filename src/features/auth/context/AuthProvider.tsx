@@ -1,41 +1,53 @@
-import { useCallback, useEffect, useState } from "react";
-import type { Branch, User } from "../types";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+
 import { authService } from "../services/authService";
+
 import { AuthContext } from "./AuthContext";
 
+import type { ActiveWorkspace, User, Workspace } from "../types";
+
+const SESSION_KEY_WORKSPACE = "jard:activeWorkspace";
+
+function buildActiveWorkspace(workspace: Workspace): ActiveWorkspace {
+  return {
+    id_modalidad_sede: workspace.id_modalidad_sede,
+    id_sucursal: workspace.id_sucursal,
+    nombre_sucursal: workspace.nombre_sucursal,
+    id_modalidad: workspace.id_modalidad,
+    nombre_modalidad: workspace.nombre_modalidad,
+    etiqueta: workspace.etiqueta,
+  };
+}
+
+function restoreWorkspace(): ActiveWorkspace | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY_WORKSPACE);
+    return raw ? (JSON.parse(raw) as ActiveWorkspace) : null;
+  } catch {
+    return null;
+  }
+}
+
 interface AuthProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [currentBranch, setCurrentBranch] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [currentModality, setCurrentModality] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUserState] = useState<User | null>(null);
+  const [activeWorkspace, setActiveWorkspace] =
+    useState<ActiveWorkspace | null>(restoreWorkspace);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const savedBranch = sessionStorage.getItem("currentBranch");
-    const savedModality = sessionStorage.getItem("currentModality");
-    if (savedBranch) setCurrentBranch(JSON.parse(savedBranch));
-    if (savedModality) setCurrentModality(JSON.parse(savedModality));
-  }, []);
-
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (): Promise<User | null> => {
     try {
       const userData = await authService.getUserProfile();
-      setUser(userData);
+      setUserState(userData);
       return userData;
     } catch {
-      setUser(null);
+      setUserState(null);
       return null;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
@@ -43,27 +55,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkAuth();
   }, [checkAuth]);
 
-  const login = (userData: User) => setUser(userData);
+  useEffect(() => {
+    if (!user) return;
+    const workspaces = user.sucursales ?? [];
 
-  const selectBranch = (branch: Branch) => {
-    const branchData = { id: branch.id_sucursal, name: branch.nombre_sucursal };
-    const modalityData = {
-      id: branch.id_modalidad,
-      name: branch.nombre_modalidad,
-    };
-    setCurrentBranch(branchData);
-    setCurrentModality(modalityData);
-    sessionStorage.setItem("currentBranch", JSON.stringify(branchData));
-    sessionStorage.setItem("currentModality", JSON.stringify(modalityData));
+    if (workspaces.length === 1 && !activeWorkspace) {
+      const built = buildActiveWorkspace(workspaces[0]);
+      setActiveWorkspace(built);
+      sessionStorage.setItem(SESSION_KEY_WORKSPACE, JSON.stringify(built));
+    }
+  }, [user, activeWorkspace]);
+
+  const setUser = (userData: User) => setUserState(userData);
+
+  const selectWorkspace = (workspace: Workspace) => {
+    const built = buildActiveWorkspace(workspace);
+    setActiveWorkspace(built);
+    sessionStorage.setItem(SESSION_KEY_WORKSPACE, JSON.stringify(built));
   };
 
   const logout = async () => {
     try {
       await authService.logout();
     } finally {
-      setUser(null);
-      setCurrentBranch(null);
-      setCurrentModality(null);
+      setUserState(null);
+      setActiveWorkspace(null);
       sessionStorage.clear();
       window.location.href = "/auth/login";
     }
@@ -73,13 +89,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     <AuthContext
       value={{
         user,
-        currentBranch,
-        currentModality,
+        activeWorkspace,
         isAuthenticated: !!user,
-        loading,
-        login,
+        isLoading,
+        setUser,
+        selectWorkspace,
         logout,
-        selectBranch,
         checkAuth,
       }}
     >

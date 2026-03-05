@@ -1,22 +1,34 @@
-// ── TYPES ──
-export * from "./types/sales.types";
+// ── Entry point ──────────────────────────────────────────────────────────────
+export { SalesPage } from "./pages/SalesPage";
+export { VentasAsesorPage } from "./pages/Ventasasesorpage";
+export { VentasBackofficePage } from "./pages/Ventasbackofficepage";
 
-// ── SERVICES ──
-export {
-  salesService,
-  catalogosService,
-  ubigeoService,
-} from "./services/sales.service";
+// ── Types ─────────────────────────────────────────────────────────────────────
+export type {
+  Venta,
+  VentaFiltros,
+  EstadisticasAsesor,
+  CreateVentaPayload,
+  UpdateVentaAsesorPayload,
+  UpdateVentaBackofficePayload,
+  EstadoSOT,
+  SubEstadoSOT,
+  EstadoAudio,
+  Producto,
+  GrabadorAudio,
+  AudioVenta,
+  PaginatedResponse,
+  ETIQUETAS_AUDIO_DNI,
+} from "./types/sales.types";
 
-// ── HOOKS ──
+// ── Hooks ─────────────────────────────────────────────────────────────────────
 export {
-  salesKeys,
   useVentas,
   useVenta,
   useEstadisticasAsesor,
   useCreateVenta,
-  useUpdateVenta,
-  useDeleteVenta,
+  useUpdateVentaAsesor,
+  useUpdateVentaBackoffice,
   useEstadosSOT,
   useSubEstadosSOT,
   useEstadosAudio,
@@ -26,29 +38,19 @@ export {
   useDepartamentos,
   useProvincias,
   useDistritos,
-  useDistritoById,
+  salesKeys,
 } from "./hooks/useSales";
 
-// ── SCHEMAS ──
+// ── Services ──────────────────────────────────────────────────────────────────
 export {
-  createVentaSchema,
-  updateVentaBackofficeSchema,
-  correccionVentaSchema,
-  audioVentaSchema,
-} from "./schemas/venta.schema";
-export type {
-  CreateVentaFormValues,
-  UpdateVentaBackofficeValues,
-  CorreccionVentaFormValues,
-} from "./schemas/venta.schema";
+  salesService,
+  catalogosService,
+  ubigeoService,
+  uploadAudioToCloudinary,
+} from "./services/sales.service";
 
-// ── COMPONENTS ──
-export { EstadoBadge, ColorBadge } from "./components/EstadoBadge";
-export { UbigeoCascada } from "./components/UbigeoCascada";
+// ── Components ────────────────────────────────────────────────────────────────
 export { VentaFormAsesor } from "./components/VentaFormAsesor";
 export { VentaFormBackoffice } from "./components/VentaFormBackoffice";
 export { DataTable } from "./components/VentasTable";
-
-// ── PAGES ──
-export { VentasAsesorPage } from "./pages/Ventasasesorpage";
-export { VentasBackofficePage } from "./pages/Ventasbackofficepage";
+export { EstadoBadge } from "./components/EstadoBadge";

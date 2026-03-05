@@ -1,18 +1,18 @@
 @import "tailwindcss";
-
 @plugin "tailwindcss-animate";
-
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono:
-    "Geist Mono", ui-monospace, SFMono-Regular, Roboto Mono, Menlo, monospace;
+  /* Fuentes Premium */
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Roboto Mono, monospace;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
+  /* Mapeo de colores semánticos */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -32,44 +32,56 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-
-  --color-sidebar: hsl(var(--sidebar-background));
-  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
-  --color-sidebar-primary: hsl(var(--sidebar-primary));
-  --color-sidebar-border: hsl(var(--sidebar-border));
-  --color-sidebar-accent: hsl(var(--sidebar-accent));
-  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
 }
 
 @layer base {
+  /* MODO CLARO (LIGHT MODE) */
   :root {
     --background: 210 40% 98%;
-    --foreground: 210 10% 12%;
-    --card: 210 40% 99%;
-    --card-foreground: 210 10% 12%;
-    --popover: 210 40% 99%;
-    --popover-foreground: 210 10% 12%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+    /* CELESTE JARD DIGITAL */
     --primary: 197 100% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 10% 20%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 210 15% 90%;
-    --muted-foreground: 210 10% 45%;
+    --secondary: 210 15% 94%;
+    --secondary-foreground: 220 20% 15%;
+    --muted: 210 15% 94%;
+    --muted-foreground: 220 10% 45%;
     --accent: 197 100% 45%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 15% 88%;
-    --input: 210 15% 92%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
     --ring: 197 100% 45%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+  }
 
-    --sidebar-background: 210 10% 12%;
-    --sidebar-foreground: 210 40% 95%;
-    --sidebar-primary: 197 100% 50%;
-    --sidebar-accent: 210 10% 25%;
-    --sidebar-accent-foreground: 197 100% 50%;
-    --sidebar-border: 210 10% 18%;
+  /* MODO OSCURO (DARK MODE) */
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 210 20% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 210 20% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 210 20% 98%;
+    /* CELESTE JARD DIGITAL BRILLANTE EN OSCURO */
+    --primary: 197 100% 50%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 10% 12%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 197 100% 50%;
+    --accent-foreground: 240 10% 4%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 240 10% 15%;
+    --input: 240 10% 15%;
+    --ring: 197 100% 50%;
   }
 }
 
@@ -80,5 +92,8 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 }
