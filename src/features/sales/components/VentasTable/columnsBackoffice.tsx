@@ -199,9 +199,7 @@ export function buildColumnsBackoffice(
       cell: ({ row }) => {
         const v = row.original;
 
-        console.log(v);
-
-        const esAtendida = v.codigo_estado.toUpperCase() === "ATENDIDO";
+        const esAtendida = v.codigo_estado?.toUpperCase() === "ATENDIDO";
 
         if (esAtendida) {
           return (
