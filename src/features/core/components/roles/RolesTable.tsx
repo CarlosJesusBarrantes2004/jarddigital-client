@@ -99,7 +99,7 @@ export function RolesTable({ roles, onEdit, onDelete }: RolesTableProps) {
 
                 <td className="px-6 py-4 align-middle hidden sm:table-cell">
                   <p className="text-[12px] text-muted-foreground max-w-[200px] lg:max-w-xs truncate font-light">
-                    {(rol as any).descripcion || "Sin descripción detallada"}
+                    {rol.descripcion || "Sin descripción detallada"}
                   </p>
                 </td>
 

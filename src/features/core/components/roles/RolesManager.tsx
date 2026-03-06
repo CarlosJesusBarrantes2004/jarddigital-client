@@ -27,7 +27,7 @@ import type { RoleFormData } from "../../schemas/roleSchema";
 import { RolesTable } from "./RolesTable";
 import { RoleForm } from "./RoleForm";
 
-import type { Role } from "../../types";
+import type { Role, RoleCode } from "../../types";
 
 export function RolesManager() {
   const { roles, loading, createRole, updateRole, deleteRole } = useRoles();
@@ -47,8 +47,13 @@ export function RolesManager() {
     setIsSubmitting(true);
     let success = false;
 
-    if (selectedRole) success = await updateRole(selectedRole.id, data);
-    else success = await createRole(data);
+    const payload = {
+      ...data,
+      codigo: data.codigo as RoleCode,
+    };
+
+    if (selectedRole) success = await updateRole(selectedRole.id, payload);
+    else success = await createRole(payload);
 
     setIsSubmitting(false);
     if (success) setIsSheetOpen(false);
