@@ -31,6 +31,7 @@ import {
 import { UbigeoCascada } from "./UbigeoCascada";
 import { AudioUploadField } from "./AudioUploadField";
 import { Button } from "@/components/ui/button";
+import { extractApiError } from "@/lib/api-errors";
 
 // ── Zod schema ────────────────────────────────────────────────────────────────
 const schema = z
@@ -50,8 +51,8 @@ const schema = z
     cliente_papa: z.string().min(2, "Nombre del padre requerido"),
     cliente_mama: z.string().min(2, "Nombre de la madre requerido"),
     numero_instalacion: z.string().min(1, "Número de instalación requerido"),
-    cant_decos_adicionales: z.number().min(0).default(0),
-    cant_repetidores_adicionales: z.number().min(0).default(0),
+    cant_decos_adicionales: z.number().min(0),
+    cant_repetidores_adicionales: z.number().min(0),
     representante_legal_dni: z.string().nullable().optional(),
     representante_legal_nombre: z.string().nullable().optional(),
 
@@ -71,10 +72,10 @@ const schema = z
     plano: z.string().min(1, "Número de plano requerido"),
     direccion_detalle: z.string().min(5, "Dirección requerida"),
     coordenadas_gps: z.string().optional(),
-    es_full_claro: z.boolean().default(false),
+    es_full_claro: z.boolean(),
     score_crediticio: z.string().optional(),
     id_grabador_audios: z.number({ message: "Selecciona grabador" }),
-    audio_urls: z.array(z.string()).default([]),
+    audio_urls: z.array(z.string()),
   })
   .refine((d) => d.id_distrito_instalacion !== null, {
     message: "Selecciona el distrito de instalación",
@@ -297,11 +298,9 @@ export function VentaFormAsesor({
   const { data: tiposDoc = [] } = useTiposDocumento();
   const { data: productos = [] } = useProductos();
 
-  const grabadorActualId = ventaOrigen
-    ? typeof ventaOrigen.id_grabador_audios === "object"
-      ? (ventaOrigen.id_grabador_audios as any).id
-      : ventaOrigen.id_grabador_audios
-    : null;
+  console.log(ventaOrigen?.id_grabador_audios);
+
+  const grabadorActualId = ventaOrigen?.id_grabador_audios ?? null;
 
   const { data: grabadores = [] } = useGrabadores(grabadorActualId);
 
@@ -524,12 +523,8 @@ export function VentaFormAsesor({
         toast.success("Venta creada correctamente");
       }
       handleClose();
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data
-          ? (Object.values(err.response.data)[0] as string)
-          : "Error al guardar la venta",
-      );
+    } catch (err) {
+      toast.error(extractApiError(err));
     }
   });
 

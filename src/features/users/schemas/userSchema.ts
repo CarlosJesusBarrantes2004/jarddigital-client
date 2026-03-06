@@ -18,16 +18,13 @@ export const userFormSchema = z.object({
 
   email: z.string().email("Correo electrónico inválido"),
 
-  password: z
-    .string()
-    .optional()
-    .transform((v) => (v === "" ? undefined : v)),
+  password: z.string().optional(),
 
   id_rol: z
-    .number({ required_error: "Selecciona un rol" })
+    .number({ message: "Selecciona un rol" })
     .min(1, "Selecciona un rol"),
 
-  activo: z.boolean().default(true),
+  activo: z.boolean(),
 });
 
 export type UserFormValues = z.infer<typeof userFormSchema>;

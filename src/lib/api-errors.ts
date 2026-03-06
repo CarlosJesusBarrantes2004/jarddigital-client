@@ -6,7 +6,7 @@ export const extractApiError = (error: unknown): string => {
     return "Ocurrió un error inesperado.";
   }
 
-  const axiosError = error as AxiosError<any>;
+  const axiosError = error as AxiosError<Record<string, unknown>>;
 
   // Si no hay respuesta (ej. el servidor de Django está apagado)
   if (!axiosError.response) {

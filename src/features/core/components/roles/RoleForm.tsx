@@ -129,6 +129,7 @@ export function RoleForm({
                             : "border-border",
                         )}
                         {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage className="text-[11px] text-destructive flex items-center gap-1" />

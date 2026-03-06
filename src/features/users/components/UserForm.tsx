@@ -13,13 +13,14 @@ import type {
   User,
   WorkspaceOption,
 } from "../types";
+import type { User as AuthUser } from "@/features/auth/types";
 import { Switch } from "@/components/ui/switch";
 import { SESSION_KEY_WORKSPACE } from "@/features/auth/context/AuthProvider";
 
 interface UserFormProps {
   user?: User;
   roles: Role[];
-  currentUser: User | null;
+  currentUser: AuthUser | null;
   onSave: (
     data: CreateUserPayload | UpdateUserPayload,
     isSupervisor: boolean,

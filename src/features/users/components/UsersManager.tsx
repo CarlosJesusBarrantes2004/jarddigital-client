@@ -11,7 +11,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useState } from "react";
-import type { Role, User, UserPayload } from "../types";
+import type {
+  Role,
+  User,
+  CreateUserPayload,
+  UpdateUserPayload,
+  UserFilters,
+} from "../types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,14 +35,17 @@ interface UsersManagerProps {
   users: User[];
   roles: Role[];
   loading: boolean;
-  filters: any;
-  onFilterChange: (filters: any) => void;
+  filters: UserFilters;
+  onFilterChange: (filters: UserFilters) => void;
   onCreateUser: (
-    payload: UserPayload,
+    payload: CreateUserPayload,
     isSup: boolean,
     branches: number[],
   ) => Promise<boolean>;
-  onUpdateUser: (id: number, payload: Partial<UserPayload>) => Promise<boolean>;
+  onUpdateUser: (
+    id: number,
+    payload: Partial<UpdateUserPayload>,
+  ) => Promise<boolean>;
   onDeleteUser: (id: number) => Promise<void>;
 }
 
@@ -74,16 +83,22 @@ export const UsersManager = ({
   };
 
   const handleSave = async (
-    data: UserPayload,
+    data: CreateUserPayload | UpdateUserPayload,
     isSupervisor: boolean,
     branches: number[],
-  ) => {
+  ): Promise<boolean> => {
     let success = false;
 
     if (selectedUser) success = await onUpdateUser(selectedUser.id, data);
-    else success = await onCreateUser(data, isSupervisor, branches);
+    else
+      success = await onCreateUser(
+        data as CreateUserPayload,
+        isSupervisor,
+        branches,
+      );
 
     if (success) setIsSheetOpen(false);
+    return success;
   };
 
   return (
@@ -96,7 +111,7 @@ export const UsersManager = ({
               placeholder="Buscar por nombre, usuario o email..."
               value={filters.search}
               onChange={(e) =>
-                onFilterChange((prev) => ({ ...prev, search: e.target.value }))
+                onFilterChange({ ...filters, search: e.target.value })
               }
               className="pl-10"
             />
@@ -104,10 +119,10 @@ export const UsersManager = ({
           <select
             value={filters.id_rol || ""}
             onChange={(e) =>
-              onFilterChange((prev) => ({
-                ...prev,
+              onFilterChange({
+                ...filters,
                 id_rol: Number(e.target.value) || 0,
-              }))
+              })
             }
             className="px-4 py-2 border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
@@ -133,6 +148,8 @@ export const UsersManager = ({
       ) : (
         <UsersTable
           users={users}
+          roles={roles}
+          isLoading={loading}
           onEdit={handleEdit}
           onDelete={handleDeleteRequest}
         />
@@ -156,6 +173,7 @@ export const UsersManager = ({
           <div className="m-6">
             <UserForm
               user={selectedUser || undefined}
+              currentUser={null}
               roles={roles}
               onSave={handleSave}
               onCancel={() => setIsSheetOpen(false)}

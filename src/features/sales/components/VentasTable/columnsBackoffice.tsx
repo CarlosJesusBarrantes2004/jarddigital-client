@@ -3,36 +3,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Eye, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
-import { cn } from "@/lib/utils";
-import type { Venta, EstadoSOT } from "../../types/sales.types";
 
-function ActionBtn({
-  onClick,
-  title,
-  variant = "default",
-  children,
-}: {
-  onClick: () => void;
-  title?: string;
-  variant?: "default" | "primary";
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold font-sans transition-all duration-200 tracking-wider uppercase",
-        variant === "default" &&
-          "bg-transparent border-border text-muted-foreground hover:bg-muted hover:text-foreground",
-        variant === "primary" &&
-          "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
+import type { Venta, EstadoSOT } from "../../types/sales.types";
+import { ActionBtnBackoffice } from "@/components/ActionBtnBackoffice";
 
 export function buildColumnsBackoffice(
   estadosSOT: EstadoSOT[],
@@ -172,12 +145,12 @@ export function buildColumnsBackoffice(
       cell: ({ row }) => {
         // Extraemos el string de la fecha que llega del backend ("YYYY-MM-DD")
         const fechaStr = row.original.fecha_visita_programada;
-        
+
         return fechaStr ? (
           <span className="text-[13px] text-foreground/80">
             {format(
               // EL PARCHE CRÍTICO: Añadimos T00:00:00 para forzar el Timezone Local
-              new Date(`${fechaStr}T00:00:00`), 
+              new Date(`${fechaStr}T00:00:00`),
               "dd MMM yyyy",
               { locale: es },
             )}
@@ -215,13 +188,13 @@ export function buildColumnsBackoffice(
         }
 
         return (
-          <ActionBtn
+          <ActionBtnBackoffice
             onClick={() => onGestionar(row.original)}
             variant="primary"
             title="Gestionar venta"
           >
             <Eye size={14} /> Gestionar
-          </ActionBtn>
+          </ActionBtnBackoffice>
         );
       },
       size: 110,

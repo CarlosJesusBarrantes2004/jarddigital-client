@@ -30,6 +30,7 @@ import {
 } from "../../hooks/useSales";
 import type { Venta } from "../../types/sales.types";
 import { Button } from "@/components/ui/button";
+import { extractApiError } from "@/lib/api-errors";
 
 // ── Schema de validación ──────────────────────────────────────────────────────
 const schema = z.object({
@@ -42,8 +43,8 @@ const schema = z.object({
   fecha_real_inst: z.string().nullable().optional(),
   fecha_rechazo: z.string().nullable().optional(),
   comentario_gestion: z.string().nullable().optional(),
-  solicitud_correccion: z.boolean().default(false),
-  audio_subido: z.boolean().default(false),
+  solicitud_correccion: z.boolean(),
+  audio_subido: z.boolean(),
   id_estado_audios: z.number().nullable().optional(),
   observacion_audios: z.string().nullable().optional(),
 });
@@ -287,13 +288,22 @@ function Divider() {
   return <div className="h-px bg-border my-6" />;
 }
 
+interface AudioQA {
+  id: number;
+  nombre_etiqueta: string;
+  url_audio: string;
+  conforme: boolean | null;
+  motivo: string | null;
+  corregido: boolean;
+}
+
 // ── AudioPlayer item para QA (AHORA NOTIFICA AL PADRE) ──────────────────────
 function AudioItemQA({
   audio,
   index,
   onQAUpdate,
 }: {
-  audio: any;
+  audio: AudioQA;
   index: number;
   onQAUpdate: (id: number, conforme: boolean, motivo: string) => void;
 }) {
@@ -451,7 +461,7 @@ export function VentaFormBackoffice({
   const { data: estadosAudio = [] } = useEstadosAudio();
 
   // Guardamos un clon de los audios localmente para modificar `conforme` y `motivo`
-  const [audiosQA, setAudiosQA] = useState<any[]>([]);
+  const [audiosQA, setAudiosQA] = useState<AudioQA[]>([]);
 
   useEffect(() => {
     if (venta && open) {
@@ -482,10 +492,7 @@ export function VentaFormBackoffice({
       fecha_visita_programada: venta.fecha_visita_programada ?? null,
       bloque_horario: venta.bloque_horario ?? "",
       id_sub_estado_sot: venta.id_sub_estado_sot ?? null,
-      id_estado_sot:
-        typeof venta.id_estado_sot === "object"
-          ? (venta.id_estado_sot as any)?.id
-          : venta.id_estado_sot,
+      id_estado_sot: venta.id_estado_sot ?? null,
       fecha_real_inst: venta.fecha_real_inst
         ? venta.fecha_real_inst.split("T")[0]
         : null,
@@ -495,10 +502,7 @@ export function VentaFormBackoffice({
       comentario_gestion: venta.comentario_gestion ?? "",
       solicitud_correccion: venta.solicitud_correccion ?? false,
       audio_subido: venta.audio_subido ?? false,
-      id_estado_audios:
-        typeof venta.id_estado_audios === "object"
-          ? (venta.id_estado_audios as any)?.id
-          : venta.id_estado_audios,
+      id_estado_audios: venta.id_estado_audios ?? null,
       observacion_audios: venta.observacion_audios ?? "",
     },
   });
@@ -652,12 +656,8 @@ export function VentaFormBackoffice({
           : "Venta procesada con éxito",
       );
       onClose();
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data
-          ? (Object.values(err.response.data)[0] as string)
-          : "Error al procesar la venta",
-      );
+    } catch (err) {
+      extractApiError(err);
     }
   });
 

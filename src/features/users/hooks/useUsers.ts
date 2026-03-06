@@ -11,6 +11,7 @@ import type {
   UserFilters,
   WorkspaceOption,
 } from "../types";
+import { extractApiError } from "@/lib/api-errors";
 
 export const useUsers = () => {
   const { user: currentUser, activeWorkspace } = useAuth();
@@ -131,14 +132,8 @@ export const useUsers = () => {
       toast.success("Colaborador creado exitosamente");
       fetchUsers();
       return true;
-    } catch (err: unknown) {
-      const detail = (err as any)?.response?.data;
-      const message =
-        detail?.username?.[0] ??
-        detail?.email?.[0] ??
-        detail?.error ??
-        "Error al crear";
-      toast.error(message);
+    } catch (err) {
+      toast.error(extractApiError(err));
       return false;
     }
   };
@@ -167,7 +162,7 @@ export const useUsers = () => {
               activo: true,
             });
           } catch (e) {
-            // Silencioso. Asumimos que la sede ya estaba asignada previamente.
+            console.log(e);
           }
         }
       }

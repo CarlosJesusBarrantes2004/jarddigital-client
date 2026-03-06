@@ -7,7 +7,30 @@ import {
   useDistritos,
 } from "../../hooks/useSales";
 
-function SelectCascada({ val, onChange, items, load, dis, place, error }: any) {
+interface UbigeoItem {
+  id: number;
+  nombre: string;
+}
+
+interface SelectCascadaProps {
+  val: number | null;
+  onChange: (id: number | null) => void;
+  items: UbigeoItem[];
+  load: boolean;
+  dis: boolean | undefined;
+  place: string;
+  error: boolean | string | null | undefined;
+}
+
+function SelectCascada({
+  val,
+  onChange,
+  items,
+  load,
+  dis,
+  place,
+  error,
+}: SelectCascadaProps) {
   return (
     <div className="relative">
       <select
@@ -28,7 +51,7 @@ function SelectCascada({ val, onChange, items, load, dis, place, error }: any) {
         )}
       >
         <option value="">{load ? "Cargando…" : place}</option>
-        {items.map((i: any) => (
+        {items.map((i) => (
           <option key={i.id} value={i.id}>
             {i.nombre}
           </option>
@@ -98,7 +121,7 @@ export function UbigeoCascada({
           load={loadDep}
           dis={disabled}
           place="1. Departamento"
-          error={error && !depId} // Marca error si falta
+          error={!!error && !depId}
         />
 
         <SelectCascada
@@ -108,7 +131,7 @@ export function UbigeoCascada({
           load={loadProv}
           dis={disabled || !depId}
           place={depId ? "2. Provincia" : "Selec. Departamento"}
-          error={error && depId && !provId}
+          error={!!error && !!depId && !provId}
         />
 
         <SelectCascada
@@ -118,7 +141,7 @@ export function UbigeoCascada({
           load={loadDist}
           dis={disabled || !provId}
           place={provId ? "3. Distrito" : "Selec. Provincia"}
-          error={error && provId && !distId}
+          error={!!error && !!provId && !distId}
         />
       </div>
 

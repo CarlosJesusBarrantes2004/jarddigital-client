@@ -302,7 +302,6 @@ export const UsersPage = () => {
             <UserForm
               user={editingUser}
               roles={roles}
-              branchOptions={workspaceOptions}
               currentUser={currentUser}
               onSave={handleSave}
               onCancel={() => setSheetOpen(false)}
