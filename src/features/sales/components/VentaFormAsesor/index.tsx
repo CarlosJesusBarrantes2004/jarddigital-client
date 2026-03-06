@@ -35,10 +35,10 @@ import { Button } from "@/components/ui/button";
 // ── Zod schema ────────────────────────────────────────────────────────────────
 const schema = z
   .object({
-    id_producto: z.number({ required_error: "Selecciona un producto" }),
+    id_producto: z.number({ message: "Selecciona un producto" }),
     tecnologia: z.string().min(1, "Selecciona tecnología"),
     id_tipo_documento: z.number({
-      required_error: "Selecciona tipo de documento",
+      message: "Selecciona tipo de documento",
     }),
     cliente_numero_doc: z.string().min(1, "Número de documento requerido"),
     cliente_nombre: z.string().min(2, "Nombre requerido"),
@@ -59,7 +59,7 @@ const schema = z
     dep_inst_id: z.number().nullable(),
     prov_inst_id: z.number().nullable(),
     id_distrito_instalacion: z
-      .number({ required_error: "Selecciona distrito de instalación" })
+      .number({ message: "Selecciona distrito de instalación" })
       .nullable(),
 
     // Ubigeo nacimiento
@@ -73,7 +73,7 @@ const schema = z
     coordenadas_gps: z.string().optional(),
     es_full_claro: z.boolean().default(false),
     score_crediticio: z.string().optional(),
-    id_grabador_audios: z.number({ required_error: "Selecciona grabador" }),
+    id_grabador_audios: z.number({ message: "Selecciona grabador" }),
     audio_urls: z.array(z.string()).default([]),
   })
   .refine((d) => d.id_distrito_instalacion !== null, {

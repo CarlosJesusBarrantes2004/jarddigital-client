@@ -19,7 +19,7 @@ import {
 } from "../hooks/useSales";
 import type { Venta, VentaFiltros } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
-import { buildColumnsAsesor } from "../components/VentasTable/ColumnsAsesor";
+import { buildColumnsAsesor } from "../components/VentasTable/columnsAsesor";
 import { VentaFormAsesor } from "../components/VentaFormAsesor";
 
 interface StatProps {
@@ -118,10 +118,10 @@ export function VentasAsesorPage() {
     setVentaParaReingresar(null);
   };
 
-  const handleVerVenta = (idVenta: number) => {
+  /*const handleVerVenta = (idVenta: number) => {
     const venta = ventas.find((v) => v.id === idVenta);
     if (venta?.solicitud_correccion) handleReingresar(venta);
-  };
+  };*/
 
   const columns = buildColumnsAsesor(estadosSOT, handleReingresar);
 

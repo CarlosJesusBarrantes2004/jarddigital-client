@@ -3,7 +3,6 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LogOut,
   Menu,
-  X,
   ChevronDown,
   LayoutDashboard,
   Users,
@@ -221,11 +220,10 @@ const NavSection = ({
 };
 
 const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
-  
   const { user, activeWorkspace, selectWorkspace } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  
+
   const workspaces: Workspace[] = user?.sucursales ?? [];
   const isBackoffice = user?.rol?.codigo === "BACKOFFICE";
 

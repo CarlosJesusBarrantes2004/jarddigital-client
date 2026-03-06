@@ -17,12 +17,12 @@ export const audioVentaSchema = z.object({
 export const createVentaSchema = z
   .object({
     // Producto
-    id_producto: z.number({ required_error: "Selecciona un producto" }),
+    id_producto: z.number({ message: "Selecciona un producto" }),
     tecnologia: z.string().min(1, "Selecciona la tecnología"),
 
     // Documento cliente
     id_tipo_documento: z.number({
-      required_error: "Selecciona tipo de documento",
+      message: "Selecciona tipo de documento",
     }),
     cliente_numero_doc: z
       .string()
@@ -50,10 +50,10 @@ export const createVentaSchema = z
     id_distrito_nacimiento: z.number().nullable().optional(),
 
     // Ubigeo instalación (cascada - obligatorio)
-    dep_instalacion_id: z.number({ required_error: "Selecciona departamento" }),
-    prov_instalacion_id: z.number({ required_error: "Selecciona provincia" }),
+    dep_instalacion_id: z.number({ message: "Selecciona departamento" }),
+    prov_instalacion_id: z.number({ message: "Selecciona provincia" }),
     id_distrito_instalacion: z.number({
-      required_error: "Selecciona el distrito de instalación",
+      message: "Selecciona el distrito de instalación",
     }),
 
     // Ubicación
@@ -65,7 +65,7 @@ export const createVentaSchema = z
     score_crediticio: z.string().min(1, "Score crediticio requerido"),
 
     // Grabador
-    id_grabador_audios: z.number({ required_error: "Selecciona el grabador" }),
+    id_grabador_audios: z.number({ message: "Selecciona el grabador" }),
 
     // Audios
     audios: z.array(audioVentaSchema).min(1, "Agrega los audios"),

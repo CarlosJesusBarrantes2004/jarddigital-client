@@ -226,6 +226,8 @@ export interface Venta {
   venta_origen: number | null;
   codigo_sec_origen: string | null;
   codigo_sot_origen: string | null;
+
+  codigo_tipo_documento?: string;
 }
 
 // ==========================================

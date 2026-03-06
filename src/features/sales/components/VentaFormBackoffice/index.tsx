@@ -28,7 +28,7 @@ import {
   useSubEstadosSOT,
   useEstadosAudio,
 } from "../../hooks/useSales";
-import type { Venta, EstadoSOT } from "../../types/sales.types";
+import type { Venta } from "../../types/sales.types";
 import { Button } from "@/components/ui/button";
 
 // ── Schema de validación ──────────────────────────────────────────────────────

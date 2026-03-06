@@ -10,7 +10,7 @@ import {
 } from "../hooks/useSales";
 import type { Venta, VentaFiltros } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
-import { buildColumnsBackoffice } from "../components/VentasTable/ColumnsBackoffice";
+import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 
 // ── Componentes de UI Internos ──

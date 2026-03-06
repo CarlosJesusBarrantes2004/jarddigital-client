@@ -11,6 +11,7 @@ import type {
   UpdateVentaBackofficePayload,
   EstadisticasAsesor,
 } from "../types/sales.types";
+import { api } from "@/api/axios";
 
 // ==========================================
 // QUERY KEYS

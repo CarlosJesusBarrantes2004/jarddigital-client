@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Pencil, AlertTriangle, Eye } from "lucide-react";
+import { Pencil, AlertTriangle } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import { cn } from "@/lib/utils";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
@@ -151,12 +151,12 @@ export function buildColumnsAsesor(
       cell: ({ row }) => {
         // Extraemos el string de la fecha que llega del backend ("YYYY-MM-DD")
         const fechaStr = row.original.fecha_visita_programada;
-        
+
         return fechaStr ? (
           <span className="text-[13px] text-foreground/80">
             {format(
               // EL PARCHE CRÍTICO: Añadimos T00:00:00 para forzar el Timezone Local
-              new Date(`${fechaStr}T00:00:00`), 
+              new Date(`${fechaStr}T00:00:00`),
               "dd MMM yyyy",
               { locale: es },
             )}

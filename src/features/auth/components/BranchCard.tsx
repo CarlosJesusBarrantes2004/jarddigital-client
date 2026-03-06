@@ -10,7 +10,6 @@ interface BranchCardProps {
 }
 
 export const BranchCard = ({
-  id,
   nombre,
   isSelected,
   isLoading,

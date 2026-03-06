@@ -1,7 +1,7 @@
-import type { role_code } from "@/features/auth/types";
+import type { RoleCode } from "@/features/auth/types";
 import { LayoutDashboard, Users, Settings, ShoppingBag } from "lucide-react";
 
-type RoleArray = role_code[];
+type RoleArray = RoleCode[];
 
 export const sidebarSections = [
   {

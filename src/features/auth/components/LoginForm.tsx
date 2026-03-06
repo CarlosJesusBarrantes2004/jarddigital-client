@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
 
-import { loginFormSchema, type LoginFormData } from "../schemas/loginSchema";
+import { loginSchema, type LoginFormValues } from "../schemas/loginSchema";
 
 interface LoginFormProps {
-  onSubmit: (credentials: LoginFormData) => Promise<void>;
+  onSubmit: (credentials: LoginFormValues) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -21,8 +21,8 @@ export const LoginForm = ({ onSubmit, isLoading }: LoginFormProps) => {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginFormSchema),
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
       password: "",
