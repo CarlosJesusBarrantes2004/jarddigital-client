@@ -95,6 +95,7 @@ const SECTIONS: RouteSection[] = [
         href: "/configuracion/modalidades",
         roles: ["DUENO"],
       },
+      { label: "Productos", href: "/products", roles: ["DUENO"] },
       { label: "Roles", href: "/configuracion/roles", roles: ["DUENO"] },
     ],
   },
