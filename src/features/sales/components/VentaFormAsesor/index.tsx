@@ -646,7 +646,7 @@ export function VentaFormAsesor({
                         placeholder="Seleccionar"
                         error={errorsObj.tecnologia?.message}
                       >
-                        {["FIBRA", "HFC", "DSL", "WIRELESS"].map((t) => (
+                        {["FTTH", "HFC"].map((t) => (
                           <option key={t} value={t}>
                             {t}
                           </option>
