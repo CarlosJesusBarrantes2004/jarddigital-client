@@ -14,6 +14,7 @@ import {
   Mic,
   AlertTriangle,
   ChevronDown,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -288,6 +289,9 @@ export function VentaFormAsesor({
   const [paso, setPaso] = useState(0);
   const esEdicion = !!ventaOrigen;
 
+  const esEjecucion = ventaOrigen?.codigo_estado?.toUpperCase() === "EJECUCION";
+  const soloAudios = esEdicion && esEjecucion;
+
   console.log(ventaOrigen);
 
   const { mutateAsync: crearVenta, isPending: creando } = useCreateVenta();
@@ -337,6 +341,8 @@ export function VentaFormAsesor({
   const esRUC = tipoDoc?.codigo?.toUpperCase() === "RUC";
   const etiquetasAudio = esRUC ? ETIQUETAS_RUC : ETIQUETAS_DNI;
 
+  console.log(ventaOrigen);
+
   useEffect(() => {
     const n = etiquetasAudio.length;
     setAudioUrls(Array(n).fill(null));
@@ -350,6 +356,10 @@ export function VentaFormAsesor({
   useEffect(() => {
     if (!ventaOrigen || !open) return;
     const v = ventaOrigen;
+
+    if (v.codigo_estado?.toUpperCase() === "EJECUCION") setPaso(2);
+    else setPaso(0);
+
     form.reset({
       id_producto: v.id_producto,
       tecnologia: v.tecnologia,
@@ -475,7 +485,7 @@ export function VentaFormAsesor({
     audioUrls.length > 0 && audioUrls.every((u) => u !== null && u !== "");
   const algunoSubiendo = audioUploading.some(Boolean);
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  /*const onSubmit = form.handleSubmit(async (values) => {
     if (!todosAudiosListos) {
       toast.error(`Debes subir los ${etiquetasAudio.length} audios requeridos`);
       setPaso(2);
@@ -526,7 +536,79 @@ export function VentaFormAsesor({
     } catch (err) {
       toast.error(extractApiError(err));
     }
-  });
+  });*/
+
+  const handleCustomSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!todosAudiosListos) {
+      toast.error(`Debes subir los ${etiquetasAudio.length} audios requeridos`);
+      setPaso(2);
+      return;
+    }
+    if (algunoSubiendo) {
+      toast.error("Espera a que terminen de subir los audios");
+      return;
+    }
+
+    const audiosPayload = etiquetasAudio.map((etiqueta, i) => ({
+      id: audioIds[i],
+      nombre_etiqueta: etiqueta,
+      url_audio: audioUrls[i]!,
+    }));
+
+    // Si está en Ejecución, saltamos la validación de Zod del formulario (porque está disabled)
+    // y enviamos directamente el payload de audios al Backend.
+    if (soloAudios) {
+      try {
+        await editarVenta({ audios: audiosPayload } as unknown as Parameters<
+          typeof editarVenta
+        >[0]); // as any para bypassear tipos obligatorios en el PATCH parcial
+        toast.success("Audios corregidos y enviados al Backoffice");
+        handleClose();
+      } catch (err) {
+        toast.error(extractApiError(err));
+      }
+    } else {
+      // Si es una venta nueva o pendiente, ejecutamos la validación normal de React Hook Form
+      form.handleSubmit(async (values) => {
+        try {
+          if (esEdicion) {
+            await editarVenta({
+              ...values,
+              representante_legal_dni: esRUC
+                ? (values.representante_legal_dni ?? null)
+                : null,
+              representante_legal_nombre: esRUC
+                ? (values.representante_legal_nombre ?? null)
+                : null,
+              id_distrito_instalacion: values.id_distrito_instalacion!,
+              id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+              audios: audiosPayload,
+            });
+            toast.success("Venta actualizada y enviada al Backoffice");
+          } else {
+            await crearVenta({
+              ...values,
+              representante_legal_dni: esRUC
+                ? (values.representante_legal_dni ?? null)
+                : null,
+              representante_legal_nombre: esRUC
+                ? (values.representante_legal_nombre ?? null)
+                : null,
+              id_distrito_instalacion: values.id_distrito_instalacion!,
+              id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+              audios: audiosPayload,
+            });
+            toast.success("Venta creada correctamente");
+          }
+          handleClose();
+        } catch (err) {
+          toast.error(extractApiError(err));
+        }
+      })(e);
+    }
+  };
 
   if (!open) return null;
   const errorsObj = form.formState.errors;
@@ -542,34 +624,42 @@ export function VentaFormAsesor({
       {/* Sheet */}
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-3xl bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
         {/* ── Header ── */}
-        <div className="p-6 border-b border-border bg-card/50 flex items-start justify-between shrink-0">
-          <div>
-            {esEdicion && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/30 mb-2">
-                <AlertTriangle size={10} /> CORRECCIÓN SOLICITADA
-              </span>
-            )}
-            <h2 className="font-serif text-2xl font-bold text-foreground leading-tight tracking-tight">
-              {esEdicion ? "Corregir Venta" : "Nueva Venta Claro"}
-            </h2>
-            {esEdicion && ventaOrigen?.comentario_gestion && (
-              <p className="text-xs text-orange-500/80 mt-1 max-w-lg leading-relaxed">
-                💬 {ventaOrigen.comentario_gestion}
-              </p>
-            )}
-            {!esEdicion && (
-              <p className="text-sm text-muted-foreground font-light mt-1">
-                Registra los datos del cliente y sube los audios
-                correspondientes.
-              </p>
-            )}
+        <div className="p-6 border-b border-border bg-card/50 flex flex-col shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              {esEdicion && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/30 mb-2">
+                  <AlertTriangle size={10} /> CORRECCIÓN SOLICITADA
+                </span>
+              )}
+              <h2 className="font-serif text-2xl font-bold text-foreground leading-tight tracking-tight">
+                {esEdicion ? "Corregir Venta" : "Nueva Venta Claro"}
+              </h2>
+              {esEdicion && ventaOrigen?.comentario_gestion && (
+                <p className="text-xs text-orange-500/80 mt-1.5 max-w-lg leading-relaxed">
+                  💬 {ventaOrigen.comentario_gestion}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
-          >
-            <X size={16} />
-          </button>
+
+          {/* Banner de Bloqueo Solo Audios */}
+          {soloAudios && (
+            <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+              <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-500/90 leading-relaxed">
+                <strong>Venta en Ejecución.</strong> Por seguridad, los datos
+                del cliente y ubicación están bloqueados. Solo tienes permitido
+                reemplazar los audios rechazados.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* ── Stepper ── */}
@@ -581,6 +671,7 @@ export function VentaFormAsesor({
             return (
               <button
                 key={p.id}
+                type="button"
                 onClick={() => setPaso(i)}
                 className={cn(
                   "flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm transition-all -mb-px",
@@ -601,12 +692,17 @@ export function VentaFormAsesor({
 
         {/* ── Contenido ── */}
         <div className="flex-1 overflow-y-auto p-6 bg-background">
-          <form id="venta-form" onSubmit={onSubmit} className="space-y-6">
+          <form
+            id="venta-form"
+            onSubmit={handleCustomSubmit}
+            className="space-y-6"
+          >
             {/* PASO 0: CLIENTE */}
             <div
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 0 && "hidden",
+                soloAudios && "pointer-events-none opacity-60 grayscale-[20%]", // Bloqueo visual extremo
               )}
             >
               <div>
@@ -619,6 +715,7 @@ export function VentaFormAsesor({
                       <NativeSelect
                         label="Producto"
                         required
+                        disabled={soloAudios}
                         value={field.value ?? ""}
                         onChange={(v) =>
                           field.onChange(v ? Number(v) : undefined)
@@ -641,6 +738,7 @@ export function VentaFormAsesor({
                       <NativeSelect
                         label="Tecnología"
                         required
+                        disabled={soloAudios}
                         value={field.value ?? ""}
                         onChange={field.onChange}
                         placeholder="Seleccionar"
@@ -670,6 +768,7 @@ export function VentaFormAsesor({
                         <NativeSelect
                           label="Tipo Documento"
                           required
+                          disabled={soloAudios}
                           value={field.value ?? ""}
                           onChange={(v) =>
                             field.onChange(v ? Number(v) : undefined)
@@ -692,6 +791,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Número de documento"
                           required
+                          disabled={soloAudios}
                           placeholder={esRUC ? "20XXXXXXXXX" : "12345678"}
                           {...field}
                           error={errorsObj.cliente_numero_doc?.message}
@@ -706,6 +806,7 @@ export function VentaFormAsesor({
                       <TextInput
                         label="Nombre completo / Razón Social"
                         required
+                        disabled={soloAudios}
                         placeholder="Ej: JUAN PEREZ"
                         {...field}
                         error={errorsObj.cliente_nombre?.message}
@@ -720,6 +821,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Teléfono"
                           required
+                          disabled={soloAudios}
                           type="tel"
                           placeholder="9XXXXXXXX"
                           {...field}
@@ -734,6 +836,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Email"
                           required
+                          disabled={soloAudios}
                           type="email"
                           placeholder="cliente@correo.com"
                           {...field}
@@ -750,6 +853,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Fecha Nacimiento"
                           required
+                          disabled={soloAudios}
                           type="date"
                           {...field}
                           error={errorsObj.cliente_fecha_nacimiento?.message}
@@ -763,6 +867,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Número Instalación"
                           required
+                          disabled={soloAudios}
                           placeholder="Ej: 12345"
                           {...field}
                           error={errorsObj.numero_instalacion?.message}
@@ -778,6 +883,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Nombre del Padre"
                           required
+                          disabled={soloAudios}
                           placeholder="Ej: CARLOS"
                           {...field}
                           error={errorsObj.cliente_papa?.message}
@@ -791,6 +897,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Nombre de la Madre"
                           required
+                          disabled={soloAudios}
                           placeholder="Ej: MARIA"
                           {...field}
                           error={errorsObj.cliente_mama?.message}
@@ -816,6 +923,7 @@ export function VentaFormAsesor({
                           <TextInput
                             label="DNI Representante"
                             required
+                            disabled={soloAudios}
                             placeholder="12345678"
                             {...field}
                             value={field.value ?? ""}
@@ -830,6 +938,7 @@ export function VentaFormAsesor({
                           <TextInput
                             label="Nombre Representante"
                             required
+                            disabled={soloAudios}
                             placeholder="NOMBRES APELLIDOS"
                             {...field}
                             value={field.value ?? ""}
@@ -857,6 +966,7 @@ export function VentaFormAsesor({
                         label="Decos adicionales"
                         type="number"
                         min="0"
+                        disabled={soloAudios}
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                         value={field.value ?? 0}
@@ -871,6 +981,7 @@ export function VentaFormAsesor({
                         label="Repetidores adicionales"
                         type="number"
                         min="0"
+                        disabled={soloAudios}
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                         value={field.value ?? 0}
@@ -885,6 +996,7 @@ export function VentaFormAsesor({
                     <NativeSelect
                       label="Grabador Asignado"
                       required
+                      disabled={soloAudios}
                       value={field.value ?? ""}
                       onChange={(v) =>
                         field.onChange(v ? Number(v) : undefined)
@@ -908,6 +1020,7 @@ export function VentaFormAsesor({
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 1 && "hidden",
+                soloAudios && "pointer-events-none opacity-60 grayscale-[20%]", // Bloqueo visual extremo
               )}
             >
               <div>
@@ -919,6 +1032,7 @@ export function VentaFormAsesor({
                     <UbigeoCascada
                       label=""
                       required
+                      disabled={soloAudios} // Si el componente hijo lo soporta
                       depId={form.watch("dep_inst_id")}
                       provId={form.watch("prov_inst_id")}
                       distId={field.value}
@@ -937,6 +1051,7 @@ export function VentaFormAsesor({
                       <TextInput
                         label="Dirección Detallada"
                         required
+                        disabled={soloAudios}
                         placeholder="Ej: AV LOS INCAS 123 PISO 2"
                         {...field}
                         error={errorsObj.direccion_detalle?.message}
@@ -951,6 +1066,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Nro Plano"
                           required
+                          disabled={soloAudios}
                           placeholder="PL-XXXXX"
                           {...field}
                           error={errorsObj.plano?.message}
@@ -963,6 +1079,7 @@ export function VentaFormAsesor({
                       render={({ field }) => (
                         <TextInput
                           label="Referencias"
+                          disabled={soloAudios}
                           placeholder="Cerca al parque..."
                           {...field}
                           value={field.value ?? ""}
@@ -976,6 +1093,7 @@ export function VentaFormAsesor({
                     render={({ field }) => (
                       <TextInput
                         label="Coordenadas GPS"
+                        disabled={soloAudios}
                         placeholder="-12.0464, -77.0428"
                         {...field}
                         value={field.value ?? ""}
@@ -995,6 +1113,7 @@ export function VentaFormAsesor({
                   render={({ field }) => (
                     <UbigeoCascada
                       label=""
+                      disabled={soloAudios}
                       depId={form.watch("dep_nac_id")}
                       provId={form.watch("prov_nac_id")}
                       distId={field.value}
@@ -1015,6 +1134,7 @@ export function VentaFormAsesor({
                     control={form.control}
                     name="es_full_claro"
                     render={({ field }) => (
+                      // Como Toggle no soporta disabled nativo, el pointer-events-none superior se encarga
                       <Toggle
                         label="Es Full Claro"
                         description="Cliente activará todos los servicios asociados."
@@ -1029,6 +1149,7 @@ export function VentaFormAsesor({
                     render={({ field }) => (
                       <TextInput
                         label="Score Crediticio"
+                        disabled={soloAudios}
                         placeholder="Ej: A / B / C"
                         {...field}
                         value={field.value ?? ""}
@@ -1067,8 +1188,8 @@ export function VentaFormAsesor({
                     url={audioUrls[i] ?? null}
                     uploading={audioUploading[i] ?? false}
                     error={audioErrors[i] ?? null}
-                    isRechazado={audioRechazados[i]} // <-- NUEVA PROP
-                    motivoRechazo={audioMotivos[i]} // <-- NUEVA PROP
+                    isRechazado={audioRechazados[i]}
+                    motivoRechazo={audioMotivos[i]}
                     onUploaded={(url) => handleAudioUploaded(i, url)}
                     onRemove={() => handleAudioRemove(i)}
                     onUploadStart={() => handleAudioStart(i)}
@@ -1116,7 +1237,7 @@ export function VentaFormAsesor({
           ) : (
             <Button
               type="button"
-              onClick={onSubmit}
+              onClick={handleCustomSubmit} // Usamos nuestra función interceptora
               disabled={isPending || algunoSubiendo}
               className="h-11 rounded-xl px-6 gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20 disabled:opacity-50"
             >

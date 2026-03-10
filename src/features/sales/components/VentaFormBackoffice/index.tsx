@@ -610,17 +610,15 @@ export function VentaFormBackoffice({
     const fVisita = values.fecha_visita_programada
       ? new Date(values.fecha_visita_programada)
       : null;
-    const fInst = values.fecha_real_inst
+    /*const fInst = values.fecha_real_inst
       ? new Date(values.fecha_real_inst)
-      : null;
+      : null;*/
     const fRechazo = values.fecha_rechazo
       ? new Date(values.fecha_rechazo)
       : null;
 
     if (fVenta && fVisita && fVisita < fVenta)
-      return toast.error("La visita no puede ser antes de la venta");
-    if (fVisita && fInst && fInst < fVisita)
-      return toast.error("La instalación no puede ser antes de la visita");
+      return toast.error("La visita programada no puede ser antes de la venta");
     if (fVenta && fRechazo && fRechazo < fVenta)
       return toast.error("El rechazo no puede ser antes de la venta");
 
@@ -827,12 +825,10 @@ export function VentaFormBackoffice({
                         placeholder="Seleccionar"
                       >
                         {[
-                          "08:00 - 10:00",
-                          "10:00 - 12:00",
-                          "12:00 - 14:00",
-                          "14:00 - 16:00",
-                          "16:00 - 18:00",
-                          "18:00 - 20:00",
+                          "9:00 - 11:00 / (AM1)",
+                          "11:00 - 1:00 / (AM2)",
+                          "2:00 - 4:00 / (PM1)",
+                          "4:00 - 6:00 / (PM2)",
                         ].map((b) => (
                           <option key={b} value={b}>
                             {b}
