@@ -22,7 +22,6 @@ const schema = z.object({
   nombre_campana: z.string().min(2, "Mín 2 caracteres"),
   tipo_solucion: z.string().min(1, "Selecciona el tipo de solución"),
   nombre_paquete: z.string().min(3, "Mín 3 caracteres"),
-  nombre_plan: z.string().min(3, "Mín 3 caracteres"),
   es_alto_valor: z.boolean(),
   costo_fijo_plan: z
     .string()
@@ -44,7 +43,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Helpers UI (Incrustados para no crear archivos extra) ─────────────────────
+// ── Helpers UI (Incrustados) ──────────────────────────────────────────────────
 function FieldLabel({
   children,
   required,
@@ -224,7 +223,7 @@ function Divider() {
   return <div className="h-px bg-border my-6" />;
 }
 
-// ── Preview card (datos clave mientras llenas el form) ────────────────────────
+// ── Preview card ──────────────────────────────────────────────────────────────
 const PreviewCard = memo(function PreviewCard({
   values,
 }: {
@@ -235,21 +234,19 @@ const PreviewCard = memo(function PreviewCard({
 
   return (
     <div className="flex flex-col gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10 relative overflow-hidden">
-      {/* Acento de fondo brillante si es alto valor */}
       {values.es_alto_valor && (
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#C9975A]/20 blur-3xl rounded-full pointer-events-none" />
       )}
 
-      {/* Header */}
       <div className="flex items-center gap-3 relative z-10">
         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-background border border-primary/20 shadow-sm shrink-0">
           <Package size={16} className="text-primary" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-bold font-serif text-foreground leading-tight truncate">
-            {values.nombre_plan || (
+            {values.nombre_paquete || (
               <span className="text-muted-foreground/70 font-sans font-normal text-[13px]">
-                Nombre del plan…
+                Nombre del paquete…
               </span>
             )}
           </p>
@@ -266,7 +263,6 @@ const PreviewCard = memo(function PreviewCard({
 
       <div className="h-px bg-border/50 my-1 relative z-10" />
 
-      {/* Precios */}
       <div className="grid grid-cols-2 gap-3 relative z-10">
         <div className="p-3 rounded-xl bg-background/50 border border-border/50">
           <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
@@ -315,7 +311,6 @@ export function ProductoForm({
       nombre_campana: "",
       tipo_solucion: "",
       nombre_paquete: "",
-      nombre_plan: "",
       es_alto_valor: false,
       costo_fijo_plan: "",
       comision_base: "",
@@ -326,7 +321,6 @@ export function ProductoForm({
 
   const watchedValues = form.watch();
 
-  // Prefill en edición
   useEffect(() => {
     if (!open) return;
     if (productoParaEditar) {
@@ -334,7 +328,6 @@ export function ProductoForm({
         nombre_campana: productoParaEditar.nombre_campana,
         tipo_solucion: productoParaEditar.tipo_solucion,
         nombre_paquete: productoParaEditar.nombre_paquete,
-        nombre_plan: productoParaEditar.nombre_plan,
         es_alto_valor: productoParaEditar.es_alto_valor,
         costo_fijo_plan: productoParaEditar.costo_fijo_plan,
         comision_base: productoParaEditar.comision_base,
@@ -346,7 +339,6 @@ export function ProductoForm({
         nombre_campana: "",
         tipo_solucion: "",
         nombre_paquete: "",
-        nombre_plan: "",
         es_alto_valor: false,
         costo_fijo_plan: "",
         comision_base: "",
@@ -393,22 +385,18 @@ export function ProductoForm({
 
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={handleClose}
-        className="fixed inset-0 bg-background/60 backdrop-blur-sm z-[1000] animate-in fade-in duration-300"
+        className="fixed inset-0 z-[1000] animate-in fade-in duration-300"
       />
-
-      {/* Sheet */}
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-[560px] bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-        {/* ── HEADER ── */}
         <div className="p-6 border-b border-border bg-card/50 flex items-start justify-between shrink-0">
           <div>
             <p className="font-mono text-[10px] tracking-widest uppercase text-primary mb-1.5 font-bold">
               {isEdit ? "Editar producto" : "Nuevo producto"}
             </p>
             <h2 className="font-serif text-2xl font-bold text-foreground leading-tight">
-              {isEdit ? productoParaEditar?.nombre_plan : "Registrar Plan"}
+              {isEdit ? productoParaEditar?.nombre_paquete : "Registrar Plan"}
             </h2>
           </div>
           <button
@@ -419,13 +407,10 @@ export function ProductoForm({
           </button>
         </div>
 
-        {/* ── BODY ── */}
         <div className="flex-1 overflow-y-auto p-6 bg-background">
           <form id="producto-form" onSubmit={onSubmit} className="space-y-7">
-            {/* Preview card */}
             <PreviewCard values={watchedValues} />
 
-            {/* ── Identificación del producto ── */}
             <div>
               <SectionTitle>Identificación</SectionTitle>
               <div className="flex flex-col gap-4">
@@ -442,7 +427,6 @@ export function ProductoForm({
                     />
                   )}
                 />
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Controller
                     control={form.control}
@@ -478,26 +462,11 @@ export function ProductoForm({
                     )}
                   />
                 </div>
-
-                <Controller
-                  control={form.control}
-                  name="nombre_plan"
-                  render={({ field }) => (
-                    <TextInput
-                      label="Nombre del plan"
-                      required
-                      placeholder="Ej: FIBRA 400 MAX PRO 29.90"
-                      error={err.nombre_plan?.message}
-                      {...field}
-                    />
-                  )}
-                />
               </div>
             </div>
 
             <Divider />
 
-            {/* ── Precios ── */}
             <div>
               <SectionTitle className="text-emerald-500">
                 Precios y Comisiones
@@ -537,7 +506,6 @@ export function ProductoForm({
                 />
               </div>
 
-              {/* Indicador de ratio comisión/costo */}
               {watchedValues.costo_fijo_plan && watchedValues.comision_base && (
                 <div className="flex items-center gap-2 mt-4 px-3.5 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                   <span className="text-[11px] text-emerald-500/80 font-medium">
@@ -557,7 +525,6 @@ export function ProductoForm({
 
             <Divider />
 
-            {/* ── Vigencia ── */}
             <div>
               <SectionTitle>Vigencia Comercial</SectionTitle>
               <Controller
@@ -583,7 +550,6 @@ export function ProductoForm({
 
             <Divider />
 
-            {/* ── Opciones ── */}
             <div>
               <SectionTitle>Opciones del Plan</SectionTitle>
               <div className="flex flex-col gap-3">
@@ -600,7 +566,6 @@ export function ProductoForm({
                     />
                   )}
                 />
-
                 {isEdit && (
                   <Controller
                     control={form.control}
@@ -621,7 +586,6 @@ export function ProductoForm({
           </form>
         </div>
 
-        {/* ── FOOTER ── */}
         <div className="p-5 border-t border-border bg-card shrink-0 flex items-center justify-between gap-3">
           <Button
             variant="outline"

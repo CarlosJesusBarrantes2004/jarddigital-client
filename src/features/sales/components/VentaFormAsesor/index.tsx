@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -287,12 +287,10 @@ export function VentaFormAsesor({
   ventaOrigen,
 }: VentaFormAsesorProps) {
   const [paso, setPaso] = useState(0);
-  const esEdicion = !!ventaOrigen;
 
+  const esEdicion = !!ventaOrigen;
   const esEjecucion = ventaOrigen?.codigo_estado?.toUpperCase() === "EJECUCION";
   const soloAudios = esEdicion && esEjecucion;
-
-  console.log(ventaOrigen);
 
   const { mutateAsync: crearVenta, isPending: creando } = useCreateVenta();
   const { mutateAsync: editarVenta, isPending: editando } =
@@ -302,13 +300,12 @@ export function VentaFormAsesor({
   const { data: tiposDoc = [] } = useTiposDocumento();
   const { data: productos = [] } = useProductos();
 
-  console.log(ventaOrigen?.id_grabador_audios);
-
   const grabadorActualId = ventaOrigen?.id_grabador_audios ?? null;
 
   const { data: grabadores = [] } = useGrabadores(grabadorActualId);
 
-  console.log(grabadores);
+  const [filtroCampana, setFiltroCampana] = useState("");
+  const [filtroSolucion, setFiltroSolucion] = useState("");
 
   const [audioIds, setAudioIds] = useState<(number | undefined)[]>([]);
   const [audioUrls, setAudioUrls] = useState<(string | null)[]>([]);
@@ -334,14 +331,47 @@ export function VentaFormAsesor({
     },
   });
 
-  console.log(form);
-
   const tipoDocId = form.watch("id_tipo_documento");
   const tipoDoc = tiposDoc.find((t) => t.id === tipoDocId);
   const esRUC = tipoDoc?.codigo?.toUpperCase() === "RUC";
   const etiquetasAudio = esRUC ? ETIQUETAS_RUC : ETIQUETAS_DNI;
 
-  console.log(ventaOrigen);
+  const campanasDisponibles = useMemo(() => {
+    // Si no tienes 'nombre_campana' en el tipado aún, lo tratamos genérico
+    const campanas = productos.map((p) => p.nombre_campana).filter(Boolean);
+    return Array.from(new Set(campanas));
+  }, [productos]);
+
+  const solucionesDisponibles = useMemo(() => {
+    if (!filtroCampana) return [];
+    const soluciones = productos
+      .filter((p) => p.nombre_campana === filtroCampana)
+      .map((p) => p.tipo_solucion)
+      .filter(Boolean);
+    return Array.from(new Set(soluciones));
+  }, [productos, filtroCampana]);
+
+  const productosFiltrados = useMemo(() => {
+    if (!filtroCampana || !filtroSolucion) return [];
+    return productos.filter(
+      (p) =>
+        p.nombre_campana === filtroCampana &&
+        p.tipo_solucion === filtroSolucion,
+    );
+  }, [productos, filtroCampana, filtroSolucion]);
+
+  useEffect(() => {
+    if (open && ventaOrigen?.id_producto && productos.length > 0) {
+      const prod = productos.find((p) => p.id === ventaOrigen.id_producto);
+      if (prod) {
+        setFiltroCampana(prod.nombre_campana || "");
+        setFiltroSolucion(prod.tipo_solucion || "");
+      }
+    } else if (!open) {
+      setFiltroCampana("");
+      setFiltroSolucion("");
+    }
+  }, [open, ventaOrigen, productos]);
 
   useEffect(() => {
     const n = etiquetasAudio.length;
@@ -615,13 +645,11 @@ export function VentaFormAsesor({
 
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={handleClose}
         className="fixed inset-0 z-[1000] animate-in fade-in duration-300"
       />
 
-      {/* Sheet */}
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-3xl bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
         {/* ── Header ── */}
         <div className="p-6 border-b border-border bg-card/50 flex flex-col shrink-0">
@@ -649,7 +677,6 @@ export function VentaFormAsesor({
             </button>
           </div>
 
-          {/* Banner de Bloqueo Solo Audios */}
           {soloAudios && (
             <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
               <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
@@ -702,30 +729,69 @@ export function VentaFormAsesor({
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 0 && "hidden",
-                soloAudios && "pointer-events-none opacity-60 grayscale-[20%]", // Bloqueo visual extremo
+                soloAudios && "pointer-events-none opacity-60 grayscale-[20%]",
               )}
             >
               <div>
                 <SectionTitle>Plan y Tecnología</SectionTitle>
+
+                {/* 👇 FILTROS EN CASCADA */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <NativeSelect
+                    label="1. Seleccionar Campaña"
+                    disabled={soloAudios}
+                    value={filtroCampana}
+                    onChange={(v) => {
+                      setFiltroCampana(v);
+                      setFiltroSolucion("");
+                      form.resetField("id_producto");
+                    }}
+                    placeholder="Elegir campaña..."
+                  >
+                    {campanasDisponibles.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </NativeSelect>
+
+                  <NativeSelect
+                    label="2. Tipo de solución"
+                    disabled={!filtroCampana || soloAudios}
+                    value={filtroSolucion}
+                    onChange={(v) => {
+                      setFiltroSolucion(v);
+                      form.resetField("id_producto");
+                    }}
+                    placeholder="Elegir solución..."
+                  >
+                    {solucionesDisponibles.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Controller
                     control={form.control}
                     name="id_producto"
                     render={({ field }) => (
                       <NativeSelect
-                        label="Producto"
+                        label="3. Producto Final"
                         required
-                        disabled={soloAudios}
+                        disabled={!filtroSolucion || soloAudios}
                         value={field.value ?? ""}
                         onChange={(v) =>
                           field.onChange(v ? Number(v) : undefined)
                         }
-                        placeholder="Seleccione producto"
+                        placeholder="Seleccione el plan..."
                         error={errorsObj.id_producto?.message}
                       >
-                        {productos.map((p) => (
+                        {productosFiltrados.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.nombre_plan}
+                            {p.nombre_paquete}
                           </option>
                         ))}
                       </NativeSelect>
@@ -1020,7 +1086,7 @@ export function VentaFormAsesor({
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 1 && "hidden",
-                soloAudios && "pointer-events-none opacity-60 grayscale-[20%]", // Bloqueo visual extremo
+                soloAudios && "pointer-events-none opacity-60 grayscale-[20%]",
               )}
             >
               <div>
@@ -1032,7 +1098,7 @@ export function VentaFormAsesor({
                     <UbigeoCascada
                       label=""
                       required
-                      disabled={soloAudios} // Si el componente hijo lo soporta
+                      disabled={soloAudios}
                       depId={form.watch("dep_inst_id")}
                       provId={form.watch("prov_inst_id")}
                       distId={field.value}
@@ -1134,7 +1200,6 @@ export function VentaFormAsesor({
                     control={form.control}
                     name="es_full_claro"
                     render={({ field }) => (
-                      // Como Toggle no soporta disabled nativo, el pointer-events-none superior se encarga
                       <Toggle
                         label="Es Full Claro"
                         description="Cliente activará todos los servicios asociados."
@@ -1237,7 +1302,7 @@ export function VentaFormAsesor({
           ) : (
             <Button
               type="button"
-              onClick={handleCustomSubmit} // Usamos nuestra función interceptora
+              onClick={handleCustomSubmit}
               disabled={isPending || algunoSubiendo}
               className="h-11 rounded-xl px-6 gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20 disabled:opacity-50"
             >

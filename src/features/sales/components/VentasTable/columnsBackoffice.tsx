@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Eye, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
-
 import type { Venta, EstadoSOT } from "../../types/sales.types";
 import { ActionBtnBackoffice } from "@/components/ActionBtnBackoffice";
 
@@ -61,25 +60,38 @@ export function buildColumnsBackoffice(
       },
     },
     {
-      accessorKey: "nombre_producto",
-      header: "Plan",
-      cell: ({ row }) => (
-        <div className="flex flex-col items-start gap-1">
-          <p className="text-[13px] font-medium text-foreground/80">
-            {row.original.nombre_producto}
-          </p>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-widest">
-            {row.original.tecnologia}
-          </span>
-        </div>
-      ),
+      id: "producto",
+      header: "Plan / Producto",
+      cell: ({ row }) => {
+        const v = row.original;
+        // Unimos Campaña - Tipo - Paquete
+        const nombreCompletoPlan =
+          [v.producto_campana, v.producto_solucion, v.producto_paquete]
+            .filter(Boolean)
+            .join(" - ") || "Producto sin nombre";
+
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <p
+              className="text-[13px] font-medium text-foreground/80 leading-tight line-clamp-2"
+              title={nombreCompletoPlan}
+            >
+              {nombreCompletoPlan}
+            </p>
+            <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-widest mt-0.5">
+              {v.tecnologia}
+            </span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "id_estado_sot",
       header: "Estado",
       cell: ({ row }) => {
         const v = row.original;
-        const estadoData = estadosSOT.find((e) => e.id === v.id_estado_sot);
+        const estadoId = v.id_estado_sot;
+        const estadoData = estadosSOT.find((e) => e.id === estadoId);
         const enCorreccion = v.solicitud_correccion;
 
         return (
@@ -143,17 +155,13 @@ export function buildColumnsBackoffice(
       accessorKey: "fecha_visita_programada",
       header: "Visita",
       cell: ({ row }) => {
-        // Extraemos el string de la fecha que llega del backend ("YYYY-MM-DD")
         const fechaStr = row.original.fecha_visita_programada;
 
         return fechaStr ? (
           <span className="text-[13px] text-foreground/80">
-            {format(
-              // EL PARCHE CRÍTICO: Añadimos T00:00:00 para forzar el Timezone Local
-              new Date(`${fechaStr}T00:00:00`),
-              "dd MMM yyyy",
-              { locale: es },
-            )}
+            {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
+              locale: es,
+            })}
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground/40">
@@ -176,7 +184,6 @@ export function buildColumnsBackoffice(
       header: "",
       cell: ({ row }) => {
         const v = row.original;
-
         const esAtendida = v.codigo_estado?.toUpperCase() === "ATENDIDO";
 
         if (esAtendida) {
@@ -189,7 +196,7 @@ export function buildColumnsBackoffice(
 
         return (
           <ActionBtnBackoffice
-            onClick={() => onGestionar(row.original)}
+            onClick={() => onGestionar(v)}
             variant="primary"
             title="Gestionar venta"
           >

@@ -149,7 +149,9 @@ export interface Venta {
 
   // Producto & cliente
   id_producto: number;
-  nombre_producto: string;
+  producto_campana: string;
+  producto_solucion: string;
+  producto_paquete: string;
   tecnologia: string;
   id_tipo_documento: number;
   cliente_numero_doc: string;

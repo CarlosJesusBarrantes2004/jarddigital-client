@@ -36,18 +36,31 @@ export function buildColumnsAsesor(
       ),
     },
     {
-      accessorKey: "nombre_producto",
-      header: "Plan",
-      cell: ({ row }) => (
-        <div className="flex flex-col items-start gap-1">
-          <p className="text-[13px] font-medium text-foreground/80">
-            {row.original.nombre_producto}
-          </p>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-widest">
-            {row.original.tecnologia}
-          </span>
-        </div>
-      ),
+      // Usamos id genérico porque ahora leeremos múltiples campos
+      id: "producto",
+      header: "Plan / Producto",
+      cell: ({ row }) => {
+        const v = row.original;
+        // Unimos Campaña - Tipo - Paquete. Si alguno falta, lo ignoramos amablemente.
+        const nombreCompletoPlan =
+          [v.producto_campana, v.producto_solucion, v.producto_paquete]
+            .filter(Boolean)
+            .join(" - ") || "Producto sin nombre";
+
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <p
+              className="text-[13px] font-medium text-foreground/80 leading-tight line-clamp-2"
+              title={nombreCompletoPlan}
+            >
+              {nombreCompletoPlan}
+            </p>
+            <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-widest mt-0.5">
+              {v.tecnologia}
+            </span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "id_estado_sot",
@@ -119,17 +132,13 @@ export function buildColumnsAsesor(
       accessorKey: "fecha_visita_programada",
       header: "Visita",
       cell: ({ row }) => {
-        // Extraemos el string de la fecha que llega del backend ("YYYY-MM-DD")
         const fechaStr = row.original.fecha_visita_programada;
 
         return fechaStr ? (
           <span className="text-[13px] text-foreground/80">
-            {format(
-              // EL PARCHE CRÍTICO: Añadimos T00:00:00 para forzar el Timezone Local
-              new Date(`${fechaStr}T00:00:00`),
-              "dd MMM yyyy",
-              { locale: es },
-            )}
+            {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
+              locale: es,
+            })}
           </span>
         ) : (
           <span className="text-[10px] text-muted-foreground/40">

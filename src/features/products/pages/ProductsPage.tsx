@@ -12,7 +12,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils"; // <-- Única adición para el diseño
+import { cn } from "@/lib/utils";
 import {
   useProductos,
   useCampanas,
@@ -113,7 +113,6 @@ const FilterChip = memo(function FilterChip({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ProductosPage() {
-  // ── State UI ──
   const [formOpen, setFormOpen] = useState(false);
   const [productoEditar, setProductoEditar] = useState<Producto | null>(null);
   const [productoEliminar, setProductoEliminar] = useState<Producto | null>(
@@ -121,12 +120,10 @@ export function ProductosPage() {
   );
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
-  // ── Filtros ──
   const [filtros, setFiltros] = useState<ProductoFiltros>({});
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
 
-  // ── Data ──
   const { data, isLoading, refetch } = useProductos({ ...filtros, page });
   const { data: campanas = [], isLoading: loadingCampanas } = useCampanas();
   const { mutateAsync: eliminar, isPending: eliminando } = useDeleteProducto();
@@ -136,8 +133,6 @@ export function ProductosPage() {
     ? data
     : (data?.results ?? []);
 
-  // ── Estadísticas calculadas ──
-  // ── Estadísticas calculadas ──
   const stats = useMemo(() => {
     if (!data)
       return { total: 0, activos: 0, alto_valor: 0, promedio_comision: "0.00" };
@@ -156,7 +151,6 @@ export function ProductosPage() {
     return { total, activos, alto_valor, promedio_comision };
   }, [data]);
 
-  // ── Handles ──
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
     setFiltros((f) => ({ ...f, search: busqueda }));
@@ -188,7 +182,8 @@ export function ProductosPage() {
     if (!productoEliminar) return;
     try {
       await eliminar(productoEliminar.id);
-      toast.success(`"${productoEliminar.nombre_plan}" desactivado`);
+      // Usamos nombre_paquete porque nombre_plan fue eliminado
+      toast.success(`"${productoEliminar.nombre_paquete}" desactivado`);
       setProductoEliminar(null);
     } catch {
       toast.error("Error al desactivar el producto");
@@ -198,7 +193,8 @@ export function ProductosPage() {
   const handleReactivar = async (p: Producto) => {
     try {
       await reactivar(p.id);
-      toast.success(`"${p.nombre_plan}" reactivado`);
+      // Usamos nombre_paquete porque nombre_plan fue eliminado
+      toast.success(`"${p.nombre_paquete}" reactivado`);
     } catch {
       toast.error("Error al reactivar el producto");
     }
@@ -214,14 +210,12 @@ export function ProductosPage() {
     handleReactivar,
   );
 
-  // Justo antes del return del componente
   const paginado = !Array.isArray(data) ? data : null;
 
   return (
     <>
       <div className="font-sans min-h-screen bg-background text-foreground transition-colors duration-300">
-        <div className="max-w-[84rem] mx-auto p-6 lg:p-9 flex flex-col gap-7 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* ── HEADER ── */}
+        <div className="max-w-[84rem] mx-auto flex flex-col gap-7 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div>
               <p className="font-mono text-[11px] tracking-widest uppercase text-primary mb-1.5 font-semibold">
@@ -244,7 +238,6 @@ export function ProductosPage() {
             </button>
           </div>
 
-          {/* ── STATS ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard
               icon={<Package size={18} strokeWidth={1.5} />}
@@ -268,7 +261,7 @@ export function ProductosPage() {
               icon={<Star size={18} strokeWidth={1.5} />}
               label="Alto valor"
               value={isLoading ? 0 : stats.alto_valor}
-              colorClass="text-[#C9975A]" // Dorado cobrizo
+              colorClass="text-[#C9975A]"
               bgClass="bg-[#C9975A]/10"
               borderClass="border-[#C9975A]/20"
               isLoading={isLoading}
@@ -284,7 +277,6 @@ export function ProductosPage() {
             />
           </div>
 
-          {/* ── CHIPS DE FILTRO RÁPIDO ── */}
           <div className="flex flex-wrap gap-2 items-center">
             <FilterChip
               label="Todos"
@@ -343,10 +335,8 @@ export function ProductosPage() {
             ))}
           </div>
 
-          {/* ── BÚSQUEDA + FILTROS AVANZADOS ── */}
           <div className="bg-card/40 border border-border/50 p-4 rounded-2xl shadow-sm flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              {/* Barra de búsqueda */}
               <form
                 onSubmit={handleBuscar}
                 className="flex-1 w-full relative flex items-center gap-2"
@@ -357,7 +347,7 @@ export function ProductosPage() {
                 />
                 <input
                   type="text"
-                  placeholder="Buscar por nombre de plan, campaña, paquete…"
+                  placeholder="Buscar por nombre de campaña, paquete…"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-11 pr-4 text-sm text-foreground focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted-foreground/60"
@@ -370,7 +360,6 @@ export function ProductosPage() {
                 </button>
               </form>
 
-              {/* Botones de acción */}
               <div className="flex w-full sm:w-auto gap-2">
                 <button
                   type="button"
@@ -412,7 +401,6 @@ export function ProductosPage() {
               </div>
             </div>
 
-            {/* Panel de filtros avanzados */}
             {mostrarFiltros && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
                 <div className="flex flex-col gap-1.5">
@@ -485,7 +473,6 @@ export function ProductosPage() {
             )}
           </div>
 
-          {/* ── TABLA ── */}
           <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
             <DataTable
               columns={columns}
@@ -495,7 +482,6 @@ export function ProductosPage() {
             />
           </div>
 
-          {/* ── PAGINACIÓN ── */}
           {paginado && (paginado.next || paginado.previous) && (
             <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
               <span>
@@ -527,18 +513,17 @@ export function ProductosPage() {
         </div>
       </div>
 
-      {/* ── FORM SHEET ── */}
       <ProductoForm
         open={formOpen}
         onClose={handleCerrarForm}
         productoParaEditar={productoEditar}
       />
 
-      {/* ── CONFIRM DIALOG ── */}
       <ConfirmDialog
         open={!!productoEliminar}
         title="Desactivar producto"
-        message={`¿Desactivar el plan "${productoEliminar?.nombre_plan}"? El plan dejará de aparecer en el formulario de ventas. Podrás reactivarlo cuando lo necesites.`}
+        // Modificado para usar nombre_paquete en lugar de nombre_plan
+        message={`¿Desactivar el paquete "${productoEliminar?.nombre_paquete}"? El paquete dejará de aparecer en el formulario de ventas. Podrás reactivarlo cuando lo necesites.`}
         confirmLabel="Desactivar"
         accentHex="#ef4444"
         loading={eliminando}

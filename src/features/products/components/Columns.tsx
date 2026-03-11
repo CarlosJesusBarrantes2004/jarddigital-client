@@ -22,8 +22,9 @@ export function buildColumnsProductos(
       ),
     },
     {
-      accessorKey: "nombre_plan",
-      header: "Plan / Paquete",
+      // Usamos nombre_paquete en lugar de nombre_plan
+      accessorKey: "nombre_paquete",
+      header: "Paquete",
       cell: ({ row }) => {
         const p = row.original;
         return (
@@ -34,10 +35,10 @@ export function buildColumnsProductos(
             </div>
             <div>
               <p className="font-semibold text-sm text-foreground mb-0.5 leading-tight">
-                {p.nombre_plan}
+                {p.nombre_paquete}
               </p>
               <p className="text-[11px] text-muted-foreground font-mono tracking-tight">
-                {p.nombre_paquete}
+                ID: {p.id}
               </p>
             </div>
           </div>

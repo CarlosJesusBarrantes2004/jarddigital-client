@@ -1084,7 +1084,15 @@ export function VentaFormBackoffice({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ReadonlyField
                   label="Plan / Producto"
-                  value={venta.nombre_producto}
+                  value={
+                    [
+                      venta.producto_campana,
+                      venta.producto_solucion,
+                      venta.producto_paquete,
+                    ]
+                      .filter(Boolean)
+                      .join(" - ") || "Producto sin nombre"
+                  }
                 />
                 <ReadonlyField label="Tecnología" value={venta.tecnologia} />
                 <ReadonlyField

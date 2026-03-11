@@ -7,7 +7,6 @@ export interface Producto {
   nombre_campana: string;
   tipo_solucion: string;
   nombre_paquete: string;
-  nombre_plan: string;
   es_alto_valor: boolean;
   costo_fijo_plan: string; // Django DecimalField → string en DRF
   comision_base: string;
@@ -20,7 +19,6 @@ export interface CreateProductoPayload {
   nombre_campana: string;
   tipo_solucion: string;
   nombre_paquete: string;
-  nombre_plan: string;
   es_alto_valor: boolean;
   costo_fijo_plan: string;
   comision_base: string;
@@ -50,5 +48,5 @@ export interface ProductoFiltros {
 export type ProductosResponse = Producto[] | PaginatedProductos;
 
 // Opciones de tipo solución (del backend)
-export const TIPOS_SOLUCION = ["1 PLAY", "2 PLAY", "3 PLAY", "4 PLAY"] as const;
+export const TIPOS_SOLUCION = ["1 PLAY", "2 PLAY", "3 PLAY"] as const;
 export type TipoSolucion = (typeof TIPOS_SOLUCION)[number];
