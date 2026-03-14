@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Pencil, AlertTriangle } from "lucide-react";
+import { Pencil, AlertTriangle, RefreshCw } from "lucide-react"; // <-- Importamos RefreshCw
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
 import { ActionBtn } from "@/components/ActionBtn";
@@ -9,6 +9,7 @@ import { ActionBtn } from "@/components/ActionBtn";
 export function buildColumnsAsesor(
   estadosSOT: EstadoSOT[],
   onEditar: (v: Venta) => void,
+  onReingresar: (v: Venta) => void, // <-- Añadimos esta nueva prop
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -26,9 +27,17 @@ export function buildColumnsAsesor(
       header: "Cliente",
       cell: ({ row }) => (
         <div className="flex flex-col gap-0.5">
-          <p className="font-medium text-[13px] text-foreground leading-snug">
-            {row.original.cliente_nombre}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-[13px] text-foreground leading-snug">
+              {row.original.cliente_nombre}
+            </p>
+            {/* Si es una venta derivada de otra, mostramos un badge */}
+            {row.original.venta_origen && (
+              <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full border border-primary/20 uppercase tracking-widest">
+                <RefreshCw size={9} /> Reingreso
+              </span>
+            )}
+          </div>
           <p className="font-mono text-[11px] text-muted-foreground">
             {row.original.cliente_numero_doc}
           </p>
@@ -36,12 +45,10 @@ export function buildColumnsAsesor(
       ),
     },
     {
-      // Usamos id genérico porque ahora leeremos múltiples campos
       id: "producto",
       header: "Plan / Producto",
       cell: ({ row }) => {
         const v = row.original;
-        // Unimos Campaña - Tipo - Paquete. Si alguno falta, lo ignoramos amablemente.
         const nombreCompletoPlan =
           [v.producto_campana, v.producto_solucion, v.producto_paquete]
             .filter(Boolean)
@@ -177,10 +184,16 @@ export function buildColumnsAsesor(
                 <Pencil size={12} /> Corregir
               </ActionBtn>
             )}
+
+            {/* 👇 Nuevo botón de Reingreso para ventas Rechazadas */}
             {esRechazada && !puedeEditar && (
-              <span className="text-[10px] font-mono text-destructive/60 uppercase tracking-widest">
-                Rechazada
-              </span>
+              <ActionBtn
+                onClick={() => onReingresar(v)}
+                variant="primary"
+                title="Crear nueva venta con estos datos"
+              >
+                <RefreshCw size={12} /> Reingresar
+              </ActionBtn>
             )}
           </div>
         );

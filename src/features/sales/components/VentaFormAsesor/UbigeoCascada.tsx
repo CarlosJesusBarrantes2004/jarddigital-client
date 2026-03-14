@@ -5,6 +5,7 @@ import {
   useDepartamentos,
   useProvincias,
   useDistritos,
+  useDistritoById,
 } from "../../hooks/useSales";
 
 interface UbigeoItem {
@@ -65,7 +66,6 @@ function SelectCascada({
   );
 }
 
-// ── 2. Componente Principal ──
 interface UbigeoCascadaProps {
   label: string;
   depId: number | null;
@@ -95,15 +95,30 @@ export function UbigeoCascada({
   const { data: provincias = [], isLoading: loadProv } = useProvincias(depId);
   const { data: distritos = [], isLoading: loadDist } = useDistritos(provId);
 
-  // Limpiar niveles inferiores cuando cambia el padre
-  useEffect(() => {
-    onProvChange(null);
-    onDistChange(null);
-  }, [depId]); // eslint-disable-line
+  // Auto-completar padres si solo tenemos el Distrito (Caso de uso: Reingreso de Venta rechazada)
+  const needsAutofill = !!distId && !depId && !provId;
+  const { data: padresInfo, isLoading: loadPadres } = useDistritoById(
+    needsAutofill ? distId : null,
+  );
 
   useEffect(() => {
-    onDistChange(null);
-  }, [provId]); // eslint-disable-line
+    if (padresInfo && needsAutofill) {
+      onDepChange(padresInfo.departamentoId);
+      onProvChange(padresInfo.provinciaId);
+    }
+  }, [padresInfo, needsAutofill, onDepChange, onProvChange]);
+
+  // 🚀 LA MAGIA ESTÁ AQUÍ: Solo limpiamos los hijos cuando el usuario hace un cambio MANUAL
+  const handleDepartamentoChange = (nuevoId: number | null) => {
+    onDepChange(nuevoId);
+    onProvChange(null); // Limpiamos provincia
+    onDistChange(null); // Limpiamos distrito
+  };
+
+  const handleProvinciaChange = (nuevoId: number | null) => {
+    onProvChange(nuevoId);
+    onDistChange(null); // Limpiamos distrito
+  };
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -116,9 +131,9 @@ export function UbigeoCascada({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SelectCascada
           val={depId}
-          onChange={onDepChange}
+          onChange={handleDepartamentoChange}
           items={departamentos}
-          load={loadDep}
+          load={loadDep || loadPadres}
           dis={disabled}
           place="1. Departamento"
           error={!!error && !depId}
@@ -126,9 +141,9 @@ export function UbigeoCascada({
 
         <SelectCascada
           val={provId}
-          onChange={onProvChange}
+          onChange={handleProvinciaChange}
           items={provincias}
-          load={loadProv}
+          load={loadProv || loadPadres}
           dis={disabled || !depId}
           place={depId ? "2. Provincia" : "Selec. Departamento"}
           error={!!error && !!depId && !provId}
@@ -138,7 +153,7 @@ export function UbigeoCascada({
           val={distId}
           onChange={onDistChange}
           items={distritos}
-          load={loadDist}
+          load={loadDist || loadPadres}
           dis={disabled || !provId}
           place={provId ? "3. Distrito" : "Selec. Provincia"}
           error={!!error && !!provId && !distId}

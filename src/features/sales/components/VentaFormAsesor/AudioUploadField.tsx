@@ -9,20 +9,23 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { uploadAudioToCloudinary } from "../../services/sales.service";
+import {
+  uploadAudioToCloudinary,
+  deleteAudioFromCloudinaryDirect,
+} from "../../services/sales.service";
 
 interface AudioUploadFieldProps {
   etiqueta: string;
   index: number;
   url: string | null;
+  deleteToken?: string | null;
   uploading: boolean;
   error: string | null;
-  onUploaded: (url: string) => void;
+  onUploaded: (url: string, token?: string) => void;
   onRemove: () => void;
   onUploadStart: () => void;
   onUploadError: (err: string) => void;
   disabled?: boolean;
-  // Nuevas props para mostrar el feedback del Backoffice
   isRechazado?: boolean;
   motivoRechazo?: string | null;
 }
@@ -31,6 +34,7 @@ export function AudioUploadField({
   etiqueta,
   index,
   url,
+  deleteToken,
   uploading,
   error,
   onUploaded,
@@ -44,6 +48,7 @@ export function AudioUploadField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -55,8 +60,8 @@ export function AudioUploadField({
       onUploadStart();
       setProgress(0);
       try {
-        const cloudUrl = await uploadAudioToCloudinary(file, setProgress);
-        onUploaded(cloudUrl);
+        const result = await uploadAudioToCloudinary(file, setProgress);
+        onUploaded(result.url, result.deleteToken);
       } catch (err) {
         onUploadError(
           err instanceof Error ? err.message : "Error al subir el audio",
@@ -85,6 +90,26 @@ export function AudioUploadField({
     },
     [handleFile],
   );
+
+  const handleRemoveClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Si tenemos un deleteToken significa que se acaba de subir y podemos destruirlo
+    if (deleteToken) {
+      setIsDeleting(true);
+      try {
+        await deleteAudioFromCloudinaryDirect(deleteToken);
+      } catch (e) {
+        console.error("Fallo al borrar en Cloudinary", e);
+      } finally {
+        setIsDeleting(false);
+        onRemove(); // Eliminamos de la interfaz pase lo que pase
+      }
+    } else {
+      // Si es un audio antiguo (de Reingreso/Edicion) solo lo quitamos visualmente
+      onRemove();
+    }
+  };
 
   const hasUrl = !!url;
   const isError = !!error;
@@ -123,7 +148,11 @@ export function AudioUploadField({
 
       <div
         onClick={() =>
-          !disabled && !uploading && !hasUrl && inputRef.current?.click()
+          !disabled &&
+          !uploading &&
+          !isDeleting &&
+          !hasUrl &&
+          inputRef.current?.click()
         }
         onDragOver={(e) => {
           e.preventDefault();
@@ -133,7 +162,7 @@ export function AudioUploadField({
         onDrop={handleDrop}
         className={cn(
           "relative flex flex-col justify-center p-3 rounded-xl border transition-all duration-200 min-h-[52px]",
-          disabled || uploading || hasUrl
+          disabled || uploading || isDeleting || hasUrl
             ? "cursor-default"
             : "cursor-pointer hover:bg-muted/50 border-dashed",
           isError
@@ -156,19 +185,32 @@ export function AudioUploadField({
           disabled={disabled}
         />
 
-        {uploading ? (
+        {uploading || isDeleting ? (
           <div className="flex items-center gap-3">
-            <Loader2 size={16} className="text-primary animate-spin shrink-0" />
+            <Loader2
+              size={16}
+              className={cn(
+                "animate-spin shrink-0",
+                isDeleting ? "text-destructive" : "text-primary",
+              )}
+            />
             <div className="flex-1 w-full">
-              <p className="text-[10px] text-primary font-mono mb-1.5">
-                Subiendo… {progress}%
+              <p
+                className={cn(
+                  "text-[10px] font-mono mb-1.5",
+                  isDeleting ? "text-destructive" : "text-primary",
+                )}
+              >
+                {isDeleting ? "Borrando archivo..." : `Subiendo… ${progress}%`}
               </p>
-              <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              {!isDeleting && (
+                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : hasUrl ? (
@@ -190,10 +232,7 @@ export function AudioUploadField({
               {!disabled && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove();
-                  }}
+                  onClick={handleRemoveClick}
                   className="w-6 h-6 flex items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-colors shrink-0"
                   title="Eliminar audio y subir uno nuevo"
                 >
@@ -201,7 +240,6 @@ export function AudioUploadField({
                 </button>
               )}
             </div>
-            {/* Si está rechazado, mostramos el motivo del Backoffice */}
             {isRechazado && motivoRechazo && (
               <div className="flex items-start gap-2 bg-destructive/10 p-2 rounded-lg border border-destructive/20 w-full mt-1">
                 <MessageSquare

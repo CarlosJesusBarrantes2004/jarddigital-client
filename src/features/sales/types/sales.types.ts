@@ -165,6 +165,7 @@ export interface Venta {
   cliente_mama: string;
   numero_instalacion: string;
   cliente_fecha_nacimiento: string;
+  cliente_genero: string;
 
   // Representante legal (solo RUC)
   representante_legal_dni: string | null;
@@ -209,6 +210,7 @@ export interface Venta {
 
   // Audios
   id_grabador_audios: number;
+  grabador_real: string | null;
   audio_subido: boolean;
   fecha_subida_audios: string | null;
   id_estado_audios: number | null;
@@ -251,6 +253,7 @@ export interface CreateVentaPayload {
   cliente_mama: string;
   numero_instalacion: string;
   cliente_fecha_nacimiento: string;
+  cliente_genero: string;
   representante_legal_dni?: string | null;
   representante_legal_nombre?: string | null;
   id_distrito_instalacion: number;
@@ -261,6 +264,7 @@ export interface CreateVentaPayload {
   es_full_claro: boolean;
   score_crediticio?: string;
   id_grabador_audios: number;
+  nombre_grabador_externo?: string | null;
   audios: AudioVentaForm[];
   venta_origen?: number | null;
 }
@@ -281,6 +285,7 @@ export interface UpdateVentaAsesorPayload {
   cliente_mama?: string;
   numero_instalacion?: string;
   cliente_fecha_nacimiento?: string;
+  cliente_genero?: string;
   representante_legal_dni?: string | null;
   representante_legal_nombre?: string | null;
   id_distrito_instalacion?: number;
@@ -291,6 +296,7 @@ export interface UpdateVentaAsesorPayload {
   es_full_claro?: boolean;
   score_crediticio?: string;
   id_grabador_audios?: number;
+  nombre_grabador_externo?: string | null;
   audios?: Partial<AudioVenta>[];
 }
 

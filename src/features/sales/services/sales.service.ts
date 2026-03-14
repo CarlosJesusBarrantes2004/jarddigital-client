@@ -34,14 +34,6 @@ function normalizeList<T>(data: unknown): PaginatedResponse<T> {
 
 // ==========================================
 // CLOUDINARY — Upload de audios
-// Recomendado sobre AWS S3 para este caso:
-// ✓ SDK simple (solo un POST a una URL pública)
-// ✓ Sin presigned URLs ni IAM roles complejos
-// ✓ Free tier generoso (25GB/mes)
-// ✓ URL inmutable por hash del contenido
-// ✓ Soporte nativo para audio/mp3
-// Para usar: crear cuenta en cloudinary.com,
-// ir a Settings > Upload > Add upload preset (unsigned)
 // ==========================================
 
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? "";
@@ -52,17 +44,21 @@ export interface CloudinaryUploadResult {
   url: string;
   public_id: string;
   secure_url: string;
+  delete_token?: string;
+}
+
+export interface UploadedAudioData {
+  url: string;
+  deleteToken?: string;
 }
 
 /**
- * Sube un archivo de audio a Cloudinary y devuelve la URL segura.
- * @param file El archivo MP3 a subir
- * @param onProgress Callback de progreso (0-100)
+ * Sube un archivo de audio a Cloudinary y devuelve la URL segura y el token de borrado.
  */
 export async function uploadAudioToCloudinary(
   file: File,
   onProgress?: (percent: number) => void,
-): Promise<string> {
+): Promise<UploadedAudioData> {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error(
       "Configura VITE_CLOUDINARY_CLOUD_NAME y VITE_CLOUDINARY_UPLOAD_PRESET en tu .env",
@@ -93,7 +89,10 @@ export async function uploadAudioToCloudinary(
     xhr.onload = () => {
       if (xhr.status === 200) {
         const result: CloudinaryUploadResult = JSON.parse(xhr.responseText);
-        resolve(result.secure_url);
+        resolve({
+          url: result.secure_url,
+          deleteToken: result.delete_token,
+        });
       } else {
         reject(
           new Error(`Error Cloudinary: ${xhr.status} ${xhr.responseText}`),
@@ -107,15 +106,35 @@ export async function uploadAudioToCloudinary(
 }
 
 /**
- * Elimina un audio de Cloudinary dado su public_id.
- * Nota: requiere firma del servidor para delete — se recomienda
- * exponer un endpoint Django que llame a cloudinary.uploader.destroy()
+ * Elimina un audio DIRECTAMENTE desde el Frontend a Cloudinary usando el delete_token.
+ * Esto ahorra espacio si el Asesor se equivoca y borra un audio antes de enviar el form.
  */
-export async function deleteAudioFromCloudinary(
-  publicId: string,
+export async function deleteAudioFromCloudinaryDirect(
+  deleteToken: string,
 ): Promise<void> {
-  // El borrado firmado se delega al backend para no exponer el API Secret
-  await api.post("/sales/audios/delete-cloudinary/", { public_id: publicId });
+  if (!CLOUDINARY_CLOUD_NAME || !deleteToken) return;
+
+  const formData = new FormData();
+  formData.append("token", deleteToken);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(
+      "POST",
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/delete_by_token`,
+    );
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        resolve();
+      } else {
+        reject(new Error(`Fallo al borrar: ${xhr.responseText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Error de red al intentar borrar"));
+    xhr.send(formData);
+  });
 }
 
 // ==========================================
@@ -186,7 +205,6 @@ export const catalogosService = {
     const { data } = await api.get("/sales/productos/?activo=true");
     return normalizeList<Producto>(data).results;
   },
-  // Actualiza solo esta función dentro de catalogosService
   getGrabadores: async (
     includeId?: number | null,
   ): Promise<GrabadorAudio[]> => {

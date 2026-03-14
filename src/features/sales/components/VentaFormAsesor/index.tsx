@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   ChevronDown,
   Lock,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -49,6 +51,7 @@ const schema = z
     cliente_fecha_nacimiento: z
       .string()
       .min(1, "Fecha de nacimiento requerida"),
+    cliente_genero: z.string().min(1, "Selecciona el género"), // <-- NUEVO
     cliente_papa: z.string().min(2, "Nombre del padre requerido"),
     cliente_mama: z.string().min(2, "Nombre de la madre requerido"),
     numero_instalacion: z.string().min(1, "Número de instalación requerido"),
@@ -57,14 +60,12 @@ const schema = z
     representante_legal_dni: z.string().nullable().optional(),
     representante_legal_nombre: z.string().nullable().optional(),
 
-    // Ubigeo instalación
     dep_inst_id: z.number().nullable(),
     prov_inst_id: z.number().nullable(),
     id_distrito_instalacion: z
       .number({ message: "Selecciona distrito de instalación" })
       .nullable(),
 
-    // Ubigeo nacimiento
     dep_nac_id: z.number().nullable(),
     prov_nac_id: z.number().nullable(),
     id_distrito_nacimiento: z.number().nullable(),
@@ -75,24 +76,40 @@ const schema = z
     coordenadas_gps: z.string().optional(),
     es_full_claro: z.boolean(),
     score_crediticio: z.string().optional(),
+
     id_grabador_audios: z.number({ message: "Selecciona grabador" }),
+    nombre_grabador_externo: z.string().nullable().optional(),
+
     audio_urls: z.array(z.string()),
   })
   .refine((d) => d.id_distrito_instalacion !== null, {
     message: "Selecciona el distrito de instalación",
     path: ["id_distrito_instalacion"],
-  });
+  })
+  .refine(
+    (d) => {
+      if (
+        d.id_grabador_audios === 1 &&
+        (!d.nombre_grabador_externo || d.nombre_grabador_externo.trim() === "")
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Especifica el nombre del grabador",
+      path: ["nombre_grabador_externo"],
+    },
+  );
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Pasos ─────────────────────────────────────────────────────────────────────
 const PASOS = [
   { id: "cliente", label: "Cliente", icon: User },
   { id: "ubicacion", label: "Ubicación", icon: MapPin },
   { id: "audios", label: "Audios", icon: Mic },
 ];
 
-// ── Helpers UI ────────────────────────────────────────────────────────────────
 function FieldLabel({
   children,
   required,
@@ -288,9 +305,13 @@ export function VentaFormAsesor({
 }: VentaFormAsesorProps) {
   const [paso, setPaso] = useState(0);
 
-  const esEdicion = !!ventaOrigen;
+  const esRechazada = ventaOrigen?.codigo_estado?.toUpperCase() === "RECHAZADO";
+  const esReingreso = !!ventaOrigen && esRechazada;
+  const esEdicion = !!ventaOrigen && !esRechazada;
+
   const esEjecucion = ventaOrigen?.codigo_estado?.toUpperCase() === "EJECUCION";
   const soloAudios = esEdicion && esEjecucion;
+  const esVentaNuevaPura = !ventaOrigen;
 
   const { mutateAsync: crearVenta, isPending: creando } = useCreateVenta();
   const { mutateAsync: editarVenta, isPending: editando } =
@@ -301,7 +322,6 @@ export function VentaFormAsesor({
   const { data: productos = [] } = useProductos();
 
   const grabadorActualId = ventaOrigen?.id_grabador_audios ?? null;
-
   const { data: grabadores = [] } = useGrabadores(grabadorActualId);
 
   const [filtroCampana, setFiltroCampana] = useState("");
@@ -311,9 +331,10 @@ export function VentaFormAsesor({
   const [audioUrls, setAudioUrls] = useState<(string | null)[]>([]);
   const [audioUploading, setAudioUploading] = useState<boolean[]>([]);
   const [audioErrors, setAudioErrors] = useState<(string | null)[]>([]);
-
   const [audioRechazados, setAudioRechazados] = useState<boolean[]>([]);
   const [audioMotivos, setAudioMotivos] = useState<(string | null)[]>([]);
+
+  const isInitialMount = useRef(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -328,16 +349,19 @@ export function VentaFormAsesor({
       dep_nac_id: null,
       prov_nac_id: null,
       id_distrito_nacimiento: null,
+      cliente_genero: "", // <-- NUEVO DEFAULT
     },
   });
 
+  const watchedValues = form.watch();
   const tipoDocId = form.watch("id_tipo_documento");
   const tipoDoc = tiposDoc.find((t) => t.id === tipoDocId);
   const esRUC = tipoDoc?.codigo?.toUpperCase() === "RUC";
   const etiquetasAudio = esRUC ? ETIQUETAS_RUC : ETIQUETAS_DNI;
 
+  const isGrabadorOtros = form.watch("id_grabador_audios") === 1;
+
   const campanasDisponibles = useMemo(() => {
-    // Si no tienes 'nombre_campana' en el tipado aún, lo tratamos genérico
     const campanas = productos.map((p) => p.nombre_campana).filter(Boolean);
     return Array.from(new Set(campanas));
   }, [productos]);
@@ -361,96 +385,179 @@ export function VentaFormAsesor({
   }, [productos, filtroCampana, filtroSolucion]);
 
   useEffect(() => {
-    if (open && ventaOrigen?.id_producto && productos.length > 0) {
-      const prod = productos.find((p) => p.id === ventaOrigen.id_producto);
-      if (prod) {
-        setFiltroCampana(prod.nombre_campana || "");
-        setFiltroSolucion(prod.tipo_solucion || "");
+    if (!open) return;
+
+    if (ventaOrigen) {
+      isInitialMount.current = true;
+      const v = ventaOrigen;
+
+      if (esEdicion && v.codigo_estado?.toUpperCase() === "EJECUCION")
+        setPaso(2);
+      else setPaso(0);
+
+      if (v.id_producto && productos.length > 0) {
+        const prod = productos.find((p) => p.id === v.id_producto);
+        if (prod) {
+          setFiltroCampana(prod.nombre_campana || "");
+          setFiltroSolucion(prod.tipo_solucion || "");
+        }
       }
-    } else if (!open) {
-      setFiltroCampana("");
-      setFiltroSolucion("");
+
+      let nombreExterno = "";
+      if (v.id_grabador_audios === 1 && v.grabador_real) {
+        nombreExterno = v.grabador_real.replace(" (Externo)", "");
+      }
+
+      form.reset({
+        id_producto: v.id_producto,
+        tecnologia: v.tecnologia,
+        id_tipo_documento: v.id_tipo_documento,
+        cliente_numero_doc: v.cliente_numero_doc,
+        cliente_nombre: v.cliente_nombre,
+        cliente_telefono: v.cliente_telefono,
+        cliente_email: v.cliente_email,
+        cliente_fecha_nacimiento:
+          v.cliente_fecha_nacimiento?.split("T")[0] ?? "",
+        cliente_genero: v.cliente_genero ?? "", // <-- Precargar género
+        cliente_papa: v.cliente_papa,
+        cliente_mama: v.cliente_mama,
+        numero_instalacion: v.numero_instalacion,
+        cant_decos_adicionales: v.cant_decos_adicionales ?? 0,
+        cant_repetidores_adicionales: v.cant_repetidores_adicionales ?? 0,
+        representante_legal_dni: v.representante_legal_dni ?? "",
+        representante_legal_nombre: v.representante_legal_nombre ?? "",
+        referencias: v.referencias ?? "",
+        plano: v.plano,
+        direccion_detalle: v.direccion_detalle,
+        coordenadas_gps: v.coordenadas_gps ?? "",
+        es_full_claro: v.es_full_claro,
+        score_crediticio: v.score_crediticio ?? "",
+        id_grabador_audios: v.id_grabador_audios,
+        nombre_grabador_externo: nombreExterno,
+        dep_inst_id: null,
+        prov_inst_id: null,
+        id_distrito_instalacion: v.id_distrito_instalacion,
+        dep_nac_id: null,
+        prov_nac_id: null,
+        id_distrito_nacimiento: v.id_distrito_nacimiento ?? null,
+        audio_urls: [],
+      });
+
+      const isOrigenRuc =
+        tiposDoc
+          .find((t) => t.id === v.id_tipo_documento)
+          ?.codigo?.toUpperCase() === "RUC";
+      const etiquetasReales = isOrigenRuc ? ETIQUETAS_RUC : ETIQUETAS_DNI;
+
+      const newUrls = Array(etiquetasReales.length).fill(null);
+      const newIds = Array(etiquetasReales.length).fill(undefined);
+      const newRechazados = Array(etiquetasReales.length).fill(false);
+      const newMotivos = Array(etiquetasReales.length).fill(null);
+
+      etiquetasReales.forEach((etiqueta, i) => {
+        const audioDB = v.audios.find((a) => a.nombre_etiqueta === etiqueta);
+        if (audioDB) {
+          newUrls[i] = audioDB.url_audio;
+          newIds[i] = esReingreso ? undefined : audioDB.id;
+          newRechazados[i] = audioDB.conforme === false;
+          newMotivos[i] = audioDB.motivo;
+        }
+      });
+
+      setAudioUrls(newUrls);
+      setAudioIds(newIds);
+      setAudioRechazados(newRechazados);
+      setAudioMotivos(newMotivos);
+      setAudioUploading(Array(etiquetasReales.length).fill(false));
+      setAudioErrors(Array(etiquetasReales.length).fill(null));
+
+      setTimeout(() => {
+        isInitialMount.current = false;
+      }, 300);
+    } else {
+      isInitialMount.current = false;
+      setPaso(0);
+      const draftStr = sessionStorage.getItem("jard_venta_draft");
+      if (draftStr) {
+        try {
+          const parsed = JSON.parse(draftStr);
+          form.reset(parsed.form);
+          setFiltroCampana(parsed.campana || "");
+          setFiltroSolucion(parsed.solucion || "");
+
+          if (parsed.audios && parsed.audios.length === etiquetasAudio.length) {
+            setAudioUrls(parsed.audios);
+          } else {
+            setAudioUrls(Array(etiquetasAudio.length).fill(null));
+          }
+        } catch (e) {
+          console.error("Error parseando borrador", e);
+        }
+      } else {
+        form.reset();
+        setFiltroCampana("");
+        setFiltroSolucion("");
+        setAudioUrls(Array(etiquetasAudio.length).fill(null));
+      }
     }
-  }, [open, ventaOrigen, productos]);
+  }, [open, ventaOrigen, esEdicion, esReingreso, productos, form, tiposDoc]);
 
   useEffect(() => {
-    const n = etiquetasAudio.length;
-    setAudioUrls(Array(n).fill(null));
-    setAudioIds(Array(n).fill(undefined));
-    setAudioUploading(Array(n).fill(false));
-    setAudioErrors(Array(n).fill(null));
-    setAudioRechazados(Array(n).fill(false));
-    setAudioMotivos(Array(n).fill(null));
-  }, [etiquetasAudio.length]);
+    if (isInitialMount.current) return;
+
+    if (audioUrls.length !== etiquetasAudio.length) {
+      setAudioUrls(Array(etiquetasAudio.length).fill(null));
+      setAudioIds(Array(etiquetasAudio.length).fill(undefined));
+      setAudioRechazados(Array(etiquetasAudio.length).fill(false));
+      setAudioMotivos(Array(etiquetasAudio.length).fill(null));
+    }
+  }, [etiquetasAudio.length, audioUrls.length]);
 
   useEffect(() => {
-    if (!ventaOrigen || !open) return;
-    const v = ventaOrigen;
+    if (open && esVentaNuevaPura) {
+      const timer = setTimeout(() => {
+        sessionStorage.setItem(
+          "jard_venta_draft",
+          JSON.stringify({
+            form: watchedValues,
+            audios: audioUrls,
+            campana: filtroCampana,
+            solucion: filtroSolucion,
+          }),
+        );
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    open,
+    esVentaNuevaPura,
+    watchedValues,
+    audioUrls,
+    filtroCampana,
+    filtroSolucion,
+  ]);
 
-    if (v.codigo_estado?.toUpperCase() === "EJECUCION") setPaso(2);
-    else setPaso(0);
-
+  const handleLimpiarBorrador = () => {
+    sessionStorage.removeItem("jard_venta_draft");
     form.reset({
-      id_producto: v.id_producto,
-      tecnologia: v.tecnologia,
-      id_tipo_documento: v.id_tipo_documento,
-      cliente_numero_doc: v.cliente_numero_doc,
-      cliente_nombre: v.cliente_nombre,
-      cliente_telefono: v.cliente_telefono,
-      cliente_email: v.cliente_email,
-      cliente_fecha_nacimiento: v.cliente_fecha_nacimiento?.split("T")[0] ?? "",
-      cliente_papa: v.cliente_papa,
-      cliente_mama: v.cliente_mama,
-      numero_instalacion: v.numero_instalacion,
-      cant_decos_adicionales: v.cant_decos_adicionales ?? 0,
-      cant_repetidores_adicionales: v.cant_repetidores_adicionales ?? 0,
-      representante_legal_dni: v.representante_legal_dni ?? "",
-      representante_legal_nombre: v.representante_legal_nombre ?? "",
-      referencias: v.referencias ?? "",
-      plano: v.plano,
-      direccion_detalle: v.direccion_detalle,
-      coordenadas_gps: v.coordenadas_gps ?? "",
-      es_full_claro: v.es_full_claro,
-      score_crediticio: v.score_crediticio ?? "",
-      id_grabador_audios: v.id_grabador_audios,
-      dep_inst_id: null,
-      prov_inst_id: null,
-      id_distrito_instalacion: v.id_distrito_instalacion,
-      dep_nac_id: null,
-      prov_nac_id: null,
-      id_distrito_nacimiento: v.id_distrito_nacimiento ?? null,
-      audio_urls: [],
+      cant_decos_adicionales: 0,
+      cant_repetidores_adicionales: 0,
+      es_full_claro: false,
+      cliente_genero: "",
     });
-
-    const newUrls = Array(etiquetasAudio.length).fill(null);
-    const newIds = Array(etiquetasAudio.length).fill(undefined);
-    const newRechazados = Array(etiquetasAudio.length).fill(false);
-    const newMotivos = Array(etiquetasAudio.length).fill(null);
-
-    etiquetasAudio.forEach((etiqueta, i) => {
-      // Buscamos si la venta original tenía este audio
-      const audioDB = v.audios.find((a) => a.nombre_etiqueta === etiqueta);
-      if (audioDB) {
-        newUrls[i] = audioDB.url_audio;
-        newIds[i] = audioDB.id;
-        // Si conforme es exactamente false, significa que el Backoffice lo rechazó
-        newRechazados[i] = audioDB.conforme === false;
-        newMotivos[i] = audioDB.motivo;
-      }
-    });
-
-    setAudioUrls(newUrls);
-    setAudioIds(newIds);
-    setAudioRechazados(newRechazados);
-    setAudioMotivos(newMotivos);
-    setAudioUploading(Array(etiquetasAudio.length).fill(false));
-    setAudioErrors(Array(etiquetasAudio.length).fill(null));
-  }, [ventaOrigen, open, form, etiquetasAudio]);
+    setFiltroCampana("");
+    setFiltroSolucion("");
+    setAudioUrls(Array(etiquetasAudio.length).fill(null));
+    setPaso(0);
+    toast.success("Borrador limpiado correctamente");
+  };
 
   const handleClose = () => {
     form.reset();
     setPaso(0);
     setAudioUrls([]);
+    setFiltroCampana("");
+    setFiltroSolucion("");
     onClose();
   };
 
@@ -515,59 +622,6 @@ export function VentaFormAsesor({
     audioUrls.length > 0 && audioUrls.every((u) => u !== null && u !== "");
   const algunoSubiendo = audioUploading.some(Boolean);
 
-  /*const onSubmit = form.handleSubmit(async (values) => {
-    if (!todosAudiosListos) {
-      toast.error(`Debes subir los ${etiquetasAudio.length} audios requeridos`);
-      setPaso(2);
-      return;
-    }
-    if (algunoSubiendo) {
-      toast.error("Espera a que terminen de subir los audios");
-      return;
-    }
-
-    const audiosPayload = etiquetasAudio.map((etiqueta, i) => ({
-      id: audioIds[i],
-      nombre_etiqueta: etiqueta,
-      url_audio: audioUrls[i]!,
-    }));
-
-    try {
-      if (esEdicion) {
-        await editarVenta({
-          ...values,
-          representante_legal_dni: esRUC
-            ? (values.representante_legal_dni ?? null)
-            : null,
-          representante_legal_nombre: esRUC
-            ? (values.representante_legal_nombre ?? null)
-            : null,
-          id_distrito_instalacion: values.id_distrito_instalacion!,
-          id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-          audios: audiosPayload,
-        });
-        toast.success("Venta actualizada y enviada al Backoffice");
-      } else {
-        await crearVenta({
-          ...values,
-          representante_legal_dni: esRUC
-            ? (values.representante_legal_dni ?? null)
-            : null,
-          representante_legal_nombre: esRUC
-            ? (values.representante_legal_nombre ?? null)
-            : null,
-          id_distrito_instalacion: values.id_distrito_instalacion!,
-          id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-          audios: audiosPayload,
-        });
-        toast.success("Venta creada correctamente");
-      }
-      handleClose();
-    } catch (err) {
-      toast.error(extractApiError(err));
-    }
-  });*/
-
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -587,20 +641,17 @@ export function VentaFormAsesor({
       url_audio: audioUrls[i]!,
     }));
 
-    // Si está en Ejecución, saltamos la validación de Zod del formulario (porque está disabled)
-    // y enviamos directamente el payload de audios al Backend.
     if (soloAudios) {
       try {
         await editarVenta({ audios: audiosPayload } as unknown as Parameters<
           typeof editarVenta
-        >[0]); // as any para bypassear tipos obligatorios en el PATCH parcial
+        >[0]);
         toast.success("Audios corregidos y enviados al Backoffice");
         handleClose();
       } catch (err) {
         toast.error(extractApiError(err));
       }
     } else {
-      // Si es una venta nueva o pendiente, ejecutamos la validación normal de React Hook Form
       form.handleSubmit(async (values) => {
         try {
           if (esEdicion) {
@@ -614,6 +665,10 @@ export function VentaFormAsesor({
                 : null,
               id_distrito_instalacion: values.id_distrito_instalacion!,
               id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+              nombre_grabador_externo:
+                values.id_grabador_audios === 1
+                  ? values.nombre_grabador_externo
+                  : null,
               audios: audiosPayload,
             });
             toast.success("Venta actualizada y enviada al Backoffice");
@@ -628,9 +683,22 @@ export function VentaFormAsesor({
                 : null,
               id_distrito_instalacion: values.id_distrito_instalacion!,
               id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+              nombre_grabador_externo:
+                values.id_grabador_audios === 1
+                  ? values.nombre_grabador_externo
+                  : null,
               audios: audiosPayload,
+              venta_origen: esReingreso ? ventaOrigen!.id : undefined,
             });
-            toast.success("Venta creada correctamente");
+            toast.success(
+              esReingreso
+                ? "Venta reingresada correctamente"
+                : "Venta creada correctamente",
+            );
+
+            if (esVentaNuevaPura) {
+              sessionStorage.removeItem("jard_venta_draft");
+            }
           }
           handleClose();
         } catch (err) {
@@ -647,7 +715,7 @@ export function VentaFormAsesor({
     <>
       <div
         onClick={handleClose}
-        className="fixed inset-0 z-[1000] animate-in fade-in duration-300"
+        className="fixed inset-0 z-[1000] bg-background/60 backdrop-blur-sm animate-in fade-in duration-300"
       />
 
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-3xl bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
@@ -660,8 +728,22 @@ export function VentaFormAsesor({
                   <AlertTriangle size={10} /> CORRECCIÓN SOLICITADA
                 </span>
               )}
-              <h2 className="font-serif text-2xl font-bold text-foreground leading-tight tracking-tight">
-                {esEdicion ? "Corregir Venta" : "Nueva Venta Claro"}
+              {esReingreso && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/30 mb-2">
+                  <RefreshCw size={10} /> REINGRESO DE VENTA RECHAZADA
+                </span>
+              )}
+              <h2 className="font-serif text-2xl font-bold text-foreground leading-tight tracking-tight flex items-center gap-3">
+                {esEdicion
+                  ? "Corregir Venta"
+                  : esReingreso
+                    ? "Nuevo Reingreso"
+                    : "Nueva Venta Claro"}
+                {esVentaNuevaPura && (
+                  <span className="text-[9px] font-sans font-normal text-muted-foreground bg-muted px-2 py-1 rounded-md ml-2">
+                    Borrador autoguardado 💾
+                  </span>
+                )}
               </h2>
               {esEdicion && ventaOrigen?.comentario_gestion && (
                 <p className="text-xs text-orange-500/80 mt-1.5 max-w-lg leading-relaxed">
@@ -735,7 +817,6 @@ export function VentaFormAsesor({
               <div>
                 <SectionTitle>Plan y Tecnología</SectionTitle>
 
-                {/* 👇 FILTROS EN CASCADA */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <NativeSelect
                     label="1. Seleccionar Campaña"
@@ -911,6 +992,8 @@ export function VentaFormAsesor({
                       )}
                     />
                   </div>
+
+                  {/* 👇 AQUÍ AÑADIMOS EL NUEVO CAMPO DE GÉNERO */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Controller
                       control={form.control}
@@ -928,19 +1011,42 @@ export function VentaFormAsesor({
                     />
                     <Controller
                       control={form.control}
-                      name="numero_instalacion"
+                      name="cliente_genero"
                       render={({ field }) => (
-                        <TextInput
-                          label="Número Instalación"
+                        <NativeSelect
+                          label="Género"
                           required
                           disabled={soloAudios}
-                          placeholder="Ej: 12345"
-                          {...field}
-                          error={errorsObj.numero_instalacion?.message}
-                        />
+                          value={field.value ?? ""}
+                          onChange={(v) => field.onChange(v)}
+                          placeholder="Seleccionar género..."
+                          error={errorsObj.cliente_genero?.message}
+                        >
+                          <option value="MASCULINO">Masculino</option>
+                          <option value="FEMENINO">Femenino</option>
+                          <option value="OTRO">
+                            Otro / Prefiero no decirlo
+                          </option>
+                        </NativeSelect>
                       )}
                     />
                   </div>
+
+                  <Controller
+                    control={form.control}
+                    name="numero_instalacion"
+                    render={({ field }) => (
+                      <TextInput
+                        label="Número Instalación"
+                        required
+                        disabled={soloAudios}
+                        placeholder="Ej: 12345"
+                        {...field}
+                        error={errorsObj.numero_instalacion?.message}
+                      />
+                    )}
+                  />
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Controller
                       control={form.control}
@@ -1055,29 +1161,49 @@ export function VentaFormAsesor({
                     )}
                   />
                 </div>
-                <Controller
-                  control={form.control}
-                  name="id_grabador_audios"
-                  render={({ field }) => (
-                    <NativeSelect
-                      label="Grabador Asignado"
-                      required
-                      disabled={soloAudios}
-                      value={field.value ?? ""}
-                      onChange={(v) =>
-                        field.onChange(v ? Number(v) : undefined)
-                      }
-                      placeholder="Seleccione el responsable"
-                      error={errorsObj.id_grabador_audios?.message}
-                    >
-                      {grabadores.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.nombre_completo}
-                        </option>
-                      ))}
-                    </NativeSelect>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="id_grabador_audios"
+                    render={({ field }) => (
+                      <NativeSelect
+                        label="Grabador Asignado"
+                        required
+                        disabled={soloAudios}
+                        value={field.value ?? ""}
+                        onChange={(v) =>
+                          field.onChange(v ? Number(v) : undefined)
+                        }
+                        placeholder="Seleccione el responsable"
+                        error={errorsObj.id_grabador_audios?.message}
+                      >
+                        {grabadores.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.nombre_completo}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    )}
+                  />
+                  {isGrabadorOtros && (
+                    <Controller
+                      control={form.control}
+                      name="nombre_grabador_externo"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Nombre del Grabador"
+                          required
+                          disabled={soloAudios}
+                          placeholder="Ej: JUAN PEREZ"
+                          {...field}
+                          value={field.value ?? ""}
+                          error={errorsObj.nombre_grabador_externo?.message}
+                        />
+                      )}
+                    />
                   )}
-                />
+                </div>
               </div>
             </div>
 
@@ -1168,9 +1294,7 @@ export function VentaFormAsesor({
                   />
                 </div>
               </div>
-
               <Divider />
-
               <div>
                 <SectionTitle>Ubigeo de Nacimiento</SectionTitle>
                 <Controller
@@ -1190,9 +1314,7 @@ export function VentaFormAsesor({
                   )}
                 />
               </div>
-
               <Divider />
-
               <div>
                 <SectionTitle>Evaluación</SectionTitle>
                 <div className="space-y-4">
@@ -1243,7 +1365,6 @@ export function VentaFormAsesor({
                   Usa Drag & Drop.
                 </p>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {etiquetasAudio.map((etiqueta, i) => (
                   <AudioUploadField
@@ -1262,7 +1383,6 @@ export function VentaFormAsesor({
                   />
                 ))}
               </div>
-
               <div className="p-4 rounded-xl bg-card border border-border flex items-center justify-between mt-4">
                 <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                   Progreso de Audios
@@ -1281,16 +1401,32 @@ export function VentaFormAsesor({
         </div>
 
         {/* ── Footer Controles ── */}
-        <div className="p-5 border-t border-border bg-card shrink-0 flex items-center justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 rounded-xl px-5 gap-2"
-            onClick={paso > 0 ? () => setPaso(paso - 1) : handleClose}
-          >
-            <ChevronLeft size={16} /> {paso > 0 ? "Atrás" : "Cancelar"}
-          </Button>
-
+        <div className="p-5 border-t border-border bg-card shrink-0 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-xl px-4 sm:px-5 gap-2"
+              onClick={paso > 0 ? () => setPaso(paso - 1) : handleClose}
+            >
+              <ChevronLeft size={16} />{" "}
+              <span className="hidden sm:inline">
+                {paso > 0 ? "Atrás" : "Cancelar"}
+              </span>
+            </Button>
+            {esVentaNuevaPura && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleLimpiarBorrador}
+                className="h-11 rounded-xl px-4 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                title="Borrar todos los datos ingresados"
+              >
+                <Trash2 size={16} className="sm:mr-2" />
+                <span className="hidden sm:inline text-xs">Limpiar</span>
+              </Button>
+            )}
+          </div>
           {paso < PASOS.length - 1 ? (
             <Button
               type="button"
@@ -1307,7 +1443,11 @@ export function VentaFormAsesor({
               className="h-11 rounded-xl px-6 gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20 disabled:opacity-50"
             >
               {isPending && <Loader2 size={16} className="animate-spin" />}
-              {esEdicion ? "Guardar Corrección" : "Confirmar Venta"}{" "}
+              {esEdicion
+                ? "Guardar Corrección"
+                : esReingreso
+                  ? "Confirmar Reingreso"
+                  : "Confirmar Venta"}{" "}
               <Check size={16} />
             </Button>
           )}

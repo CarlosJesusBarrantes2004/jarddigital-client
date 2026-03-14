@@ -108,11 +108,6 @@ export function VentasAsesorPage() {
     setFiltros((f) => ({ ...f, search: busqueda }));
   };
 
-  const handleReingresar = (venta: Venta) => {
-    setVentaParaReingresar(venta);
-    setFormOpen(true);
-  };
-
   const handleCerrarForm = () => {
     setFormOpen(false);
     setVentaParaReingresar(null);
@@ -123,7 +118,16 @@ export function VentasAsesorPage() {
     if (venta?.solicitud_correccion) handleReingresar(venta);
   };*/
 
-  const columns = buildColumnsAsesor(estadosSOT, handleReingresar);
+  const handleAccionVenta = (venta: Venta) => {
+    setVentaParaReingresar(venta);
+    setFormOpen(true);
+  };
+
+  const columns = buildColumnsAsesor(
+    estadosSOT,
+    handleAccionVenta,
+    handleAccionVenta,
+  );
 
   console.log(ventaParaReingresar);
 

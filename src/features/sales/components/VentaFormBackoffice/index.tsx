@@ -19,6 +19,7 @@ import {
   Settings,
   Clock,
   MessageSquare,
+  Download, // <-- ¡NUEVO ICONO IMPORTADO!
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -297,7 +298,7 @@ interface AudioQA {
   corregido: boolean;
 }
 
-// ── AudioPlayer item para QA (AHORA NOTIFICA AL PADRE) ──────────────────────
+// ── AudioPlayer item para QA (AHORA CON BOTÓN DE DESCARGA) ──────────────────────
 function AudioItemQA({
   audio,
   index,
@@ -328,6 +329,31 @@ function AudioItemQA({
         audioEl.play();
         setPlaying(true);
       }
+    }
+  };
+
+  // Función mágica para forzar la descarga de un archivo externo
+  const handleDownload = async () => {
+    try {
+      toast.info("Iniciando descarga...", { id: `dl-${audio.id}` });
+      const response = await fetch(audio.url_audio);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      // Le damos un nombre bonito al archivo: "Audio_1_DNI.mp3"
+      const safeName = audio.nombre_etiqueta
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase();
+      a.download = `Audio_${index + 1}_${safeName}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Audio descargado", { id: `dl-${audio.id}` });
+    } catch (error) {
+      toast.error(extractApiError(error));
     }
   };
 
@@ -369,6 +395,16 @@ function AudioItemQA({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
+          {/* 👇 Botón de Descargar */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="flex items-center justify-center w-8 h-8 rounded-full border bg-background border-border text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all shrink-0"
+            title="Descargar MP3"
+          >
+            <Download size={14} />
+          </button>
+
           <button
             type="button"
             onClick={togglePlay}
@@ -460,12 +496,10 @@ export function VentaFormBackoffice({
   const { data: subEstados = [] } = useSubEstadosSOT();
   const { data: estadosAudio = [] } = useEstadosAudio();
 
-  // Guardamos un clon de los audios localmente para modificar `conforme` y `motivo`
   const [audiosQA, setAudiosQA] = useState<AudioQA[]>([]);
 
   useEffect(() => {
     if (venta && open) {
-      // Clonamos para no mutar directamente las props
       setAudiosQA(venta.audios ? JSON.parse(JSON.stringify(venta.audios)) : []);
     }
   }, [venta, open]);
@@ -474,7 +508,6 @@ export function VentaFormBackoffice({
     venta.id_estado_sot === null && !venta.solicitud_correccion;
   const esReingreso = !!venta.venta_origen && venta.id_estado_sot === null;
 
-  // Regla estricta SOT: Si es primera vez, solo puede ir a EJECUCION.
   const estadosSotPermitidos =
     esPrimeraGestion || esReingreso
       ? estadosSOT.filter((e) => e.codigo.toUpperCase() === "EJECUCION")
@@ -530,7 +563,6 @@ export function VentaFormBackoffice({
     }
   }, [esRechazado, watchSolicitud, form]);
 
-  // Si hay algún audio rechazado, obligamos a devolver al asesor
   useEffect(() => {
     const hayRechazados = audiosQA.some((a) => a.conforme === false);
     if (hayRechazados && !watchSolicitud) {
@@ -544,7 +576,6 @@ export function VentaFormBackoffice({
     }
   }, [audiosQA, watchSolicitud, form]);
 
-  // Función que llama el hijo (AudioItemQA) para actualizar el estado del Padre
   const handleQAUpdate = (id: number, conforme: boolean, motivo: string) => {
     setAudiosQA((prev) =>
       prev.map((a) => (a.id === id ? { ...a, conforme, motivo } : a)),
@@ -552,7 +583,6 @@ export function VentaFormBackoffice({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
-    // 1. SI VA A DEVOLVER AL ASESOR (CORRECCIÓN)
     if (values.solicitud_correccion) {
       if (!values.comentario_gestion?.trim()) {
         form.setError("comentario_gestion", {
@@ -562,7 +592,6 @@ export function VentaFormBackoffice({
         return toast.error("Debe indicar qué debe corregir el asesor.");
       }
 
-      // Asegurar que los audios no conformes tengan motivo
       const audioRechazadoSinMotivo = audiosQA.find(
         (a) => a.conforme === false && !a.motivo?.trim(),
       );
@@ -573,7 +602,6 @@ export function VentaFormBackoffice({
         );
       }
     } else {
-      // 2. SI VA A PROCESAR LA VENTA (NO ES CORRECCIÓN)
       if (!values.id_estado_sot) {
         setTab("gestion");
         return toast.error(
@@ -581,7 +609,6 @@ export function VentaFormBackoffice({
         );
       }
 
-      // Validaciones operativas si no se está rechazando
       if (!esRechazado) {
         if (!values.codigo_sot)
           return toast.error("El Código SOT es obligatorio para procesar.");
@@ -605,24 +632,34 @@ export function VentaFormBackoffice({
       }
     }
 
-    // Validaciones lógicas de fechas
-    const fVenta = venta.fecha_venta ? new Date(venta.fecha_venta) : null;
-    const fVisita = values.fecha_visita_programada
-      ? new Date(values.fecha_visita_programada)
-      : null;
-    /*const fInst = values.fecha_real_inst
-      ? new Date(values.fecha_real_inst)
-      : null;*/
-    const fRechazo = values.fecha_rechazo
-      ? new Date(values.fecha_rechazo)
-      : null;
+    const getStartOfDay = (dateString?: string | null) => {
+      if (!dateString) return null;
+      const str = dateString.includes("T")
+        ? dateString
+        : `${dateString}T00:00:00`;
+      const d = new Date(str);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    const fVenta = getStartOfDay(venta.fecha_venta);
+    const fVisita = getStartOfDay(values.fecha_visita_programada);
+    const fInst = getStartOfDay(values.fecha_real_inst);
+    const fRechazo = getStartOfDay(values.fecha_rechazo);
 
     if (fVenta && fVisita && fVisita < fVenta)
-      return toast.error("La visita programada no puede ser antes de la venta");
+      return toast.error(
+        "La visita programada no puede ser anterior a la fecha de venta.",
+      );
+    if (fVenta && fInst && fInst < fVenta)
+      return toast.error(
+        "La fecha de instalación no puede ser anterior a la fecha de venta.",
+      );
     if (fVenta && fRechazo && fRechazo < fVenta)
-      return toast.error("El rechazo no puede ser antes de la venta");
+      return toast.error(
+        "La fecha de rechazo no puede ser anterior a la fecha de venta.",
+      );
 
-    // Mapear audiosQA para el backend
     const audiosPayload = audiosQA.map((a) => ({
       id: a.id,
       nombre_etiqueta: a.nombre_etiqueta,
@@ -646,7 +683,7 @@ export function VentaFormBackoffice({
         audio_subido: values.audio_subido,
         id_estado_audios: values.id_estado_audios ?? null,
         observacion_audios: values.observacion_audios || null,
-        audios: audiosPayload, // <-- ¡AQUÍ VIAJA LA CALIFICACIÓN DE LOS AUDIOS!
+        audios: audiosPayload,
       });
       toast.success(
         values.solicitud_correccion
@@ -655,11 +692,12 @@ export function VentaFormBackoffice({
       );
       onClose();
     } catch (err) {
-      extractApiError(err);
+      toast.error(extractApiError(err));
     }
   });
 
   if (!open) return null;
+  // const errorsObj = form.formState.errors;
 
   return (
     <>
