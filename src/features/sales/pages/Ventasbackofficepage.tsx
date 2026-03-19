@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, RefreshCw, Filter, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,17 @@ import { DataTable } from "../components/VentasTable";
 import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 
-// ── Componentes de UI Internos ──
+// ── Debounce hook ─────────────────────────────────────────────────────────────
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
 function FilterChip({
   label,
   active,
@@ -71,31 +81,76 @@ function Select({
   );
 }
 
-export function VentasBackofficePage() {
+// ── Filtros extendidos (flag _pendientes es solo local, no va a la API) ───────
+interface FiltrosLocales extends VentaFiltros {
+  _pendientes?: boolean;
+}
+
+function buildFiltrosApi(f: FiltrosLocales): VentaFiltros {
+  const { _pendientes, ...rest } = f;
+  if (_pendientes) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id_estado_sot, ...sinEstado } = rest;
+    return { ...sinEstado, id_estado_sot__isnull: true } as VentaFiltros;
+  }
+  return rest;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface VentasBackofficePageProps {
+  /** DUEÑO: puede ver pero no gestionar ventas */
+  soloLectura?: boolean;
+}
+
+export function VentasBackofficePage({
+  soloLectura = false,
+}: VentasBackofficePageProps) {
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
     null,
   );
-  const [filtros, setFiltros] = useState<VentaFiltros>({});
+  const [filtros, setFiltros] = useState<FiltrosLocales>({});
   const [busqueda, setBusqueda] = useState("");
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, refetch } = useVentas({ ...filtros, page });
+  // Debounce 350ms: la petición se lanza solo cuando el usuario para de escribir
+  const busquedaDebounced = useDebounce(busqueda, 350);
+
+  // Sincroniza filtro search con el valor debounced (salta el primer render)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setFiltros((f) => ({ ...f, search: busquedaDebounced || undefined }));
+    setPage(1);
+  }, [busquedaDebounced]);
+
+  const filtrosApi = buildFiltrosApi({ ...filtros, page });
+
+  const { data, isLoading, refetch } = useVentas(filtrosApi);
   const { data: estadosSOT = [] } = useEstadosSOT();
   const { data: estadosAudio = [] } = useEstadosAudio();
-  const { data: productos = [] } = useProductos();
+  const { data: productosRaw = [] } = useProductos();
+
+  const productos = Array.isArray(productosRaw)
+    ? productosRaw
+    : ((productosRaw as { results?: typeof productosRaw }).results ?? []);
 
   const ventas = data?.results ?? [];
 
-  const filtrosActivos = Object.entries(filtros).filter(
-    ([k, v]) => v !== undefined && v !== "" && v !== null && k !== "search",
-  ).length;
-
-  const handleBuscar = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFiltros((f) => ({ ...f, search: busqueda }));
-    setPage(1);
-  };
+  const filtrosActivos =
+    Object.entries(filtros).filter(
+      ([k, v]) =>
+        v !== undefined &&
+        v !== "" &&
+        v !== null &&
+        k !== "search" &&
+        k !== "page" &&
+        k !== "_pendientes",
+    ).length + (filtros._pendientes ? 1 : 0);
 
   const limpiarFiltros = () => {
     setFiltros({});
@@ -107,8 +162,10 @@ export function VentasBackofficePage() {
   const idAtendido = estadosSOT.find((e) => e.codigo === "ATENDIDO")?.id;
   const idRechazado = estadosSOT.find((e) => e.codigo === "RECHAZADO")?.id;
 
-  const columns = buildColumnsBackoffice(estadosSOT, (v) =>
-    setVentaSeleccionada(v),
+  const columns = buildColumnsBackoffice(
+    estadosSOT,
+    estadosAudio,
+    soloLectura ? null : (v) => setVentaSeleccionada(v),
   );
 
   return (
@@ -118,21 +175,26 @@ export function VentasBackofficePage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <p className="font-mono text-[11px] tracking-widest uppercase text-primary mb-1.5 font-semibold">
-              Backoffice & Control
+              {soloLectura ? "Visión Global" : "Backoffice & Control"}
             </p>
             <h1 className="font-serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-1.5">
               Gestión de Ventas
             </h1>
             <p className="text-sm text-muted-foreground font-light">
-              {data?.count !== undefined ? (
+              {isLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-16 h-4 rounded bg-muted/60 animate-pulse inline-block" />
+                  <span className="text-muted-foreground/50">
+                    ventas encontradas
+                  </span>
+                </span>
+              ) : (
                 <>
                   <strong className="text-primary font-mono font-semibold">
-                    {data.count}
+                    {data?.count ?? 0}
                   </strong>{" "}
                   ventas encontradas
                 </>
-              ) : (
-                "Cargando…"
               )}
             </p>
           </div>
@@ -155,15 +217,18 @@ export function VentasBackofficePage() {
           />
           <FilterChip
             label="Pendientes"
-            active={filtros.id_estado_sot === "null"}
+            active={!!filtros._pendientes}
             colorClass="text-amber-500"
             bgClass="bg-amber-500/10"
             onClick={() =>
-              setFiltros((f) => ({
-                ...f,
-                id_estado_sot: f.id_estado_sot === "null" ? undefined : "null",
-                solicitud_correccion: undefined,
-              }))
+              setFiltros((f) => {
+                if (f._pendientes) {
+                  const { _pendientes, ...rest } = f;
+                  return rest;
+                }
+                const { id_estado_sot, solicitud_correccion, ...rest } = f;
+                return { ...rest, _pendientes: true };
+              })
             }
           />
           {idEjecucion && (
@@ -173,13 +238,16 @@ export function VentasBackofficePage() {
               colorClass="text-blue-500"
               bgClass="bg-blue-500/10"
               onClick={() =>
-                setFiltros((f) => ({
-                  ...f,
-                  id_estado_sot:
-                    f.id_estado_sot === String(idEjecucion)
-                      ? undefined
-                      : String(idEjecucion),
-                }))
+                setFiltros((f) => {
+                  const { _pendientes, ...rest } = f;
+                  return {
+                    ...rest,
+                    id_estado_sot:
+                      f.id_estado_sot === String(idEjecucion)
+                        ? undefined
+                        : String(idEjecucion),
+                  };
+                })
               }
             />
           )}
@@ -190,13 +258,16 @@ export function VentasBackofficePage() {
               colorClass="text-emerald-500"
               bgClass="bg-emerald-500/10"
               onClick={() =>
-                setFiltros((f) => ({
-                  ...f,
-                  id_estado_sot:
-                    f.id_estado_sot === String(idAtendido)
-                      ? undefined
-                      : String(idAtendido),
-                }))
+                setFiltros((f) => {
+                  const { _pendientes, ...rest } = f;
+                  return {
+                    ...rest,
+                    id_estado_sot:
+                      f.id_estado_sot === String(idAtendido)
+                        ? undefined
+                        : String(idAtendido),
+                  };
+                })
               }
             />
           )}
@@ -207,13 +278,16 @@ export function VentasBackofficePage() {
               colorClass="text-destructive"
               bgClass="bg-destructive/10"
               onClick={() =>
-                setFiltros((f) => ({
-                  ...f,
-                  id_estado_sot:
-                    f.id_estado_sot === String(idRechazado)
-                      ? undefined
-                      : String(idRechazado),
-                }))
+                setFiltros((f) => {
+                  const { _pendientes, ...rest } = f;
+                  return {
+                    ...rest,
+                    id_estado_sot:
+                      f.id_estado_sot === String(idRechazado)
+                        ? undefined
+                        : String(idRechazado),
+                  };
+                })
               }
             />
           )}
@@ -223,12 +297,14 @@ export function VentasBackofficePage() {
             colorClass="text-orange-500"
             bgClass="bg-orange-500/10"
             onClick={() =>
-              setFiltros((f) => ({
-                ...f,
-                solicitud_correccion:
-                  f.solicitud_correccion === true ? undefined : true,
-                id_estado_sot: undefined,
-              }))
+              setFiltros((f) => {
+                if (f.solicitud_correccion === true) {
+                  const { solicitud_correccion, ...rest } = f;
+                  return rest;
+                }
+                const { id_estado_sot, _pendientes, ...rest } = f;
+                return { ...rest, solicitud_correccion: true };
+              })
             }
           />
         </div>
@@ -236,28 +312,31 @@ export function VentasBackofficePage() {
         {/* ── BÚSQUEDA Y FILTROS AVANZADOS ── */}
         <div className="flex flex-col gap-3 bg-card border border-border p-3 rounded-2xl shadow-sm">
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            <form
-              onSubmit={handleBuscar}
-              className="flex-1 w-full relative flex items-center gap-2"
-            >
+            {/* Input live — filtra en tiempo real, sin form ni submit */}
+            <div className="flex-1 w-full relative flex items-center">
               <Search
                 size={16}
-                className="absolute left-4 text-muted-foreground"
+                className="absolute left-4 text-muted-foreground pointer-events-none"
               />
               <input
                 type="text"
                 placeholder="Buscar por cliente, DNI, SOT, SEC, asesor…"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full h-11 bg-background border border-border rounded-xl pl-11 pr-4 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                className="w-full h-11 bg-background border border-border rounded-xl pl-11 pr-10 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
               />
-              <button
-                type="submit"
-                className="hidden lg:block h-11 px-6 rounded-xl bg-muted border border-border text-xs font-semibold hover:bg-muted/80 transition-colors"
-              >
-                Buscar
-              </button>
-            </form>
+              {busqueda && (
+                <button
+                  type="button"
+                  onClick={() => setBusqueda("")}
+                  className="absolute right-3.5 text-muted-foreground/50 hover:text-foreground transition-colors"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
             <div className="flex w-full sm:w-auto gap-2">
               <button
                 onClick={() => setMostrarFiltros(!mostrarFiltros)}
@@ -268,7 +347,7 @@ export function VentasBackofficePage() {
                     : "bg-background border-border text-muted-foreground hover:bg-muted",
                 )}
               >
-                <Filter size={14} /> Filtros{" "}
+                <Filter size={14} /> Filtros
                 {filtrosActivos > 0 && (
                   <span className="w-4 h-4 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px]">
                     {filtrosActivos}
@@ -280,7 +359,7 @@ export function VentasBackofficePage() {
                   onClick={limpiarFiltros}
                   className="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-transparent border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
                 >
-                  <X size={14} />{" "}
+                  <X size={14} />
                   <span className="hidden sm:inline">Limpiar</span>
                 </button>
               )}
@@ -295,16 +374,31 @@ export function VentasBackofficePage() {
                 </label>
                 <Select
                   value={
-                    filtros.id_estado_sot
-                      ? String(filtros.id_estado_sot)
-                      : "todos"
+                    filtros._pendientes
+                      ? "null"
+                      : filtros.id_estado_sot
+                        ? String(filtros.id_estado_sot)
+                        : "todos"
                   }
-                  onChange={(v) =>
-                    setFiltros({
-                      ...filtros,
-                      id_estado_sot: v === "todos" ? undefined : v,
-                    })
-                  }
+                  onChange={(v) => {
+                    if (v === "todos") {
+                      setFiltros((f) => {
+                        const { id_estado_sot, _pendientes, ...rest } = f;
+                        return rest;
+                      });
+                    } else if (v === "null") {
+                      setFiltros((f) => {
+                        const { id_estado_sot, solicitud_correccion, ...rest } =
+                          f;
+                        return { ...rest, _pendientes: true };
+                      });
+                    } else {
+                      setFiltros((f) => {
+                        const { _pendientes, ...rest } = f;
+                        return { ...rest, id_estado_sot: v };
+                      });
+                    }
+                  }}
                   placeholder="Todos los estados"
                 >
                   <option value="null">Sin estado (pendiente)</option>
@@ -358,7 +452,7 @@ export function VentasBackofficePage() {
                 >
                   {productos.map((p) => (
                     <option key={p.id} value={String(p.id)}>
-                      {p.nombre_plan}
+                      {p.nombre_paquete}
                     </option>
                   ))}
                 </Select>
@@ -405,7 +499,7 @@ export function VentasBackofficePage() {
       </div>
 
       {/* ── MODAL BACKOFFICE ── */}
-      {ventaSeleccionada && (
+      {ventaSeleccionada && !soloLectura && (
         <VentaFormBackoffice
           key={ventaSeleccionada.id}
           open={!!ventaSeleccionada}

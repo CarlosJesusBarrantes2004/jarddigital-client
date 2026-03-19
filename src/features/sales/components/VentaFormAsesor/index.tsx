@@ -26,7 +26,7 @@ import {
   useProductos,
   useGrabadores,
 } from "../../hooks/useSales";
-import type { Venta } from "../../types/sales.types";
+import type { Venta, AudioVentaForm } from "../../types/sales.types";
 import {
   ETIQUETAS_AUDIO_DNI as ETIQUETAS_DNI,
   ETIQUETAS_AUDIO_RUC as ETIQUETAS_RUC,
@@ -36,73 +36,104 @@ import { AudioUploadField } from "./AudioUploadField";
 import { Button } from "@/components/ui/button";
 import { extractApiError } from "@/lib/api-errors";
 
-// ── Zod schema ────────────────────────────────────────────────────────────────
 const schema = z
   .object({
-    id_producto: z.number({ message: "Selecciona un producto" }),
-    tecnologia: z.string().min(1, "Selecciona tecnología"),
-    id_tipo_documento: z.number({
-      message: "Selecciona tipo de documento",
-    }),
-    cliente_numero_doc: z.string().min(1, "Número de documento requerido"),
-    cliente_nombre: z.string().min(2, "Nombre requerido"),
-    cliente_telefono: z.string().min(7, "Teléfono requerido"),
+    id_producto: z
+      .number({ error: "Requerido" })
+      .min(1, "Selecciona un producto"),
+    tecnologia: z
+      .string({ error: "Requerido" })
+      .min(1, "Selecciona tecnología"),
+    id_tipo_documento: z
+      .number({ error: "Requerido" })
+      .min(1, "Selecciona tipo de documento"),
+    cliente_numero_doc: z.string().min(1, "Número requerido"),
+    cliente_nombre: z.string().min(2, "Nombre muy corto"),
+    cliente_telefono: z.string().min(7, "Teléfono inválido"),
     cliente_email: z.string().email("Email inválido"),
-    cliente_fecha_nacimiento: z
-      .string()
-      .min(1, "Fecha de nacimiento requerida"),
-    cliente_genero: z.string().min(1, "Selecciona el género"), // <-- NUEVO
+    cliente_fecha_nacimiento: z.string().min(1, "Fecha requerida"),
+    cliente_genero: z.string().min(1, "Selecciona el género"),
     cliente_papa: z.string().min(2, "Nombre del padre requerido"),
     cliente_mama: z.string().min(2, "Nombre de la madre requerido"),
     numero_instalacion: z.string().min(1, "Número de instalación requerido"),
-    cant_decos_adicionales: z.number().min(0),
-    cant_repetidores_adicionales: z.number().min(0),
-    representante_legal_dni: z.string().nullable().optional(),
-    representante_legal_nombre: z.string().nullable().optional(),
 
-    dep_inst_id: z.number().nullable(),
-    prov_inst_id: z.number().nullable(),
-    id_distrito_instalacion: z
-      .number({ message: "Selecciona distrito de instalación" })
-      .nullable(),
+    cant_decos_adicionales: z.number().optional().default(0),
+    cant_repetidores_adicionales: z.number().optional().default(0),
 
-    dep_nac_id: z.number().nullable(),
-    prov_nac_id: z.number().nullable(),
-    id_distrito_nacimiento: z.number().nullable(),
+    representante_legal_dni: z.string().optional(),
+    representante_legal_nombre: z.string().optional(),
+
+    // Campos auxiliares de ubigeo — solo para el form, no van al backend
+    dep_inst_id: z.number().optional(),
+    prov_inst_id: z.number().optional(),
+    // optional() sin refine: la validación de "requerido" se hace en handleCustomSubmit
+    id_distrito_instalacion: z.number().optional(),
+
+    dep_nac_id: z.number().optional(),
+    prov_nac_id: z.number().optional(),
+    id_distrito_nacimiento: z.number().optional(),
 
     referencias: z.string().optional(),
-    plano: z.string().min(1, "Número de plano requerido"),
+    plano: z.string().min(1, "Requerido"),
     direccion_detalle: z.string().min(5, "Dirección requerida"),
     coordenadas_gps: z.string().optional(),
-    es_full_claro: z.boolean(),
+    es_full_claro: z.boolean().default(false),
     score_crediticio: z.string().optional(),
 
-    id_grabador_audios: z.number({ message: "Selecciona grabador" }),
-    nombre_grabador_externo: z.string().nullable().optional(),
+    id_grabador_audios: z
+      .number({ error: "Selecciona un grabador" })
+      .min(1, "Selecciona un grabador"),
+    nombre_grabador_externo: z.string().optional(),
 
-    audio_urls: z.array(z.string()),
+    audio_urls: z.array(z.string().optional()).optional(),
   })
-  .refine((d) => d.id_distrito_instalacion !== null, {
-    message: "Selecciona el distrito de instalación",
-    path: ["id_distrito_instalacion"],
-  })
+  .refine(
+    (d) => {
+      const esRuc = d.id_tipo_documento === 3;
+      if (
+        esRuc &&
+        (!d.representante_legal_dni || d.representante_legal_dni.trim() === "")
+      )
+        return false;
+      return true;
+    },
+    { message: "Requerido para RUC", path: ["representante_legal_dni"] },
+  )
+  .refine(
+    (d) => {
+      const esRuc = d.id_tipo_documento === 3;
+      if (
+        esRuc &&
+        (!d.representante_legal_nombre ||
+          d.representante_legal_nombre.trim() === "")
+      )
+        return false;
+      return true;
+    },
+    { message: "Requerido para RUC", path: ["representante_legal_nombre"] },
+  )
   .refine(
     (d) => {
       if (
         d.id_grabador_audios === 1 &&
         (!d.nombre_grabador_externo || d.nombre_grabador_externo.trim() === "")
-      ) {
+      )
         return false;
-      }
       return true;
     },
-    {
-      message: "Especifica el nombre del grabador",
-      path: ["nombre_grabador_externo"],
-    },
+    { message: "Especifica el nombre", path: ["nombre_grabador_externo"] },
   );
 
 type FormValues = z.infer<typeof schema>;
+
+// Tipo local para los audios del payload — reemplaza schema._type que no existe en Zod v4
+type AudioPayloadItem = {
+  id?: number;
+  nombre_etiqueta: string;
+  url_audio: string;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const PASOS = [
   { id: "cliente", label: "Cliente", icon: User },
@@ -118,9 +149,13 @@ function FieldLabel({
   required?: boolean;
 }) {
   return (
-    <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-1.5">
+    <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-1.5 flex items-center">
       {children}
-      {required && <span className="text-destructive ml-1">*</span>}
+      {required && (
+        <span className="text-destructive ml-1 text-[14px] leading-none">
+          *
+        </span>
+      )}
     </p>
   );
 }
@@ -154,8 +189,9 @@ function TextInput({
         )}
       />
       {error && (
-        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
-          <AlertTriangle size={10} /> {error}
+        <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />{" "}
+          <span>{error}</span>
         </p>
       )}
     </div>
@@ -190,7 +226,7 @@ function NativeSelect({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           className={cn(
-            "w-full h-10 pl-3.5 pr-10 rounded-xl bg-background border text-sm font-sans outline-none appearance-none transition-all duration-200 focus:ring-4 focus:ring-primary/10",
+            "w-full h-11 pl-3.5 pr-10 rounded-xl bg-background border text-sm font-sans outline-none appearance-none transition-all duration-200 focus:ring-4 focus:ring-primary/10",
             disabled
               ? "cursor-not-allowed bg-muted opacity-60"
               : "cursor-pointer hover:border-primary/50",
@@ -209,8 +245,9 @@ function NativeSelect({
         />
       </div>
       {error && (
-        <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
-          <AlertTriangle size={10} /> {error}
+        <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />{" "}
+          <span>{error}</span>
         </p>
       )}
     </div>
@@ -308,7 +345,6 @@ export function VentaFormAsesor({
   const esRechazada = ventaOrigen?.codigo_estado?.toUpperCase() === "RECHAZADO";
   const esReingreso = !!ventaOrigen && esRechazada;
   const esEdicion = !!ventaOrigen && !esRechazada;
-
   const esEjecucion = ventaOrigen?.codigo_estado?.toUpperCase() === "EJECUCION";
   const soloAudios = esEdicion && esEjecucion;
   const esVentaNuevaPura = !ventaOrigen;
@@ -320,7 +356,6 @@ export function VentaFormAsesor({
 
   const { data: tiposDoc = [] } = useTiposDocumento();
   const { data: productos = [] } = useProductos();
-
   const grabadorActualId = ventaOrigen?.id_grabador_audios ?? null;
   const { data: grabadores = [] } = useGrabadores(grabadorActualId);
 
@@ -329,27 +364,30 @@ export function VentaFormAsesor({
 
   const [audioIds, setAudioIds] = useState<(number | undefined)[]>([]);
   const [audioUrls, setAudioUrls] = useState<(string | null)[]>([]);
+  const [audioTokens, setAudioTokens] = useState<(string | undefined)[]>([]);
   const [audioUploading, setAudioUploading] = useState<boolean[]>([]);
   const [audioErrors, setAudioErrors] = useState<(string | null)[]>([]);
   const [audioRechazados, setAudioRechazados] = useState<boolean[]>([]);
   const [audioMotivos, setAudioMotivos] = useState<(string | null)[]>([]);
 
   const isInitialMount = useRef(true);
+  const prevLengthRef = useRef(0);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    mode: "onSubmit",
     defaultValues: {
       cant_decos_adicionales: 0,
       cant_repetidores_adicionales: 0,
       es_full_claro: false,
       audio_urls: [],
-      dep_inst_id: null,
-      prov_inst_id: null,
-      id_distrito_instalacion: null,
-      dep_nac_id: null,
-      prov_nac_id: null,
-      id_distrito_nacimiento: null,
-      cliente_genero: "", // <-- NUEVO DEFAULT
+      dep_inst_id: undefined,
+      prov_inst_id: undefined,
+      id_distrito_instalacion: undefined,
+      dep_nac_id: undefined,
+      prov_nac_id: undefined,
+      id_distrito_nacimiento: undefined,
+      cliente_genero: "",
     },
   });
 
@@ -358,21 +396,24 @@ export function VentaFormAsesor({
   const tipoDoc = tiposDoc.find((t) => t.id === tipoDocId);
   const esRUC = tipoDoc?.codigo?.toUpperCase() === "RUC";
   const etiquetasAudio = esRUC ? ETIQUETAS_RUC : ETIQUETAS_DNI;
-
   const isGrabadorOtros = form.watch("id_grabador_audios") === 1;
 
   const campanasDisponibles = useMemo(() => {
-    const campanas = productos.map((p) => p.nombre_campana).filter(Boolean);
-    return Array.from(new Set(campanas));
+    return Array.from(
+      new Set(productos.map((p) => p.nombre_campana).filter(Boolean)),
+    );
   }, [productos]);
 
   const solucionesDisponibles = useMemo(() => {
     if (!filtroCampana) return [];
-    const soluciones = productos
-      .filter((p) => p.nombre_campana === filtroCampana)
-      .map((p) => p.tipo_solucion)
-      .filter(Boolean);
-    return Array.from(new Set(soluciones));
+    return Array.from(
+      new Set(
+        productos
+          .filter((p) => p.nombre_campana === filtroCampana)
+          .map((p) => p.tipo_solucion)
+          .filter(Boolean),
+      ),
+    );
   }, [productos, filtroCampana]);
 
   const productosFiltrados = useMemo(() => {
@@ -384,6 +425,7 @@ export function VentaFormAsesor({
     );
   }, [productos, filtroCampana, filtroSolucion]);
 
+  // ── INICIALIZACIÓN ──
   useEffect(() => {
     if (!open) return;
 
@@ -418,7 +460,7 @@ export function VentaFormAsesor({
         cliente_email: v.cliente_email,
         cliente_fecha_nacimiento:
           v.cliente_fecha_nacimiento?.split("T")[0] ?? "",
-        cliente_genero: v.cliente_genero ?? "", // <-- Precargar género
+        cliente_genero: v.cliente_genero ?? "",
         cliente_papa: v.cliente_papa,
         cliente_mama: v.cliente_mama,
         numero_instalacion: v.numero_instalacion,
@@ -434,12 +476,14 @@ export function VentaFormAsesor({
         score_crediticio: v.score_crediticio ?? "",
         id_grabador_audios: v.id_grabador_audios,
         nombre_grabador_externo: nombreExterno,
-        dep_inst_id: null,
-        prov_inst_id: null,
+        // FIX ERROR 2: usamos undefined en lugar de null para campos opcionales
+        dep_inst_id: undefined,
+        prov_inst_id: undefined,
         id_distrito_instalacion: v.id_distrito_instalacion,
-        dep_nac_id: null,
-        prov_nac_id: null,
-        id_distrito_nacimiento: v.id_distrito_nacimiento ?? null,
+        dep_nac_id: undefined,
+        prov_nac_id: undefined,
+        // id_distrito_nacimiento puede ser null en la BD, lo convertimos a undefined
+        id_distrito_nacimiento: v.id_distrito_nacimiento ?? undefined,
         audio_urls: [],
       });
 
@@ -448,11 +492,20 @@ export function VentaFormAsesor({
           .find((t) => t.id === v.id_tipo_documento)
           ?.codigo?.toUpperCase() === "RUC";
       const etiquetasReales = isOrigenRuc ? ETIQUETAS_RUC : ETIQUETAS_DNI;
+      prevLengthRef.current = etiquetasReales.length;
 
-      const newUrls = Array(etiquetasReales.length).fill(null);
-      const newIds = Array(etiquetasReales.length).fill(undefined);
-      const newRechazados = Array(etiquetasReales.length).fill(false);
-      const newMotivos = Array(etiquetasReales.length).fill(null);
+      const newUrls: (string | null)[] = Array(etiquetasReales.length).fill(
+        null,
+      );
+      const newIds: (number | undefined)[] = Array(etiquetasReales.length).fill(
+        undefined,
+      );
+      const newRechazados: boolean[] = Array(etiquetasReales.length).fill(
+        false,
+      );
+      const newMotivos: (string | null)[] = Array(etiquetasReales.length).fill(
+        null,
+      );
 
       etiquetasReales.forEach((etiqueta, i) => {
         const audioDB = v.audios.find((a) => a.nombre_etiqueta === etiqueta);
@@ -466,29 +519,44 @@ export function VentaFormAsesor({
 
       setAudioUrls(newUrls);
       setAudioIds(newIds);
+      setAudioTokens(Array(etiquetasReales.length).fill(undefined));
       setAudioRechazados(newRechazados);
       setAudioMotivos(newMotivos);
       setAudioUploading(Array(etiquetasReales.length).fill(false));
       setAudioErrors(Array(etiquetasReales.length).fill(null));
-
       setTimeout(() => {
         isInitialMount.current = false;
-      }, 300);
+      }, 500);
     } else {
-      isInitialMount.current = false;
+      isInitialMount.current = true;
       setPaso(0);
       const draftStr = sessionStorage.getItem("jard_venta_draft");
+
       if (draftStr) {
         try {
           const parsed = JSON.parse(draftStr);
           form.reset(parsed.form);
           setFiltroCampana(parsed.campana || "");
           setFiltroSolucion(parsed.solucion || "");
-
-          if (parsed.audios && parsed.audios.length === etiquetasAudio.length) {
+          const docTypeDraft = tiposDoc
+            .find((t) => t.id === parsed.form.id_tipo_documento)
+            ?.codigo?.toUpperCase();
+          const draftLength =
+            docTypeDraft === "RUC"
+              ? ETIQUETAS_RUC.length
+              : ETIQUETAS_DNI.length;
+          prevLengthRef.current = draftLength;
+          if (parsed.audios && parsed.audios.length === draftLength) {
             setAudioUrls(parsed.audios);
+            setAudioTokens(parsed.tokens || Array(draftLength).fill(undefined));
+            setAudioIds(Array(draftLength).fill(undefined));
+            setAudioRechazados(Array(draftLength).fill(false));
+            setAudioMotivos(Array(draftLength).fill(null));
+            setAudioUploading(Array(draftLength).fill(false));
+            setAudioErrors(Array(draftLength).fill(null));
           } else {
-            setAudioUrls(Array(etiquetasAudio.length).fill(null));
+            setAudioUrls(Array(draftLength).fill(null));
+            setAudioTokens(Array(draftLength).fill(undefined));
           }
         } catch (e) {
           console.error("Error parseando borrador", e);
@@ -498,34 +566,41 @@ export function VentaFormAsesor({
         setFiltroCampana("");
         setFiltroSolucion("");
         setAudioUrls(Array(etiquetasAudio.length).fill(null));
+        setAudioTokens(Array(etiquetasAudio.length).fill(undefined));
+        prevLengthRef.current = etiquetasAudio.length;
       }
+      setTimeout(() => {
+        isInitialMount.current = false;
+      }, 500);
     }
   }, [open, ventaOrigen, esEdicion, esReingreso, productos, form, tiposDoc]);
 
   useEffect(() => {
     if (isInitialMount.current) return;
-
-    if (audioUrls.length !== etiquetasAudio.length) {
+    if (prevLengthRef.current !== etiquetasAudio.length) {
       setAudioUrls(Array(etiquetasAudio.length).fill(null));
       setAudioIds(Array(etiquetasAudio.length).fill(undefined));
+      setAudioTokens(Array(etiquetasAudio.length).fill(undefined));
       setAudioRechazados(Array(etiquetasAudio.length).fill(false));
       setAudioMotivos(Array(etiquetasAudio.length).fill(null));
+      prevLengthRef.current = etiquetasAudio.length;
     }
-  }, [etiquetasAudio.length, audioUrls.length]);
+  }, [etiquetasAudio.length]);
 
   useEffect(() => {
-    if (open && esVentaNuevaPura) {
+    if (open && esVentaNuevaPura && !isInitialMount.current) {
       const timer = setTimeout(() => {
         sessionStorage.setItem(
           "jard_venta_draft",
           JSON.stringify({
-            form: watchedValues,
+            form: form.getValues(),
             audios: audioUrls,
+            tokens: audioTokens,
             campana: filtroCampana,
             solucion: filtroSolucion,
           }),
         );
-      }, 800);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [
@@ -533,8 +608,10 @@ export function VentaFormAsesor({
     esVentaNuevaPura,
     watchedValues,
     audioUrls,
+    audioTokens,
     filtroCampana,
     filtroSolucion,
+    form,
   ]);
 
   const handleLimpiarBorrador = () => {
@@ -548,6 +625,7 @@ export function VentaFormAsesor({
     setFiltroCampana("");
     setFiltroSolucion("");
     setAudioUrls(Array(etiquetasAudio.length).fill(null));
+    setAudioTokens(Array(etiquetasAudio.length).fill(undefined));
     setPaso(0);
     toast.success("Borrador limpiado correctamente");
   };
@@ -561,168 +639,231 @@ export function VentaFormAsesor({
     onClose();
   };
 
-  const handleAudioUploaded = useCallback((i: number, url: string) => {
-    setAudioUrls((prev) => {
-      const n = [...prev];
-      n[i] = url;
-      return n;
-    });
-    setAudioUploading((prev) => {
-      const n = [...prev];
-      n[i] = false;
-      return n;
-    });
-    setAudioErrors((prev) => {
-      const n = [...prev];
-      n[i] = null;
-      return n;
-    });
-  }, []);
+  const handleAudioUploaded = useCallback(
+    (i: number, url: string, token?: string) => {
+      setAudioUrls((p) => {
+        const n = [...p];
+        n[i] = url;
+        return n;
+      });
+      setAudioTokens((p) => {
+        const n = [...p];
+        n[i] = token;
+        return n;
+      });
+      setAudioUploading((p) => {
+        const n = [...p];
+        n[i] = false;
+        return n;
+      });
+      setAudioErrors((p) => {
+        const n = [...p];
+        n[i] = null;
+        return n;
+      });
+    },
+    [],
+  );
 
   const handleAudioRemove = useCallback((i: number) => {
-    setAudioUrls((prev) => {
-      const n = [...prev];
+    setAudioUrls((p) => {
+      const n = [...p];
       n[i] = null;
       return n;
     });
-    setAudioRechazados((prev) => {
-      const n = [...prev];
+    setAudioTokens((p) => {
+      const n = [...p];
+      n[i] = undefined;
+      return n;
+    });
+    setAudioRechazados((p) => {
+      const n = [...p];
       n[i] = false;
       return n;
     });
   }, []);
 
   const handleAudioStart = useCallback((i: number) => {
-    setAudioUploading((prev) => {
-      const n = [...prev];
+    setAudioUploading((p) => {
+      const n = [...p];
       n[i] = true;
       return n;
     });
-    setAudioErrors((prev) => {
-      const n = [...prev];
+    setAudioErrors((p) => {
+      const n = [...p];
       n[i] = null;
       return n;
     });
   }, []);
 
   const handleAudioError = useCallback((i: number, err: string) => {
-    setAudioUploading((prev) => {
-      const n = [...prev];
+    setAudioUploading((p) => {
+      const n = [...p];
       n[i] = false;
       return n;
     });
-    setAudioErrors((prev) => {
-      const n = [...prev];
+    setAudioErrors((p) => {
+      const n = [...p];
       n[i] = err;
       return n;
     });
   }, []);
 
-  const todosAudiosListos =
-    audioUrls.length > 0 && audioUrls.every((u) => u !== null && u !== "");
   const algunoSubiendo = audioUploading.some(Boolean);
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!todosAudiosListos) {
-      toast.error(`Debes subir los ${etiquetasAudio.length} audios requeridos`);
-      setPaso(2);
-      return;
-    }
     if (algunoSubiendo) {
-      toast.error("Espera a que terminen de subir los audios");
+      toast.error("Espera a que terminen de subir los audios antes de guardar");
       return;
     }
 
-    const audiosPayload = etiquetasAudio.map((etiqueta, i) => ({
-      id: audioIds[i],
-      nombre_etiqueta: etiqueta,
-      url_audio: audioUrls[i]!,
+    // Validación manual del distrito de instalación (fuera del schema para evitar
+    // el conflicto de tipos con react-hook-form)
+    const values = form.getValues();
+    if (!soloAudios && !values.id_distrito_instalacion) {
+      form.setError("id_distrito_instalacion", {
+        message: "Selecciona un distrito",
+      });
+      setPaso(1);
+      toast.error("Por favor, selecciona el distrito de instalación.");
+      return;
+    }
+
+    const isValid = await form.trigger();
+    if (!isValid) {
+      const errors = form.formState.errors;
+      const paso0Fields = [
+        "id_producto",
+        "tecnologia",
+        "id_tipo_documento",
+        "cliente_numero_doc",
+        "cliente_nombre",
+        "cliente_telefono",
+        "cliente_email",
+        "cliente_fecha_nacimiento",
+        "cliente_genero",
+        "cliente_papa",
+        "cliente_mama",
+        "numero_instalacion",
+        "representante_legal_dni",
+        "representante_legal_nombre",
+        "id_grabador_audios",
+        "nombre_grabador_externo",
+      ];
+      const paso1Fields = [
+        "id_distrito_instalacion",
+        "plano",
+        "direccion_detalle",
+      ];
+      let primerPasoConError = 0;
+      if (Object.keys(errors).some((k) => paso0Fields.includes(k)))
+        primerPasoConError = 0;
+      else if (Object.keys(errors).some((k) => paso1Fields.includes(k)))
+        primerPasoConError = 1;
+      setPaso(primerPasoConError);
+      toast.error("Por favor, revisa los campos en rojo antes de continuar.");
+      return;
+    }
+
+    // FIX ERROR 3: usamos AudioPayloadItem en lugar de schema._type
+    const audiosPayload: AudioPayloadItem[] = etiquetasAudio
+      .map((etiqueta, i) => ({
+        id: audioIds[i], // number | undefined
+        nombre_etiqueta: etiqueta,
+        url_audio: audioUrls[i], // string | null
+      }))
+      .filter((a) => a.url_audio !== null) // descarta los null en runtime
+      .map((a) => ({
+        ...(a.id !== undefined && { id: a.id }), // solo incluye id si existe
+        nombre_etiqueta: a.nombre_etiqueta,
+        url_audio: a.url_audio as string, // seguro porque filtramos null arriba
+      }));
+
+    // AudioVentaForm[] para el API (sin el campo id)
+    const audiosApi: AudioVentaForm[] = audiosPayload.map((a) => ({
+      nombre_etiqueta: a.nombre_etiqueta,
+      url_audio: a.url_audio,
     }));
 
     if (soloAudios) {
       try {
-        await editarVenta({ audios: audiosPayload } as unknown as Parameters<
-          typeof editarVenta
-        >[0]);
+        await editarVenta({ audios: audiosApi });
         toast.success("Audios corregidos y enviados al Backoffice");
         handleClose();
       } catch (err) {
         toast.error(extractApiError(err));
       }
-    } else {
-      form.handleSubmit(async (values) => {
-        try {
-          if (esEdicion) {
-            await editarVenta({
-              ...values,
-              representante_legal_dni: esRUC
-                ? (values.representante_legal_dni ?? null)
-                : null,
-              representante_legal_nombre: esRUC
-                ? (values.representante_legal_nombre ?? null)
-                : null,
-              id_distrito_instalacion: values.id_distrito_instalacion!,
-              id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-              nombre_grabador_externo:
-                values.id_grabador_audios === 1
-                  ? values.nombre_grabador_externo
-                  : null,
-              audios: audiosPayload,
-            });
-            toast.success("Venta actualizada y enviada al Backoffice");
-          } else {
-            await crearVenta({
-              ...values,
-              representante_legal_dni: esRUC
-                ? (values.representante_legal_dni ?? null)
-                : null,
-              representante_legal_nombre: esRUC
-                ? (values.representante_legal_nombre ?? null)
-                : null,
-              id_distrito_instalacion: values.id_distrito_instalacion!,
-              id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-              nombre_grabador_externo:
-                values.id_grabador_audios === 1
-                  ? values.nombre_grabador_externo
-                  : null,
-              audios: audiosPayload,
-              venta_origen: esReingreso ? ventaOrigen!.id : undefined,
-            });
-            toast.success(
-              esReingreso
-                ? "Venta reingresada correctamente"
-                : "Venta creada correctamente",
-            );
+      return;
+    }
 
-            if (esVentaNuevaPura) {
-              sessionStorage.removeItem("jard_venta_draft");
-            }
-          }
-          handleClose();
-        } catch (err) {
-          toast.error(extractApiError(err));
-        }
-      })(e);
+    // FIX ERROR 4: id_distrito_instalacion es number | undefined en el schema,
+    // pero el payload del API espera number. Lo casteamos tras validar que existe.
+    const distritoInstalacion = values.id_distrito_instalacion as number;
+
+    try {
+      const payload = {
+        ...values,
+        representante_legal_dni: esRUC
+          ? (values.representante_legal_dni ?? null)
+          : null,
+        representante_legal_nombre: esRUC
+          ? (values.representante_legal_nombre ?? null)
+          : null,
+        id_distrito_instalacion: distritoInstalacion,
+        // FIX ERROR 4: id_distrito_nacimiento es number | undefined → convertimos a null para el API
+        id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+        nombre_grabador_externo:
+          values.id_grabador_audios === 1
+            ? (values.nombre_grabador_externo ?? null)
+            : null,
+        audios: audiosApi,
+      };
+
+      if (esEdicion) {
+        await editarVenta(payload);
+        toast.success("Venta actualizada y enviada al Backoffice");
+      } else {
+        await crearVenta({
+          ...payload,
+          venta_origen: esReingreso ? ventaOrigen!.id : undefined,
+        });
+        toast.success(
+          esReingreso
+            ? "Venta reingresada correctamente"
+            : "Venta creada correctamente",
+        );
+        if (esVentaNuevaPura) sessionStorage.removeItem("jard_venta_draft");
+      }
+      handleClose();
+    } catch (err) {
+      toast.error(extractApiError(err));
     }
   };
 
   if (!open) return null;
   const errorsObj = form.formState.errors;
 
+  // FIX ERROR 4: UbigeoCascada espera number | null, pero form.watch devuelve
+  // number | undefined cuando el campo es optional(). Normalizamos con ?? null.
+  const depInstId = form.watch("dep_inst_id") ?? null;
+  const provInstId = form.watch("prov_inst_id") ?? null;
+  const depNacId = form.watch("dep_nac_id") ?? null;
+  const provNacId = form.watch("prov_nac_id") ?? null;
+
   return (
     <>
       <div
         onClick={handleClose}
-        className="fixed inset-0 z-[1000] bg-background/60 backdrop-blur-sm animate-in fade-in duration-300"
+        className="fixed inset-0 z-[1000] animate-in fade-in duration-300"
       />
 
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-3xl bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
         {/* ── Header ── */}
         <div className="p-6 border-b border-border bg-card/50 flex flex-col shrink-0">
           <div className="flex items-start justify-between">
-            <div>
+            <div className="w-full pr-4">
               {esEdicion && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/30 mb-2">
                   <AlertTriangle size={10} /> CORRECCIÓN SOLICITADA
@@ -746,9 +887,24 @@ export function VentaFormAsesor({
                 )}
               </h2>
               {esEdicion && ventaOrigen?.comentario_gestion && (
-                <p className="text-xs text-orange-500/80 mt-1.5 max-w-lg leading-relaxed">
-                  💬 {ventaOrigen.comentario_gestion}
-                </p>
+                <div className="mt-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                  <p className="text-xs text-orange-600 dark:text-orange-400 leading-snug">
+                    <strong className="font-bold uppercase tracking-wider text-[10px] block mb-1">
+                      Motivo de corrección:
+                    </strong>
+                    {ventaOrigen.comentario_gestion}
+                  </p>
+                </div>
+              )}
+              {esReingreso && ventaOrigen?.comentario_gestion && (
+                <div className="mt-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                  <p className="text-xs text-destructive leading-snug">
+                    <strong className="font-bold uppercase tracking-wider text-[10px] block mb-1">
+                      Motivo del rechazo original:
+                    </strong>
+                    {ventaOrigen.comentario_gestion}
+                  </p>
+                </div>
               )}
             </div>
             <button
@@ -758,7 +914,6 @@ export function VentaFormAsesor({
               <X size={16} />
             </button>
           </div>
-
           {soloAudios && (
             <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
               <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
@@ -777,6 +932,34 @@ export function VentaFormAsesor({
             const Icon = p.icon;
             const activo = paso === i;
             const completo = paso > i;
+            const paso0Fields = [
+              "id_producto",
+              "tecnologia",
+              "id_tipo_documento",
+              "cliente_numero_doc",
+              "cliente_nombre",
+              "cliente_telefono",
+              "cliente_email",
+              "cliente_fecha_nacimiento",
+              "cliente_genero",
+              "cliente_papa",
+              "cliente_mama",
+              "numero_instalacion",
+              "representante_legal_dni",
+              "representante_legal_nombre",
+              "id_grabador_audios",
+              "nombre_grabador_externo",
+            ];
+            const paso1Fields = [
+              "id_distrito_instalacion",
+              "plano",
+              "direccion_detalle",
+            ];
+            const hasError =
+              (i === 0 &&
+                Object.keys(errorsObj).some((k) => paso0Fields.includes(k))) ||
+              (i === 1 &&
+                Object.keys(errorsObj).some((k) => paso1Fields.includes(k)));
             return (
               <button
                 key={p.id}
@@ -787,12 +970,20 @@ export function VentaFormAsesor({
                   activo
                     ? "border-primary text-primary font-bold"
                     : "border-transparent font-medium hover:border-border",
-                  completo
+                  completo && !hasError
                     ? "text-emerald-500"
-                    : !activo && "text-muted-foreground",
+                    : hasError
+                      ? "text-destructive"
+                      : !activo && "text-muted-foreground",
                 )}
               >
-                {completo ? <Check size={16} /> : <Icon size={16} />}
+                {completo && !hasError ? (
+                  <Check size={16} />
+                ) : hasError ? (
+                  <AlertTriangle size={14} />
+                ) : (
+                  <Icon size={16} />
+                )}
                 {p.label}
               </button>
             );
@@ -816,7 +1007,6 @@ export function VentaFormAsesor({
             >
               <div>
                 <SectionTitle>Plan y Tecnología</SectionTitle>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <NativeSelect
                     label="1. Seleccionar Campaña"
@@ -835,7 +1025,6 @@ export function VentaFormAsesor({
                       </option>
                     ))}
                   </NativeSelect>
-
                   <NativeSelect
                     label="2. Tipo de solución"
                     disabled={!filtroCampana || soloAudios}
@@ -853,7 +1042,6 @@ export function VentaFormAsesor({
                     ))}
                   </NativeSelect>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Controller
                     control={form.control}
@@ -992,8 +1180,6 @@ export function VentaFormAsesor({
                       )}
                     />
                   </div>
-
-                  {/* 👇 AQUÍ AÑADIMOS EL NUEVO CAMPO DE GÉNERO */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Controller
                       control={form.control}
@@ -1031,7 +1217,6 @@ export function VentaFormAsesor({
                       )}
                     />
                   </div>
-
                   <Controller
                     control={form.control}
                     name="numero_instalacion"
@@ -1046,7 +1231,6 @@ export function VentaFormAsesor({
                       />
                     )}
                   />
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Controller
                       control={form.control}
@@ -1161,7 +1345,6 @@ export function VentaFormAsesor({
                     )}
                   />
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Controller
                     control={form.control}
@@ -1225,12 +1408,17 @@ export function VentaFormAsesor({
                       label=""
                       required
                       disabled={soloAudios}
-                      depId={form.watch("dep_inst_id")}
-                      provId={form.watch("prov_inst_id")}
-                      distId={field.value}
-                      onDepChange={(v) => form.setValue("dep_inst_id", v)}
-                      onProvChange={(v) => form.setValue("prov_inst_id", v)}
-                      onDistChange={(v) => field.onChange(v)}
+                      depId={depInstId}
+                      provId={provInstId}
+                      // FIX ERROR 4: field.value es number | undefined → convertimos a null para UbigeoCascada
+                      distId={field.value ?? null}
+                      onDepChange={(v) =>
+                        form.setValue("dep_inst_id", v ?? undefined)
+                      }
+                      onProvChange={(v) =>
+                        form.setValue("prov_inst_id", v ?? undefined)
+                      }
+                      onDistChange={(v) => field.onChange(v ?? undefined)}
                       error={errorsObj.id_distrito_instalacion?.message}
                     />
                   )}
@@ -1294,7 +1482,9 @@ export function VentaFormAsesor({
                   />
                 </div>
               </div>
+
               <Divider />
+
               <div>
                 <SectionTitle>Ubigeo de Nacimiento</SectionTitle>
                 <Controller
@@ -1304,17 +1494,23 @@ export function VentaFormAsesor({
                     <UbigeoCascada
                       label=""
                       disabled={soloAudios}
-                      depId={form.watch("dep_nac_id")}
-                      provId={form.watch("prov_nac_id")}
-                      distId={field.value}
-                      onDepChange={(v) => form.setValue("dep_nac_id", v)}
-                      onProvChange={(v) => form.setValue("prov_nac_id", v)}
-                      onDistChange={(v) => field.onChange(v)}
+                      depId={depNacId}
+                      provId={provNacId}
+                      distId={field.value ?? null}
+                      onDepChange={(v) =>
+                        form.setValue("dep_nac_id", v ?? undefined)
+                      }
+                      onProvChange={(v) =>
+                        form.setValue("prov_nac_id", v ?? undefined)
+                      }
+                      onDistChange={(v) => field.onChange(v ?? undefined)}
                     />
                   )}
                 />
               </div>
+
               <Divider />
+
               <div>
                 <SectionTitle>Evaluación</SectionTitle>
                 <div className="space-y-4">
@@ -1355,14 +1551,18 @@ export function VentaFormAsesor({
               )}
             >
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex flex-col gap-1">
-                <p className="text-sm font-bold text-primary">
-                  {esRUC
-                    ? "14 audios requeridos (RUC)"
-                    : "12 audios requeridos (DNI/CE)"}
-                </p>
-                <p className="text-xs text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-primary">
+                    {esRUC ? "14 audios (RUC)" : "12 audios (DNI/CE)"}
+                  </p>
+                  <span className="text-[10px] font-mono font-bold px-2 py-1 bg-amber-500/10 text-amber-600 rounded-md border border-amber-500/20">
+                    Opcional ahora
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
                   Sube los archivos en formato .mp3 correspondientes al guión.
-                  Usa Drag & Drop.
+                  Puedes guardar la venta y subir los audios más tarde
+                  editándola.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1372,11 +1572,14 @@ export function VentaFormAsesor({
                     etiqueta={etiqueta}
                     index={i}
                     url={audioUrls[i] ?? null}
+                    deleteToken={audioTokens[i]}
                     uploading={audioUploading[i] ?? false}
                     error={audioErrors[i] ?? null}
                     isRechazado={audioRechazados[i]}
                     motivoRechazo={audioMotivos[i]}
-                    onUploaded={(url) => handleAudioUploaded(i, url)}
+                    onUploaded={(url, token) =>
+                      handleAudioUploaded(i, url, token)
+                    }
                     onRemove={() => handleAudioRemove(i)}
                     onUploadStart={() => handleAudioStart(i)}
                     onUploadError={(err) => handleAudioError(i, err)}
@@ -1387,12 +1590,7 @@ export function VentaFormAsesor({
                 <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                   Progreso de Audios
                 </span>
-                <span
-                  className={cn(
-                    "text-sm font-mono font-bold",
-                    todosAudiosListos ? "text-emerald-500" : "text-primary",
-                  )}
-                >
+                <span className="text-sm font-mono font-bold text-primary">
                   {audioUrls.filter(Boolean).length} / {etiquetasAudio.length}
                 </span>
               </div>
@@ -1400,7 +1598,7 @@ export function VentaFormAsesor({
           </form>
         </div>
 
-        {/* ── Footer Controles ── */}
+        {/* ── Footer ── */}
         <div className="p-5 border-t border-border bg-card shrink-0 flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 flex-1">
             <Button
@@ -1409,7 +1607,7 @@ export function VentaFormAsesor({
               className="h-11 rounded-xl px-4 sm:px-5 gap-2"
               onClick={paso > 0 ? () => setPaso(paso - 1) : handleClose}
             >
-              <ChevronLeft size={16} />{" "}
+              <ChevronLeft size={16} />
               <span className="hidden sm:inline">
                 {paso > 0 ? "Atrás" : "Cancelar"}
               </span>
@@ -1447,7 +1645,7 @@ export function VentaFormAsesor({
                 ? "Guardar Corrección"
                 : esReingreso
                   ? "Confirmar Reingreso"
-                  : "Confirmar Venta"}{" "}
+                  : "Guardar Venta"}{" "}
               <Check size={16} />
             </Button>
           )}

@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Pencil, AlertTriangle, RefreshCw } from "lucide-react"; // <-- Importamos RefreshCw
+import { Pencil, AlertTriangle, RefreshCw } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
 import { ActionBtn } from "@/components/ActionBtn";
@@ -9,7 +9,7 @@ import { ActionBtn } from "@/components/ActionBtn";
 export function buildColumnsAsesor(
   estadosSOT: EstadoSOT[],
   onEditar: (v: Venta) => void,
-  onReingresar: (v: Venta) => void, // <-- Añadimos esta nueva prop
+  onReingresar: (v: Venta) => void,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -31,7 +31,6 @@ export function buildColumnsAsesor(
             <p className="font-medium text-[13px] text-foreground leading-snug">
               {row.original.cliente_nombre}
             </p>
-            {/* Si es una venta derivada de otra, mostramos un badge */}
             {row.original.venta_origen && (
               <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full border border-primary/20 uppercase tracking-widest">
                 <RefreshCw size={9} /> Reingreso
@@ -168,25 +167,23 @@ export function buildColumnsAsesor(
       header: "",
       cell: ({ row }) => {
         const v = row.original;
-        const puedeEditar = v.solicitud_correccion;
         const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
-
-        if (!puedeEditar && !esRechazada) return null;
 
         return (
           <div className="flex gap-1.5">
-            {puedeEditar && (
+            {/* Si NO está rechazada (o si está rechazada pero NO tiene permiso), se muestra Editar */}
+            {!esRechazada && (
               <ActionBtn
                 onClick={() => onEditar(v)}
-                variant="warning"
-                title="Corregir venta según indicación"
+                variant="primary"
+                title="Editar Venta o subir audios faltantes"
               >
-                <Pencil size={12} /> Corregir
+                <Pencil size={12} /> Editar
               </ActionBtn>
             )}
 
-            {/* 👇 Nuevo botón de Reingreso para ventas Rechazadas */}
-            {esRechazada && !puedeEditar && (
+            {/* 👇 SOLO APARECE SI ES RECHAZADA Y TIENE EL PERMISO */}
+            {esRechazada && v.permitir_reingreso && (
               <ActionBtn
                 onClick={() => onReingresar(v)}
                 variant="primary"
@@ -194,6 +191,12 @@ export function buildColumnsAsesor(
               >
                 <RefreshCw size={12} /> Reingresar
               </ActionBtn>
+            )}
+
+            {esRechazada && !v.permitir_reingreso && (
+              <span className="text-[10px] font-mono text-destructive/60 uppercase tracking-widest px-2">
+                Rechazada
+              </span>
             )}
           </div>
         );

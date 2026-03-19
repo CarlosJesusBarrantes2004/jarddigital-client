@@ -86,7 +86,7 @@ export const CorporativeConfigPage = () => {
             className="flex-1 md:flex-none gap-2.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none transition-all duration-300"
           >
             <Package size={16} />
-            <span className="hidden sm:inline">Catálogo</span>
+            <span className="hidden sm:inline">Productos</span>
           </TabsTrigger>
         </TabsList>
 
@@ -122,9 +122,8 @@ export const CorporativeConfigPage = () => {
                y paddings, lo renderizamos tal cual. Si ves que se ve raro (doble padding), 
                podrías quitarle las clases de padding al div raíz de ProductosPage.
             */}
-            <div className="-mx-8 -mt-8">
-              <ProductosPage />
-            </div>
+
+            <ProductosPage />
           </TabsContent>
         </div>
       </Tabs>

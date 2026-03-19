@@ -1,14 +1,28 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Eye, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
+import {
+  Eye,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle2,
+  Mic,
+  XCircle,
+} from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
-import type { Venta, EstadoSOT } from "../../types/sales.types";
+import type { Venta, EstadoSOT, EstadoAudio } from "../../types/sales.types";
 import { ActionBtnBackoffice } from "@/components/ActionBtnBackoffice";
+import { cn } from "@/lib/utils";
 
+/**
+ * @param onGestionar  Callback para abrir el form de gestión.
+ *                     Si se pasa `null`, la columna de acciones muestra solo
+ *                     un ícono de "solo lectura" (rol DUEÑO).
+ */
 export function buildColumnsBackoffice(
   estadosSOT: EstadoSOT[],
-  onGestionar: (v: Venta) => void,
+  estadosAudio: EstadoAudio[],
+  onGestionar: ((v: Venta) => void) | null,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -64,7 +78,6 @@ export function buildColumnsBackoffice(
       header: "Plan / Producto",
       cell: ({ row }) => {
         const v = row.original;
-        // Unimos Campaña - Tipo - Paquete
         const nombreCompletoPlan =
           [v.producto_campana, v.producto_solucion, v.producto_paquete]
             .filter(Boolean)
@@ -87,7 +100,7 @@ export function buildColumnsBackoffice(
     },
     {
       accessorKey: "id_estado_sot",
-      header: "Estado",
+      header: "Estado General",
       cell: ({ row }) => {
         const v = row.original;
         const estadoId = v.id_estado_sot;
@@ -126,6 +139,53 @@ export function buildColumnsBackoffice(
       },
     },
     {
+      accessorKey: "id_estado_audios",
+      header: "Audios",
+      cell: ({ row }) => {
+        const v = row.original;
+        const estadoAudioData = estadosAudio.find(
+          (e) => e.id === v.id_estado_audios,
+        );
+        const codigoAudio =
+          estadoAudioData?.codigo.toUpperCase() || "PENDIENTE";
+
+        let colorBadge = "bg-muted text-muted-foreground border-border";
+        let Icon = Mic;
+
+        if (codigoAudio === "CONFORME") {
+          colorBadge =
+            "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+          Icon = CheckCircle2;
+        } else if (codigoAudio === "RECHAZADO") {
+          colorBadge =
+            "bg-destructive/10 text-destructive border-destructive/20";
+          Icon = XCircle;
+        }
+
+        return (
+          <div className="flex flex-col gap-0.5 items-start">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-widest border",
+                colorBadge,
+              )}
+            >
+              <Icon size={10} /> {estadoAudioData?.nombre || "Pendiente"}
+            </span>
+            {v.audio_subido ? (
+              <span className="text-[9px] text-primary/70 mt-1 font-semibold flex items-center gap-1">
+                <CheckCircle2 size={10} /> Subido a Claro
+              </span>
+            ) : (
+              <span className="text-[9px] text-muted-foreground/50 mt-1">
+                Sin subir a Claro
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       id: "codigos",
       header: "SOT / SEC",
       cell: ({ row }) => {
@@ -156,7 +216,6 @@ export function buildColumnsBackoffice(
       header: "Visita",
       cell: ({ row }) => {
         const fechaStr = row.original.fecha_visita_programada;
-
         return fechaStr ? (
           <span className="text-[13px] text-foreground/80">
             {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
@@ -185,6 +244,15 @@ export function buildColumnsBackoffice(
       cell: ({ row }) => {
         const v = row.original;
         const esAtendida = v.codigo_estado?.toUpperCase() === "ATENDIDO";
+
+        // DUEÑO: sin botón de gestión, solo indicador visual
+        if (onGestionar === null) {
+          return (
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+              <Eye size={12} /> Solo lectura
+            </div>
+          );
+        }
 
         if (esAtendida) {
           return (

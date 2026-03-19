@@ -18,8 +18,7 @@ import {
   User,
   Settings,
   Clock,
-  MessageSquare,
-  Download, // <-- ¡NUEVO ICONO IMPORTADO!
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +44,7 @@ const schema = z.object({
   fecha_rechazo: z.string().nullable().optional(),
   comentario_gestion: z.string().nullable().optional(),
   solicitud_correccion: z.boolean(),
+  permitir_reingreso: z.boolean(),
   audio_subido: z.boolean(),
   id_estado_audios: z.number().nullable().optional(),
   observacion_audios: z.string().nullable().optional(),
@@ -127,6 +127,7 @@ function Textarea({
   onChange,
   placeholder,
   rows = 3,
+  required,
 }: {
   label: string;
   error?: string;
@@ -134,10 +135,11 @@ function Textarea({
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  required?: boolean;
 }) {
   return (
     <div>
-      <FieldLabel>{label}</FieldLabel>
+      <FieldLabel required={required}>{label}</FieldLabel>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -298,7 +300,6 @@ interface AudioQA {
   corregido: boolean;
 }
 
-// ── AudioPlayer item para QA (AHORA CON BOTÓN DE DESCARGA) ──────────────────────
 function AudioItemQA({
   audio,
   index,
@@ -310,7 +311,6 @@ function AudioItemQA({
 }) {
   const [playing, setPlaying] = useState(false);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
-
   const isConforme = audio.conforme === true;
   const isNoConforme = audio.conforme === false;
 
@@ -332,7 +332,6 @@ function AudioItemQA({
     }
   };
 
-  // Función mágica para forzar la descarga de un archivo externo
   const handleDownload = async () => {
     try {
       toast.info("Iniciando descarga...", { id: `dl-${audio.id}` });
@@ -342,7 +341,6 @@ function AudioItemQA({
       const a = document.createElement("a");
       a.style.display = "none";
       a.href = url;
-      // Le damos un nombre bonito al archivo: "Audio_1_DNI.mp3"
       const safeName = audio.nombre_etiqueta
         .replace(/[^a-z0-9]/gi, "_")
         .toLowerCase();
@@ -393,9 +391,7 @@ function AudioItemQA({
             </p>
           </div>
         </div>
-
         <div className="flex items-center gap-3 shrink-0">
-          {/* 👇 Botón de Descargar */}
           <button
             type="button"
             onClick={handleDownload}
@@ -404,7 +400,6 @@ function AudioItemQA({
           >
             <Download size={14} />
           </button>
-
           <button
             type="button"
             onClick={togglePlay}
@@ -422,7 +417,6 @@ function AudioItemQA({
               <Play size={14} className="ml-0.5" />
             )}
           </button>
-
           <div className="flex gap-1.5 bg-background p-1 rounded-full border border-border">
             <button
               type="button"
@@ -453,7 +447,6 @@ function AudioItemQA({
           </div>
         </div>
       </div>
-
       {isNoConforme && (
         <div className="mt-3 pl-9">
           <input
@@ -504,18 +497,51 @@ export function VentaFormBackoffice({
     }
   }, [venta, open]);
 
+  // ─── Flags de contexto ────────────────────────────────────────────────────
   const esPrimeraGestion =
     venta.id_estado_sot === null && !venta.solicitud_correccion;
   const esReingreso = !!venta.venta_origen && venta.id_estado_sot === null;
 
-  const estadosSotPermitidos =
-    esPrimeraGestion || esReingreso
-      ? estadosSOT.filter((e) => e.codigo.toUpperCase() === "EJECUCION")
-      : estadosSOT.filter((e) =>
-          ["EJECUCION", "ATENDIDO", "RECHAZADO"].includes(
-            e.codigo.toUpperCase(),
-          ),
-        );
+  // ── CÓDIGO ESTADO ACTUAL DE LA VENTA (en BD) ─────────────────────────────
+  // Necesitamos el código del estado actual de la venta para decidir qué estados mostrar.
+  // venta.codigo_estado viene del serializer como campo de solo lectura.
+  const codigoEstadoActual = venta.codigo_estado?.toUpperCase() ?? "";
+  const ventaEstaRechazada = codigoEstadoActual === "RECHAZADO";
+
+  /**
+   * FIX PRINCIPAL: Estados SOT permitidos en el selector.
+   *
+   * Antes: la venta RECHAZADA caía en el else (no era primeraGestion ni reingreso)
+   * y el select mostraba [EJECUCION, ATENDIDO, RECHAZADO] — correcto en papel —
+   * pero el valor inicial del form era `venta.id_estado_sot` (el ID del estado RECHAZADO),
+   * que SÍ estaba en la lista. Sin embargo, al pulsar "Procesar Venta" sin tocar
+   * el selector, `watchEstadoId` era el ID de RECHAZADO y la validación del frontend
+   * (`!values.id_estado_sot`) pasaba, pero la lógica de `esRechazado = true` activaba
+   * el bloque de validación de rechazo que exigía `comentario_gestion`, lo cual
+   * podía detener el submit antes de llegar al API. Si el usuario SÍ quiere cambiar
+   * a EJECUCION, cambia el select y el botón debe funcionar normalmente.
+   *
+   * Solución: incluir todos los estados operativos relevantes siempre que la venta
+   * no esté ATENDIDA (estado final). Para ventas RECHAZADAS en particular, incluimos
+   * EJECUCION explícitamente para que el backoffice pueda reclasificarla.
+   */
+  const estadosSotPermitidos = (() => {
+    // Venta ATENDIDA: estado final, no se puede cambiar desde el frontend.
+    if (codigoEstadoActual === "ATENDIDO") {
+      return estadosSOT.filter((e) => e.codigo.toUpperCase() === "ATENDIDO");
+    }
+
+    // Primera gestión o reingreso: solo se puede pasar a EJECUCION.
+    if (esPrimeraGestion || esReingreso) {
+      return estadosSOT.filter((e) => e.codigo.toUpperCase() === "EJECUCION");
+    }
+
+    // Todos los demás casos (EJECUCION, RECHAZADO, sin estado pero con corrección):
+    // permitir EJECUCION, ATENDIDO y RECHAZADO.
+    return estadosSOT.filter((e) =>
+      ["EJECUCION", "ATENDIDO", "RECHAZADO"].includes(e.codigo.toUpperCase()),
+    );
+  })();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -525,6 +551,7 @@ export function VentaFormBackoffice({
       fecha_visita_programada: venta.fecha_visita_programada ?? null,
       bloque_horario: venta.bloque_horario ?? "",
       id_sub_estado_sot: venta.id_sub_estado_sot ?? null,
+      // ↓ Inicializamos con el estado actual de la venta para que el select no quede vacío.
       id_estado_sot: venta.id_estado_sot ?? null,
       fecha_real_inst: venta.fecha_real_inst
         ? venta.fecha_real_inst.split("T")[0]
@@ -534,6 +561,7 @@ export function VentaFormBackoffice({
         : null,
       comentario_gestion: venta.comentario_gestion ?? "",
       solicitud_correccion: venta.solicitud_correccion ?? false,
+      permitir_reingreso: venta.permitir_reingreso ?? false,
       audio_subido: venta.audio_subido ?? false,
       id_estado_audios: venta.id_estado_audios ?? null,
       observacion_audios: venta.observacion_audios ?? "",
@@ -557,12 +585,7 @@ export function VentaFormBackoffice({
   const audioEsRechazado =
     estadoAudioSeleccionado?.codigo.toUpperCase() === "RECHAZADO";
 
-  useEffect(() => {
-    if (esRechazado && !watchSolicitud) {
-      form.setValue("solicitud_correccion", false);
-    }
-  }, [esRechazado, watchSolicitud, form]);
-
+  // Cuando hay audios rechazados, activar solicitud de corrección automáticamente.
   useEffect(() => {
     const hayRechazados = audiosQA.some((a) => a.conforme === false);
     if (hayRechazados && !watchSolicitud) {
@@ -583,6 +606,7 @@ export function VentaFormBackoffice({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
+    // ── RAMA A: Solicitar corrección al asesor ────────────────────────────
     if (values.solicitud_correccion) {
       if (!values.comentario_gestion?.trim()) {
         form.setError("comentario_gestion", {
@@ -602,14 +626,25 @@ export function VentaFormBackoffice({
         );
       }
     } else {
+      // ── RAMA B: Procesar / rechazar la venta ─────────────────────────
       if (!values.id_estado_sot) {
         setTab("gestion");
-        return toast.error(
-          "Debe seleccionar un Estado SOT (ej: EJECUCIÓN) para procesar.",
-        );
+        return toast.error("Debe seleccionar un Estado SOT para procesar.");
       }
 
-      if (!esRechazado) {
+      if (esRechazado) {
+        // Si se rechaza, el comentario de gestión es obligatorio
+        if (!values.comentario_gestion?.trim()) {
+          form.setError("comentario_gestion", {
+            message: "Debe explicar el motivo del rechazo",
+          });
+          setTab("gestion");
+          return toast.error(
+            "Indique el motivo del rechazo para que el asesor lo sepa.",
+          );
+        }
+      } else {
+        // EJECUCION o ATENDIDO: validaciones operativas
         if (!values.codigo_sot)
           return toast.error("El Código SOT es obligatorio para procesar.");
         if (!values.codigo_sec)
@@ -632,6 +667,7 @@ export function VentaFormBackoffice({
       }
     }
 
+    // ── Validaciones de fechas ────────────────────────────────────────────
     const getStartOfDay = (dateString?: string | null) => {
       if (!dateString) return null;
       const str = dateString.includes("T")
@@ -660,6 +696,7 @@ export function VentaFormBackoffice({
         "La fecha de rechazo no puede ser anterior a la fecha de venta.",
       );
 
+    // ── Payload de audios ─────────────────────────────────────────────────
     const audiosPayload = audiosQA.map((a) => ({
       id: a.id,
       nombre_etiqueta: a.nombre_etiqueta,
@@ -680,6 +717,7 @@ export function VentaFormBackoffice({
         fecha_rechazo: values.fecha_rechazo || null,
         comentario_gestion: values.comentario_gestion || null,
         solicitud_correccion: values.solicitud_correccion,
+        permitir_reingreso: esRechazado ? values.permitir_reingreso : false,
         audio_subido: values.audio_subido,
         id_estado_audios: values.id_estado_audios ?? null,
         observacion_audios: values.observacion_audios || null,
@@ -697,13 +735,12 @@ export function VentaFormBackoffice({
   });
 
   if (!open) return null;
-  // const errorsObj = form.formState.errors;
 
   return (
     <>
       <div
         onClick={onClose}
-        className="fixed inset-0  z-[100] animate-in fade-in duration-300"
+        className="fixed inset-0 z-[100] animate-in fade-in duration-300"
       />
 
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-2xl bg-card border-l border-border z-[101] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
@@ -714,8 +751,13 @@ export function VentaFormBackoffice({
               <div className="flex flex-wrap gap-2 mb-2">
                 {(esPrimeraGestion || esReingreso) && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                    <Clock size={10} />{" "}
+                    <Clock size={10} />
                     {esReingreso ? "Nuevo Reingreso" : "Primera Gestión"}
+                  </span>
+                )}
+                {ventaEstaRechazada && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-destructive/10 text-destructive border border-destructive/20">
+                    <XCircle size={10} /> Rechazada
                   </span>
                 )}
                 {venta.venta_origen && !esReingreso && (
@@ -746,18 +788,6 @@ export function VentaFormBackoffice({
               <X size={16} />
             </button>
           </div>
-          {venta.comentario_gestion && !venta.solicitud_correccion && (
-            <div className="flex gap-2 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
-              <MessageSquare
-                size={14}
-                className="text-cyan-500 shrink-0 mt-0.5"
-              />
-              <p className="text-xs text-cyan-600 dark:text-cyan-400 leading-snug">
-                <strong className="font-semibold">Nota previa:</strong>{" "}
-                {venta.comentario_gestion}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* ── TABS ── */}
@@ -791,6 +821,7 @@ export function VentaFormBackoffice({
               onSubmit={onSubmit}
               className="space-y-6 animate-in fade-in duration-300"
             >
+              {/* Banner informativo según contexto */}
               {(esPrimeraGestion || esReingreso) && (
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <p className="text-sm font-bold text-amber-500 dark:text-amber-400 mb-1">
@@ -805,6 +836,20 @@ export function VentaFormBackoffice({
                 </div>
               )}
 
+              {/* Banner de venta rechazada — avisa que se puede reclasificar */}
+              {ventaEstaRechazada && (
+                <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm font-bold text-destructive mb-1">
+                    Esta venta está en estado RECHAZADO
+                  </p>
+                  <p className="text-xs text-destructive/70">
+                    Puedes cambiar el Estado SOT a EJECUCIÓN si corresponde
+                    reclasificarla, o mantener el rechazo completando el motivo.
+                  </p>
+                </div>
+              )}
+
+              {/* ── Códigos Operativos ── */}
               <div>
                 <SectionTitle>Códigos Operativos</SectionTitle>
                 <div className="grid grid-cols-2 gap-4">
@@ -836,6 +881,7 @@ export function VentaFormBackoffice({
               </div>
               <Divider />
 
+              {/* ── Programación de Visita ── */}
               <div>
                 <SectionTitle>Programación de Visita</SectionTitle>
                 <div className="grid grid-cols-2 gap-4">
@@ -879,6 +925,7 @@ export function VentaFormBackoffice({
               </div>
               <Divider />
 
+              {/* ── Gestión de Audios en Claro ── */}
               <div>
                 <SectionTitle>Gestión de Audios en Claro</SectionTitle>
                 <div className="space-y-4">
@@ -939,6 +986,7 @@ export function VentaFormBackoffice({
               </div>
               <Divider />
 
+              {/* ── Estado de la Venta ── */}
               <div>
                 <SectionTitle>Estado de la Venta</SectionTitle>
                 <div className="space-y-4">
@@ -951,15 +999,8 @@ export function VentaFormBackoffice({
                         value={field.value ?? ""}
                         onChange={(v) => field.onChange(v ? Number(v) : null)}
                         placeholder="Seleccionar"
-                        disabled={
-                          !!(
-                            venta.id_estado_sot &&
-                            !esPrimeraGestion &&
-                            !esReingreso &&
-                            !watchSolicitud &&
-                            venta.codigo_estado?.toUpperCase() !== "EJECUCION"
-                          )
-                        }
+                        // Solo bloqueamos si la venta ya está ATENDIDA (estado final)
+                        disabled={codigoEstadoActual === "ATENDIDO"}
                       >
                         {estadosSotPermitidos.map((e) => (
                           <option key={e.id} value={e.id}>
@@ -1029,79 +1070,120 @@ export function VentaFormBackoffice({
               </div>
               <Divider />
 
+              {/* ── Comentarios y Decisiones ── */}
               <div>
-                <SectionTitle>Comentario & Corrección</SectionTitle>
+                <SectionTitle>
+                  {esRechazado
+                    ? "Motivo del Rechazo"
+                    : "Comentarios y Decisiones"}
+                </SectionTitle>
                 <div className="space-y-4">
-                  <Controller
-                    control={form.control}
-                    name="solicitud_correccion"
-                    render={({ field }) => (
-                      <div
-                        onClick={() => field.onChange(!field.value)}
-                        className={cn(
-                          "flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all border",
-                          field.value
-                            ? "bg-orange-500/10 border-orange-500/30"
-                            : "bg-card border-border hover:bg-muted",
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <AlertTriangle
-                            size={18}
-                            className={
-                              field.value
-                                ? "text-orange-500"
-                                : "text-muted-foreground"
-                            }
-                          />
-                          <div>
-                            <p
-                              className={cn(
-                                "text-sm font-bold",
-                                field.value
-                                  ? "text-orange-500"
-                                  : "text-foreground",
-                              )}
-                            >
-                              Solicitar corrección al Asesor
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {field.value
-                                ? "Devuelve la venta para que el asesor la edite"
-                                : "Activa esto para devolver la venta"}
-                            </p>
-                          </div>
-                        </div>
+                  {/* Toggle: solicitud corrección (solo si NO estamos rechazando) */}
+                  {!esRechazado && (
+                    <Controller
+                      control={form.control}
+                      name="solicitud_correccion"
+                      render={({ field }) => (
                         <div
+                          onClick={() => field.onChange(!field.value)}
                           className={cn(
-                            "w-11 h-6 rounded-full relative transition-colors",
+                            "flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all border",
                             field.value
-                              ? "bg-orange-500"
-                              : "bg-muted-foreground/30",
+                              ? "bg-orange-500/10 border-orange-500/30"
+                              : "bg-card border-border hover:bg-muted",
                           )}
                         >
+                          <div className="flex items-center gap-3">
+                            <AlertTriangle
+                              size={18}
+                              className={
+                                field.value
+                                  ? "text-orange-500"
+                                  : "text-muted-foreground"
+                              }
+                            />
+                            <div>
+                              <p
+                                className={cn(
+                                  "text-sm font-bold",
+                                  field.value
+                                    ? "text-orange-500"
+                                    : "text-foreground",
+                                )}
+                              >
+                                Solicitar corrección al Asesor
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {field.value
+                                  ? "Devuelve la venta para que el asesor la edite"
+                                  : "Activa esto para devolver la venta"}
+                              </p>
+                            </div>
+                          </div>
                           <div
                             className={cn(
-                              "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
-                              field.value ? "left-6" : "left-1",
+                              "w-11 h-6 rounded-full relative transition-colors",
+                              field.value
+                                ? "bg-orange-500"
+                                : "bg-muted-foreground/30",
                             )}
-                          />
+                          >
+                            <div
+                              className={cn(
+                                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+                                field.value ? "left-6" : "left-1",
+                              )}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  />
+                      )}
+                    />
+                  )}
+
+                  {/* Toggle: permitir reingreso (solo si se está rechazando) */}
+                  {esRechazado && (
+                    <Controller
+                      control={form.control}
+                      name="permitir_reingreso"
+                      render={({ field }) => (
+                        <Toggle
+                          label="Habilitar Reingreso al Asesor"
+                          description="Permite que el asesor clone los datos de esta venta para intentar venderle nuevamente."
+                          checked={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  )}
+
+                  {/*
+                   * CAMPO COMENTARIO_GESTION — siempre visible.
+                   * Es obligatorio cuando:
+                   *   - se solicita corrección al asesor, o
+                   *   - el estado SOT pasa a RECHAZADO.
+                   * En los demás casos es opcional (el asesor puede ver el historial).
+                   */}
                   <Controller
                     control={form.control}
                     name="comentario_gestion"
                     render={({ field }) => (
                       <Textarea
-                        label="Comentario de gestión"
+                        label={
+                          esRechazado
+                            ? "Motivo del rechazo (visible para el Asesor)"
+                            : watchSolicitud
+                              ? "Qué debe corregir el Asesor"
+                              : "Comentario de gestión (opcional)"
+                        }
+                        required={esRechazado || watchSolicitud}
                         value={field.value ?? ""}
                         onChange={field.onChange}
                         placeholder={
-                          watchSolicitud
-                            ? "Describe qué debe corregir el asesor…"
-                            : "Observaciones opcionales…"
+                          esRechazado
+                            ? "Explica por qué la venta ha sido rechazada..."
+                            : watchSolicitud
+                              ? "Describe qué debe corregir el asesor..."
+                              : "Observaciones internas opcionales..."
                         }
                         rows={3}
                         error={
@@ -1240,7 +1322,7 @@ export function VentaFormBackoffice({
               disabled={isPending}
               className={cn(
                 "flex-1 h-12 rounded-xl font-bold shadow-lg transition-all",
-                watchSolicitud
+                watchSolicitud || esRechazado
                   ? "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20"
                   : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20",
               )}
@@ -1248,7 +1330,11 @@ export function VentaFormBackoffice({
               {isPending ? (
                 <Loader2 className="animate-spin mr-2" size={18} />
               ) : null}
-              {watchSolicitud ? "Devolver al Asesor" : "Procesar Venta"}
+              {esRechazado
+                ? "Guardar Rechazo"
+                : watchSolicitud
+                  ? "Devolver al Asesor"
+                  : "Procesar Venta"}
             </Button>
           )}
         </div>

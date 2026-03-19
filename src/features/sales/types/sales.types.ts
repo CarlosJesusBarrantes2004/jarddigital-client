@@ -187,6 +187,8 @@ export interface Venta {
    */
   solicitud_correccion: boolean;
 
+  permitir_reingreso: boolean;
+
   // Operativo
   codigo_sec: string | null;
   codigo_sot: string | null;
@@ -311,6 +313,7 @@ export interface UpdateVentaBackofficePayload {
   fecha_rechazo?: string | null;
   comentario_gestion?: string | null;
   solicitud_correccion?: boolean;
+  permitir_reingreso?: boolean;
   id_estado_audios?: number | null;
   observacion_audios?: string | null;
   audio_subido?: boolean;
@@ -323,6 +326,9 @@ export interface UpdateVentaBackofficePayload {
 
 export interface VentaFiltros {
   id_estado_sot?: number | string;
+  // ↓ NUEVO: para filtrar ventas sin estado (pendientes)
+  // El backend de Django-filter lo acepta como ?id_estado_sot__isnull=true
+  id_estado_sot__isnull?: boolean;
   id_sub_estado_sot?: number | string;
   id_estado_audios?: number | string;
   id_producto?: number | string;
