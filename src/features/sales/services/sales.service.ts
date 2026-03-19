@@ -52,9 +52,6 @@ export interface UploadedAudioData {
   deleteToken?: string;
 }
 
-/**
- * Sube un archivo de audio a Cloudinary y devuelve la URL segura y el token de borrado.
- */
 export async function uploadAudioToCloudinary(
   file: File,
   onProgress?: (percent: number) => void,
@@ -68,7 +65,7 @@ export async function uploadAudioToCloudinary(
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-  formData.append("resource_type", "video"); // Cloudinary trata audios como "video"
+  formData.append("resource_type", "video");
   formData.append("folder", "audios_ventas");
 
   return new Promise((resolve, reject) => {
@@ -80,19 +77,15 @@ export async function uploadAudioToCloudinary(
 
     if (onProgress) {
       xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
+        if (e.lengthComputable)
           onProgress(Math.round((e.loaded / e.total) * 100));
-        }
       });
     }
 
     xhr.onload = () => {
       if (xhr.status === 200) {
         const result: CloudinaryUploadResult = JSON.parse(xhr.responseText);
-        resolve({
-          url: result.secure_url,
-          deleteToken: result.delete_token,
-        });
+        resolve({ url: result.secure_url, deleteToken: result.delete_token });
       } else {
         reject(
           new Error(`Error Cloudinary: ${xhr.status} ${xhr.responseText}`),
@@ -105,10 +98,6 @@ export async function uploadAudioToCloudinary(
   });
 }
 
-/**
- * Elimina un audio DIRECTAMENTE desde el Frontend a Cloudinary usando el delete_token.
- * Esto ahorra espacio si el Asesor se equivoca y borra un audio antes de enviar el form.
- */
 export async function deleteAudioFromCloudinaryDirect(
   deleteToken: string,
 ): Promise<void> {
@@ -123,15 +112,10 @@ export async function deleteAudioFromCloudinaryDirect(
       "POST",
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/delete_by_token`,
     );
-
     xhr.onload = () => {
-      if (xhr.status === 200) {
-        resolve();
-      } else {
-        reject(new Error(`Fallo al borrar: ${xhr.responseText}`));
-      }
+      if (xhr.status === 200) resolve();
+      else reject(new Error(`Fallo al borrar: ${xhr.responseText}`));
     };
-
     xhr.onerror = () => reject(new Error("Error de red al intentar borrar"));
     xhr.send(formData);
   });
@@ -181,6 +165,50 @@ export const salesService = {
   ): Promise<Venta> => {
     const { data } = await api.patch<Venta>(`/sales/ventas/${id}/`, payload);
     return data;
+  },
+
+  /**
+   * Descarga el reporte Excel de ventas.
+   * El backend devuelve un blob .xlsx que abrimos como descarga directa en el navegador.
+   *
+   * @param fechaInicio  YYYY-MM-DD (opcional). Si no se pasa, exporta todo.
+   * @param fechaFin     YYYY-MM-DD (opcional). Si no se pasa, exporta todo.
+   */
+  exportarExcel: async (
+    fechaInicio?: string,
+    fechaFin?: string,
+  ): Promise<void> => {
+    const params = new URLSearchParams();
+    if (fechaInicio) params.append("fecha_inicio", fechaInicio);
+    if (fechaFin) params.append("fecha_fin", fechaFin);
+
+    // responseType: "blob" es clave — le dice a axios que no intente parsear el binario como JSON
+    const response = await api.get(
+      `/sales/ventas/exportar_excel/?${params.toString()}`,
+      {
+        responseType: "blob",
+      },
+    );
+
+    // Creamos una URL temporal para el blob y la "clickeamos" para forzar la descarga
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Intentamos usar el nombre de archivo que manda el backend en el header,
+    // si no existe usamos uno por defecto.
+    const contentDisposition = response.headers["content-disposition"] as
+      | string
+      | undefined;
+    const fileNameMatch = contentDisposition?.match(/filename="?([^"]+)"?/);
+    link.setAttribute("download", fileNameMatch?.[1] ?? "Reporte_Ventas.xlsx");
+
+    document.body.appendChild(link);
+    link.click();
+
+    // Limpieza
+    link.remove();
+    window.URL.revokeObjectURL(url);
   },
 };
 

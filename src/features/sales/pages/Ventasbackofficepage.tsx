@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, RefreshCw, Filter, X, ChevronDown } from "lucide-react";
+import {
+  Search,
+  RefreshCw,
+  Filter,
+  X,
+  ChevronDown,
+  FileDown,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 import {
   useVentas,
@@ -8,6 +17,7 @@ import {
   useEstadosAudio,
   useProductos,
 } from "../hooks/useSales";
+import { salesService } from "../services/sales.service";
 import type { Venta, VentaFiltros } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
 import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
@@ -81,7 +91,7 @@ function Select({
   );
 }
 
-// ── Filtros extendidos (flag _pendientes es solo local, no va a la API) ───────
+// ── Filtros extendidos ────────────────────────────────────────────────────────
 interface FiltrosLocales extends VentaFiltros {
   _pendientes?: boolean;
 }
@@ -99,7 +109,6 @@ function buildFiltrosApi(f: FiltrosLocales): VentaFiltros {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface VentasBackofficePageProps {
-  /** DUEÑO: puede ver pero no gestionar ventas */
   soloLectura?: boolean;
 }
 
@@ -114,11 +123,15 @@ export function VentasBackofficePage({
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [page, setPage] = useState(1);
 
-  // Debounce 350ms: la petición se lanza solo cuando el usuario para de escribir
-  const busquedaDebounced = useDebounce(busqueda, 350);
+  // ── Estado para exportación ──────────────────────────────────────────────
+  const [exportando, setExportando] = useState(false);
+  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaFin, setFechaFin] = useState("");
+  const [mostrarExport, setMostrarExport] = useState(false);
 
-  // Sincroniza filtro search con el valor debounced (salta el primer render)
+  const busquedaDebounced = useDebounce(busqueda, 350);
   const isFirstRender = useRef(true);
+
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -168,6 +181,30 @@ export function VentasBackofficePage({
     soloLectura ? null : (v) => setVentaSeleccionada(v),
   );
 
+  // ── Handler de exportación ────────────────────────────────────────────────
+  const handleExportar = async () => {
+    if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
+      toast.error("La fecha de inicio no puede ser posterior a la fecha fin.");
+      return;
+    }
+    try {
+      setExportando(true);
+      toast.loading("Generando Excel…", { id: "export-excel" });
+      await salesService.exportarExcel(
+        fechaInicio || undefined,
+        fechaFin || undefined,
+      );
+      toast.success("Excel descargado correctamente", { id: "export-excel" });
+      setMostrarExport(false);
+    } catch {
+      toast.error("Error al generar el Excel. Intenta de nuevo.", {
+        id: "export-excel",
+      });
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="font-sans min-h-screen bg-background text-foreground transition-colors duration-300">
       <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -198,12 +235,86 @@ export function VentasBackofficePage({
               )}
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all shadow-sm"
-          >
-            <RefreshCw size={16} /> Refrescar
-          </button>
+
+          {/* Botones de acción del header */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => refetch()}
+              className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all shadow-sm"
+            >
+              <RefreshCw size={16} /> Refrescar
+            </button>
+
+            {/* Botón Exportar Excel (solo para roles que pueden verlo) */}
+            <div className="relative">
+              <button
+                onClick={() => setMostrarExport(!mostrarExport)}
+                className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+              >
+                <FileDown size={16} /> Exportar Excel
+              </button>
+
+              {/* Panel de configuración de fechas para exportar */}
+              {mostrarExport && (
+                <>
+                  {/* Overlay para cerrar al hacer click fuera */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setMostrarExport(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 z-20 w-72 bg-card border border-border rounded-2xl shadow-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-3 font-semibold">
+                      Rango de Fechas de Venta
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-muted-foreground font-medium">
+                          Desde
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaInicio}
+                          onChange={(e) => setFechaInicio(e.target.value)}
+                          className="h-10 px-3 rounded-xl bg-background border border-border text-sm text-foreground outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-muted-foreground font-medium">
+                          Hasta
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaFin}
+                          onChange={(e) => setFechaFin(e.target.value)}
+                          className="h-10 px-3 rounded-xl bg-background border border-border text-sm text-foreground outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                        Si no seleccionas fechas, se exportarán{" "}
+                        <strong>todas las ventas</strong>.
+                      </p>
+                      <button
+                        onClick={handleExportar}
+                        disabled={exportando}
+                        className="w-full h-10 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                      >
+                        {exportando ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />{" "}
+                            Generando…
+                          </>
+                        ) : (
+                          <>
+                            <FileDown size={14} /> Descargar Excel
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── CHIPS RÁPIDOS ── */}
@@ -312,7 +423,6 @@ export function VentasBackofficePage({
         {/* ── BÚSQUEDA Y FILTROS AVANZADOS ── */}
         <div className="flex flex-col gap-3 bg-card border border-border p-3 rounded-2xl shadow-sm">
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Input live — filtra en tiempo real, sin form ni submit */}
             <div className="flex-1 w-full relative flex items-center">
               <Search
                 size={16}
@@ -359,7 +469,7 @@ export function VentasBackofficePage({
                   onClick={limpiarFiltros}
                   className="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-transparent border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
                 >
-                  <X size={14} />
+                  <X size={14} />{" "}
                   <span className="hidden sm:inline">Limpiar</span>
                 </button>
               )}
@@ -381,23 +491,22 @@ export function VentasBackofficePage({
                         : "todos"
                   }
                   onChange={(v) => {
-                    if (v === "todos") {
+                    if (v === "todos")
                       setFiltros((f) => {
                         const { id_estado_sot, _pendientes, ...rest } = f;
                         return rest;
                       });
-                    } else if (v === "null") {
+                    else if (v === "null")
                       setFiltros((f) => {
                         const { id_estado_sot, solicitud_correccion, ...rest } =
                           f;
                         return { ...rest, _pendientes: true };
                       });
-                    } else {
+                    else
                       setFiltros((f) => {
                         const { _pendientes, ...rest } = f;
                         return { ...rest, id_estado_sot: v };
                       });
-                    }
                   }}
                   placeholder="Todos los estados"
                 >
@@ -498,7 +607,6 @@ export function VentasBackofficePage({
         )}
       </div>
 
-      {/* ── MODAL BACKOFFICE ── */}
       {ventaSeleccionada && !soloLectura && (
         <VentaFormBackoffice
           key={ventaSeleccionada.id}
