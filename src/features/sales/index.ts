@@ -1,7 +1,7 @@
 // ── Entry point ──────────────────────────────────────────────────────────────
 export { SalesPage } from "./pages/SalesPage";
-export { VentasAsesorPage } from "./pages/Ventasasesorpage";
-export { VentasBackofficePage } from "./pages/Ventasbackofficepage";
+export { AsesorPage } from "./pages/Ventasasesorpage";
+export { BackofficePage } from "./pages/Ventasbackofficepage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type {

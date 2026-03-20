@@ -234,6 +234,7 @@ export interface Venta {
   codigo_sot_origen: string | null;
 
   codigo_tipo_documento?: string;
+  ya_reingresada?: boolean;
 }
 
 // ==========================================
@@ -339,6 +340,8 @@ export interface VentaFiltros {
   search?: string;
   ordering?: string;
   page?: number;
+  fecha_inicio?: string;
+  fecha_fin?: string;
 }
 
 export interface PaginatedResponse<T> {

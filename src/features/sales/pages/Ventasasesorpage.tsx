@@ -1,332 +1,546 @@
-import { useState } from "react";
+/**
+ * features/sales/pages/AsesorPage.tsx
+ *
+ * Página principal del ROL ASESOR.
+ * Fixes incluidos:
+ *   #3  — Botón Editar solo aparece cuando el asesor tiene permiso real
+ *   #4  — Botón Eliminar solo en ventas pendientes o en corrección
+ *   #5  — Filtros por fecha + tabs de estado
+ *   #8  — Botón Reingresar oculto si la venta ya fue reingresada (ya_reingresada)
+ */
+import { useState, useMemo } from "react";
 import {
-  ShoppingBag,
-  CheckCircle2,
-  Zap,
-  XCircle,
-  Clock,
   Plus,
   Search,
+  X,
+  Calendar,
   RefreshCw,
+  Loader2,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 import {
   useVentas,
-  useEstadisticasAsesor,
   useEstadosSOT,
+  useEstadisticasAsesor,
+  useDeleteVentaAsesor,
 } from "../hooks/useSales";
-import type { Venta, VentaFiltros } from "../types/sales.types";
+import type { Venta, VentaFiltros, EstadoSOT } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
 import { buildColumnsAsesor } from "../components/VentasTable/columnsAsesor";
 import { VentaFormAsesor } from "../components/VentaFormAsesor";
 
-interface StatProps {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  colorClass: string; // Ej: "text-primary" o "text-amber-500" (solo para el icono y valor)
-  isLoading?: boolean;
-  onClick?: () => void;
-  highlight?: boolean; // Para destacar suavemente (ej. correcciones)
+// ─── Tipos de filtro de estado ────────────────────────────────────────────────
+type TabEstado =
+  | "todos"
+  | "pendientes"
+  | "ejecucion"
+  | "atendidas"
+  | "rechazadas"
+  | "correccion";
+
+const TABS: { key: TabEstado; label: string; colorActivo: string }[] = [
+  {
+    key: "todos",
+    label: "Todas",
+    colorActivo: "bg-foreground text-background border-foreground",
+  },
+  {
+    key: "pendientes",
+    label: "Pendientes",
+    colorActivo:
+      "bg-amber-500/15 text-amber-600 border-amber-500/40 dark:text-amber-400",
+  },
+  {
+    key: "ejecucion",
+    label: "Ejecución",
+    colorActivo:
+      "bg-blue-500/15 text-blue-600 border-blue-500/40 dark:text-blue-400",
+  },
+  {
+    key: "atendidas",
+    label: "Atendidas",
+    colorActivo:
+      "bg-emerald-500/15 text-emerald-600 border-emerald-500/40 dark:text-emerald-400",
+  },
+  {
+    key: "rechazadas",
+    label: "Rechazadas",
+    colorActivo: "bg-destructive/15 text-destructive border-destructive/40",
+  },
+  {
+    key: "correccion",
+    label: "Corrección",
+    colorActivo:
+      "bg-orange-500/15 text-orange-600 border-orange-500/40 dark:text-orange-400",
+  },
+];
+
+// ─── Hook: construye VentaFiltros a partir del tab + fechas + search ──────────
+function useFiltrosAsesor(estadosSOT: EstadoSOT[]) {
+  const [tab, setTab] = useState<TabEstado>("todos");
+  const [search, setSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+
+  const filtros: VentaFiltros = useMemo(() => {
+    const base: VentaFiltros = {
+      search: search || undefined,
+      // FIX #5: fechas van directo al query; el backend filtra por fecha_creacion
+      ...(fechaDesde ? { fecha_inicio: fechaDesde } : {}),
+      ...(fechaHasta ? { fecha_fin: fechaHasta } : {}),
+    } as VentaFiltros;
+
+    switch (tab) {
+      case "pendientes":
+        return { ...base, id_estado_sot__isnull: true };
+      case "correccion":
+        return { ...base, solicitud_correccion: true };
+      case "ejecucion": {
+        const e = estadosSOT.find(
+          (s) => s.codigo.toUpperCase() === "EJECUCION",
+        );
+        return e ? { ...base, id_estado_sot: e.id } : base;
+      }
+      case "atendidas": {
+        const e = estadosSOT.find((s) => s.codigo.toUpperCase() === "ATENDIDO");
+        return e ? { ...base, id_estado_sot: e.id } : base;
+      }
+      case "rechazadas": {
+        const e = estadosSOT.find(
+          (s) => s.codigo.toUpperCase() === "RECHAZADO",
+        );
+        return e ? { ...base, id_estado_sot: e.id } : base;
+      }
+      default:
+        return base;
+    }
+  }, [tab, search, fechaDesde, fechaHasta, estadosSOT]);
+
+  const limpiarFechas = () => {
+    setFechaDesde("");
+    setFechaHasta("");
+  };
+
+  return {
+    tab,
+    setTab,
+    search,
+    setSearch,
+    fechaDesde,
+    setFechaDesde,
+    fechaHasta,
+    setFechaHasta,
+    limpiarFechas,
+    filtros,
+  };
 }
 
+// ─── Modal de confirmación de borrado ────────────────────────────────────────
+interface ConfirmDeleteModalProps {
+  venta: Venta | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}
+
+function ConfirmDeleteModal({
+  venta,
+  onConfirm,
+  onCancel,
+  isPending,
+}: ConfirmDeleteModalProps) {
+  if (!venta) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-[2000] bg-black/40 animate-in fade-in duration-200"
+        onClick={onCancel}
+      />
+      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[2001] w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 fade-in duration-200">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+            <Trash2 size={18} className="text-destructive" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-sm leading-snug">
+              ¿Eliminar esta venta?
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Esta acción no se puede deshacer
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-muted/50 border border-border mb-5">
+          <p className="text-sm font-medium text-foreground">
+            {venta.cliente_nombre}
+          </p>
+          <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+            {venta.cliente_numero_doc} · #{venta.id}
+          </p>
+          {venta.solicitud_correccion && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <AlertTriangle size={11} className="text-orange-500" />
+              <span className="text-[10px] text-orange-500 font-mono uppercase tracking-widest">
+                En corrección
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 h-10 rounded-xl"
+            onClick={onCancel}
+            disabled={isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            className="flex-1 h-10 rounded-xl bg-destructive text-white hover:bg-destructive/90"
+            onClick={onConfirm}
+            disabled={isPending}
+          >
+            {isPending ? (
+              <Loader2 size={14} className="animate-spin mr-1.5" />
+            ) : (
+              <Trash2 size={14} className="mr-1.5" />
+            )}
+            Eliminar
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Tarjeta de estadística ───────────────────────────────────────────────────
 function StatCard({
-  icon,
   label,
   value,
-  colorClass,
-  isLoading,
+  color,
   onClick,
-  highlight,
-}: StatProps) {
+  active,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
-      disabled={!onClick}
       className={cn(
-        "group flex flex-col sm:flex-row items-start sm:items-center gap-3.5 p-4 rounded-2xl w-full text-left transition-all duration-500 ease-out",
-        onClick
-          ? "cursor-pointer hover:bg-card/80 hover:shadow-lg hover:-translate-y-0.5"
-          : "cursor-default",
-        // Fondo base muy sutil
-        "bg-card/40 border border-border/50",
-        // Si está destacado (highlight), le damos un brillo muuuuy tenue del color primario/alerta
-        highlight &&
-          "bg-primary/5 border-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.05)]",
+        "flex flex-col gap-1 p-4 rounded-2xl border text-left transition-all duration-200",
+        active
+          ? "border-primary/40 bg-primary/5 shadow-sm"
+          : "border-border bg-card hover:bg-muted/50",
       )}
     >
-      <div
-        className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-500 ease-out group-hover:scale-110",
-          // El icono lleva el color semántico, pero el fondo es un cristal oscuro genérico
-          "bg-background/80 border border-white/5 shadow-inner",
-          colorClass,
-        )}
-      >
-        {icon}
-      </div>
-      <div className="flex flex-col">
-        <p className="font-mono text-[10px] tracking-[0.15em] uppercase text-muted-foreground/70 mb-0.5">
-          {label}
-        </p>
-        {isLoading ? (
-          <div className="w-12 h-6 rounded bg-muted/50 animate-pulse mt-1" />
-        ) : (
-          <p
-            className={cn(
-              "font-serif text-2xl font-semibold leading-none tracking-tight transition-colors duration-300",
-              // Si tiene valor > 0, toma el color semántico, si no, se queda gris/blanco
-              value > 0 ? colorClass : "text-foreground/80",
-            )}
-          >
-            {value}
-          </p>
-        )}
-      </div>
+      <span className={cn("text-2xl font-serif font-bold", color)}>
+        {value}
+      </span>
+      <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
+        {label}
+      </span>
     </button>
   );
 }
 
-export function VentasAsesorPage() {
-  const [formOpen, setFormOpen] = useState(false);
-  const [ventaParaReingresar, setVentaParaReingresar] = useState<Venta | null>(
-    null,
-  );
-  const [filtros, setFiltros] = useState<VentaFiltros>({});
-  const [busqueda, setBusqueda] = useState("");
+// ─── Componente principal ─────────────────────────────────────────────────────
+export function AsesorPage() {
+  const { data: estadosSOTData = [] } = useEstadosSOT();
+
+  const {
+    tab,
+    setTab,
+    search,
+    setSearch,
+    fechaDesde,
+    setFechaDesde,
+    fechaHasta,
+    setFechaHasta,
+    limpiarFechas,
+    filtros,
+  } = useFiltrosAsesor(estadosSOTData);
 
   const { data, isLoading, refetch } = useVentas(filtros);
-  const { stats, isLoading: loadingStats } = useEstadisticasAsesor();
-  const { data: estadosSOT = [] } = useEstadosSOT();
-
   const ventas = data?.results ?? [];
 
-  const handleBuscar = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFiltros((f) => ({ ...f, search: busqueda }));
-  };
+  // Stats (siempre sin filtros para que los conteos sean globales)
+  const { stats } = useEstadisticasAsesor();
 
-  const handleCerrarForm = () => {
-    setFormOpen(false);
-    setVentaParaReingresar(null);
-  };
+  // Modales
+  const [formOpen, setFormOpen] = useState(false);
+  const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
+    null,
+  );
+  const [ventaParaEliminar, setVentaParaEliminar] = useState<Venta | null>(
+    null,
+  );
 
-  /*const handleVerVenta = (idVenta: number) => {
-    const venta = ventas.find((v) => v.id === idVenta);
-    if (venta?.solicitud_correccion) handleReingresar(venta);
-  };*/
+  const { mutateAsync: eliminarVenta, isPending: eliminando } =
+    useDeleteVentaAsesor();
 
-  const handleAccionVenta = (venta: Venta) => {
-    setVentaParaReingresar(venta);
+  // ── Handlers ────────────────────────────────────────────────
+  const handleNuevaVenta = () => {
+    setVentaSeleccionada(null);
     setFormOpen(true);
   };
 
-  const columns = buildColumnsAsesor(
-    estadosSOT,
-    handleAccionVenta,
-    handleAccionVenta,
+  // FIX #3: handleEditar — solo se llama desde columnsAsesor cuando puedeEditar=true
+  const handleEditar = (v: Venta) => {
+    setVentaSeleccionada(v);
+    setFormOpen(true);
+  };
+
+  // FIX #8: handleReingresar — columnsAsesor ya oculta el botón si ya_reingresada=true
+  const handleReingresar = (v: Venta) => {
+    setVentaSeleccionada(v);
+    setFormOpen(true);
+  };
+
+  // FIX #4: handleEliminar — columnsAsesor solo muestra el botón si puedeEliminar=true
+  const handleEliminar = (v: Venta) => {
+    setVentaParaEliminar(v);
+  };
+
+  const confirmarEliminar = async () => {
+    if (!ventaParaEliminar) return;
+    try {
+      await eliminarVenta(ventaParaEliminar.id);
+      toast.success(
+        `Venta de ${ventaParaEliminar.cliente_nombre} eliminada correctamente`,
+      );
+      setVentaParaEliminar(null);
+    } catch {
+      toast.error("No se pudo eliminar la venta. Inténtalo de nuevo.");
+    }
+  };
+
+  const handleCloseForm = () => {
+    setFormOpen(false);
+    setVentaSeleccionada(null);
+  };
+
+  // ── Columnas ─────────────────────────────────────────────────
+  const columns = useMemo(
+    () =>
+      buildColumnsAsesor(
+        estadosSOTData,
+        handleEditar,
+        handleReingresar,
+        handleEliminar, // FIX #4: cuarto parámetro
+      ),
+    [estadosSOTData],
   );
 
-  console.log(ventaParaReingresar);
+  const tieneFechas = !!fechaDesde || !!fechaHasta;
 
   return (
-    <div className="font-sans min-h-screen bg-background text-foreground transition-colors duration-300">
-      <div className="max-w-[1300px] mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* ── HEADER ── */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div>
-            <p className="font-mono text-[11px] tracking-widest uppercase text-primary mb-1.5 font-semibold">
-              Dashboard
-            </p>
-            <h1 className="font-serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-1.5">
-              Mis Ventas
-            </h1>
-            <p className="text-sm text-muted-foreground font-light">
-              Gestiona y registra tus ventas de servicios Claro.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setVentaParaReingresar(null);
-                setFormOpen(true);
-              }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-[0_4px_20px_rgba(var(--primary),0.35)] hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(var(--primary),0.45)] active:translate-y-0"
-            >
-              <Plus size={16} /> Nueva Venta
-            </button>
-          </div>
+    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-[1400px] mx-auto">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground tracking-tight">
+            Mis Ventas
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Gestiona y da seguimiento a tus ventas registradas
+          </p>
         </div>
+        <Button
+          onClick={handleNuevaVenta}
+          className="h-11 px-5 rounded-xl gap-2 bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90"
+        >
+          <Plus size={16} />
+          <span className="hidden sm:inline">Nueva Venta</span>
+        </Button>
+      </div>
 
-        {/* ── ALERTA CORRECCIONES ── */}
-        {stats && stats.en_correccion > 0 && (
-          <div className="flex items-center gap-4 p-4 rounded-2xl bg-orange-500/10 border border-orange-500/30 animate-in slide-in-from-top-2">
-            <AlertTriangle className="text-orange-500 shrink-0" size={20} />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-orange-500 dark:text-orange-400 mb-0.5">
-                {stats.en_correccion} venta
-                {stats.en_correccion > 1 ? "s requieren" : " requiere"}{" "}
-                corrección
-              </p>
-              <p className="text-xs text-orange-600/80 dark:text-orange-400/80">
-                El backoffice ha solicitado que corrijas los datos antes de
-                hacer reingreso.
-              </p>
-            </div>
-            <button
-              onClick={() =>
-                setFiltros((f) => ({ ...f, solicitud_correccion: true }))
-              }
-              className="px-4 py-1.5 rounded-lg bg-orange-500/20 border border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs font-bold hover:bg-orange-500/30 transition-colors whitespace-nowrap"
-            >
-              Ver todas
-            </button>
-          </div>
-        )}
+      {/* ── Estadísticas ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard
+          label="Total"
+          value={stats.total}
+          color="text-foreground"
+          onClick={() => setTab("todos")}
+          active={tab === "todos"}
+        />
+        <StatCard
+          label="Pendientes"
+          value={stats.pendientes}
+          color="text-amber-500"
+          onClick={() => setTab("pendientes")}
+          active={tab === "pendientes"}
+        />
+        <StatCard
+          label="Ejecución"
+          value={stats.en_ejecucion}
+          color="text-blue-500"
+          onClick={() => setTab("ejecucion")}
+          active={tab === "ejecucion"}
+        />
+        <StatCard
+          label="Atendidas"
+          value={stats.atendidas}
+          color="text-emerald-500"
+          onClick={() => setTab("atendidas")}
+          active={tab === "atendidas"}
+        />
+        <StatCard
+          label="Rechazadas"
+          value={stats.rechazadas}
+          color="text-destructive"
+          onClick={() => setTab("rechazadas")}
+          active={tab === "rechazadas"}
+        />
+        <StatCard
+          label="Corrección"
+          value={stats.en_correccion}
+          color="text-orange-500"
+          onClick={() => setTab("correccion")}
+          active={tab === "correccion"}
+        />
+      </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <StatCard
-            icon={<ShoppingBag size={16} strokeWidth={1.5} />}
-            label="Total"
-            value={stats?.total || 0}
-            colorClass="text-foreground"
-            isLoading={loadingStats}
-            onClick={() => setFiltros({})}
-          />
-          <StatCard
-            icon={<Zap size={16} strokeWidth={1.5} />}
-            label="En Ejecución"
-            value={stats?.en_ejecucion || 0}
-            colorClass="text-primary" // Celeste Jard (Tu color principal)
-            isLoading={loadingStats}
-          />
-          <StatCard
-            icon={<CheckCircle2 size={16} strokeWidth={1.5} />}
-            label="Atendidas"
-            value={stats?.atendidas || 0}
-            colorClass="text-emerald-400" // Verde suave y elegante
-            isLoading={loadingStats}
-          />
-          <StatCard
-            icon={<XCircle size={16} strokeWidth={1.5} />}
-            label="Rechazadas"
-            value={stats?.rechazadas || 0}
-            colorClass="text-red-400/90" // Rojo desaturado, no fosforescente
-            isLoading={loadingStats}
-          />
-          <StatCard
-            icon={<Clock size={16} strokeWidth={1.5} />}
-            label="Pendientes"
-            value={stats?.pendientes || 0}
-            colorClass="text-[#C9975A]" // El Dorado Cobrizo original de Claude
-            isLoading={loadingStats}
-          />
-          <StatCard
-            icon={<AlertTriangle size={16} strokeWidth={1.5} />}
-            label="Correcciones"
-            value={stats?.en_correccion || 0}
-            colorClass="text-orange-400/90"
-            isLoading={loadingStats}
-            highlight={(stats?.en_correccion || 0) > 0}
-            onClick={() =>
-              setFiltros((f) => ({ ...f, solicitud_correccion: true }))
-            }
-          />
-        </div>
-
-        {/* ── BÚSQUEDA ── */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 bg-card border border-border p-3 rounded-2xl shadow-sm">
-          <form
-            onSubmit={handleBuscar}
-            className="flex-1 w-full relative flex items-center gap-2"
-          >
+      {/* ── Filtros ── */}
+      <div className="flex flex-col gap-3">
+        {/* Fila 1: Búsqueda + Fechas + refresh */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Buscador */}
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search
-              size={16}
-              className="absolute left-4 text-muted-foreground"
+              size={13}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
             <input
               type="text"
-              placeholder="Buscar por nombre, DNI, código SOT/SEC…"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full h-11 bg-background border border-border rounded-xl pl-11 pr-4 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+              placeholder="Cliente, DNI, SOT, SEC…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-background border border-border text-sm font-sans outline-none transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* FIX #5: Rango de fechas */}
+          <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
+            <Calendar size={12} className="text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              title="Desde"
+              className="text-sm text-foreground bg-transparent outline-none w-[7.5rem] cursor-pointer"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground select-none">—</span>
+          <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
+            <Calendar size={12} className="text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              title="Hasta"
+              className="text-sm text-foreground bg-transparent outline-none w-[7.5rem] cursor-pointer"
+            />
+          </div>
+          {tieneFechas && (
             <button
-              type="submit"
-              className="hidden sm:block h-11 px-6 rounded-xl bg-muted border border-border text-xs font-semibold hover:bg-muted/80 transition-colors"
+              onClick={limpiarFechas}
+              className="h-10 px-3 rounded-xl border border-border text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Limpiar fechas"
             >
-              Buscar
-            </button>
-          </form>
-          <button
-            onClick={() => refetch()}
-            title="Refrescar"
-            className="w-full sm:w-11 h-11 flex items-center justify-center rounded-xl bg-background border border-border text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          >
-            <RefreshCw size={16} />{" "}
-            <span className="sm:hidden ml-2 text-sm font-medium">
-              Refrescar
-            </span>
-          </button>
-          {(filtros.search || filtros.solicitud_correccion) && (
-            <button
-              onClick={() => {
-                setFiltros({});
-                setBusqueda("");
-              }}
-              className="w-full sm:w-auto h-11 px-4 rounded-xl bg-transparent border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap"
-            >
-              Limpiar filtros
+              <X size={13} />
             </button>
           )}
-        </div>
 
-        {/* ── TABLA ── */}
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-          <DataTable
-            columns={columns}
-            data={ventas}
-            isLoading={isLoading}
-            emptyMessage="No tienes ventas registradas. ¡Crea tu primera venta!"
-          />
-        </div>
-
-        {/* ── PAGINACIÓN ── */}
-        {data && (data.next || data.previous) && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
-            <span>
-              <strong className="text-foreground">{data.count}</strong> ventas
-              en total
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={!data.previous}
-                className="px-4 py-2 rounded-lg bg-card border border-border disabled:opacity-50 hover:bg-muted transition-colors"
-              >
-                Anterior
-              </button>
-              <button
-                disabled={!data.next}
-                className="px-4 py-2 rounded-lg bg-card border border-border disabled:opacity-50 hover:bg-muted transition-colors"
-              >
-                Siguiente
-              </button>
-            </div>
+          {/* Contador + refresh */}
+          <div className="ml-auto flex items-center gap-2">
+            {data?.count !== undefined && (
+              <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                {data.count} resultado{data.count !== 1 ? "s" : ""}
+              </span>
+            )}
+            <button
+              onClick={() => refetch()}
+              className="h-10 w-10 rounded-xl border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Refrescar"
+            >
+              <RefreshCw size={13} />
+            </button>
           </div>
-        )}
+        </div>
+
+        {/* FIX #5: Fila 2 — Tabs de estado */}
+        <div className="flex gap-1.5 flex-wrap">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                "h-8 px-3.5 rounded-full text-[11px] font-mono font-semibold uppercase tracking-widest border transition-all duration-150 whitespace-nowrap",
+                tab === t.key
+                  ? t.colorActivo + " shadow-sm"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/30 hover:text-foreground",
+              )}
+            >
+              {t.label}
+              {/* Muestra conteo en el tab activo */}
+              {t.key !== "todos" &&
+                tab === t.key &&
+                data?.count !== undefined && (
+                  <span className="ml-1.5 opacity-70">({data.count})</span>
+                )}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ── MODAL FORM ASESOR ── */}
-      {formOpen && (
-        <VentaFormAsesor
-          open={formOpen}
-          onClose={handleCerrarForm}
-          ventaOrigen={ventaParaReingresar}
-        />
-      )}
+      {/* ── Tabla ── */}
+      <DataTable
+        columns={columns}
+        data={ventas}
+        isLoading={isLoading}
+        emptyMessage={
+          tab === "pendientes"
+            ? "No tienes ventas pendientes"
+            : tab === "correccion"
+              ? "No tienes ventas en corrección"
+              : "No se encontraron ventas con los filtros aplicados"
+        }
+      />
+
+      {/* ── Form Asesor (Nueva / Editar / Reingresar) ── */}
+      <VentaFormAsesor
+        open={formOpen}
+        onClose={handleCloseForm}
+        ventaOrigen={ventaSeleccionada}
+      />
+
+      {/* FIX #4: Modal de confirmación de borrado */}
+      <ConfirmDeleteModal
+        venta={ventaParaEliminar}
+        onConfirm={confirmarEliminar}
+        onCancel={() => setVentaParaEliminar(null)}
+        isPending={eliminando}
+      />
     </div>
   );
 }

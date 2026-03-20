@@ -55,9 +55,9 @@ export const productosService = {
 
   /** Reactivar (activo=true) */
   reactivate: async (id: number): Promise<Producto> => {
-    const { data } = await api.patch(`/sales/productos/${id}/`, {
-      activo: true,
-    });
+    const { data } = await api.patch<Producto>(
+      `/sales/productos/${id}/reactivar/`,
+    );
     return data;
   },
 

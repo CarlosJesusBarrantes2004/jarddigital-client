@@ -177,26 +177,22 @@ export const salesService = {
   exportarExcel: async (
     fechaInicio?: string,
     fechaFin?: string,
+    estadoSot?: string, // FIX #6: "ATENDIDO" | "EJECUCION" | "RECHAZADO" | undefined
   ): Promise<void> => {
     const params = new URLSearchParams();
     if (fechaInicio) params.append("fecha_inicio", fechaInicio);
     if (fechaFin) params.append("fecha_fin", fechaFin);
+    if (estadoSot) params.append("estado_sot", estadoSot); // ← NUEVO
 
-    // responseType: "blob" es clave — le dice a axios que no intente parsear el binario como JSON
     const response = await api.get(
       `/sales/ventas/exportar_excel/?${params.toString()}`,
-      {
-        responseType: "blob",
-      },
+      { responseType: "blob" },
     );
 
-    // Creamos una URL temporal para el blob y la "clickeamos" para forzar la descarga
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
 
-    // Intentamos usar el nombre de archivo que manda el backend en el header,
-    // si no existe usamos uno por defecto.
     const contentDisposition = response.headers["content-disposition"] as
       | string
       | undefined;
@@ -205,8 +201,6 @@ export const salesService = {
 
     document.body.appendChild(link);
     link.click();
-
-    // Limpieza
     link.remove();
     window.URL.revokeObjectURL(url);
   },

@@ -1,617 +1,531 @@
-import { useState, useEffect, useRef } from "react";
+/**
+ * features/sales/pages/BackofficePage.tsx
+ *
+ * Fixes incluidos:
+ *   #5 (BO) — Filtros de fecha + tabs de estado (pendientes, ejecución,
+ *              atendidas, rechazadas, corrección)
+ *   #6      — Exportar Excel con selector de estado (Atendidas / Ejecución /
+ *              Rechazadas / Todas) y rango de fechas independiente
+ */
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search,
-  RefreshCw,
-  Filter,
   X,
-  ChevronDown,
-  FileDown,
+  Calendar,
+  RefreshCw,
+  Download,
   Loader2,
+  ChevronDown,
+  FileSpreadsheet,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-import {
-  useVentas,
-  useEstadosSOT,
-  useEstadosAudio,
-  useProductos,
-} from "../hooks/useSales";
+import { useVentas, useEstadosSOT, useEstadosAudio } from "../hooks/useSales";
 import { salesService } from "../services/sales.service";
-import type { Venta, VentaFiltros } from "../types/sales.types";
+import type { Venta, VentaFiltros, EstadoSOT } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
 import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 
-// ── Debounce hook ─────────────────────────────────────────────────────────────
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
+// ─── Tabs de estado ───────────────────────────────────────────────────────────
+type TabEstado =
+  | "todos"
+  | "pendientes"
+  | "ejecucion"
+  | "atendidas"
+  | "rechazadas"
+  | "correccion";
 
-// ── UI helpers ────────────────────────────────────────────────────────────────
-function FilterChip({
-  label,
-  active,
-  colorClass,
-  bgClass,
-  onClick,
-}: {
+const TABS: {
+  key: TabEstado;
   label: string;
-  active?: boolean;
-  colorClass: string;
-  bgClass: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-4 py-1.5 rounded-full text-xs font-sans transition-all duration-200 border whitespace-nowrap",
-        active
-          ? cn(bgClass, colorClass, "border-current/30 font-semibold shadow-sm")
-          : "bg-card border-border text-muted-foreground hover:bg-muted",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
+  colorActivo: string;
+}[] = [
+  {
+    key: "todos",
+    label: "Todas",
+    colorActivo: "bg-foreground text-background border-foreground",
+  },
+  {
+    key: "pendientes",
+    label: "Pendientes",
+    colorActivo:
+      "bg-amber-500/15 text-amber-600 border-amber-500/40 dark:text-amber-400",
+  },
+  {
+    key: "ejecucion",
+    label: "Ejecución",
+    colorActivo:
+      "bg-blue-500/15 text-blue-600 border-blue-500/40 dark:text-blue-400",
+  },
+  {
+    key: "atendidas",
+    label: "Atendidas",
+    colorActivo:
+      "bg-emerald-500/15 text-emerald-600 border-emerald-500/40 dark:text-emerald-400",
+  },
+  {
+    key: "rechazadas",
+    label: "Rechazadas",
+    colorActivo: "bg-destructive/15 text-destructive border-destructive/40",
+  },
+  {
+    key: "correccion",
+    label: "Corrección",
+    colorActivo:
+      "bg-orange-500/15 text-orange-600 border-orange-500/40 dark:text-orange-400",
+  },
+];
 
-function Select({
-  value,
-  onChange,
-  children,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  children: React.ReactNode;
-  placeholder: string;
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full h-11 bg-background border border-border rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 appearance-none outline-none transition-all cursor-pointer"
-      >
-        <option value="todos">{placeholder}</option>
-        {children}
-      </select>
-      <ChevronDown
-        size={14}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-      />
-    </div>
-  );
-}
+// ─── Opciones para exportar Excel (FIX #6) ───────────────────────────────────
+type EstadoExcel = "todas" | "ATENDIDO" | "EJECUCION" | "RECHAZADO";
 
-// ── Filtros extendidos ────────────────────────────────────────────────────────
-interface FiltrosLocales extends VentaFiltros {
-  _pendientes?: boolean;
-}
+const OPCIONES_EXCEL: { key: EstadoExcel; label: string; desc: string }[] = [
+  {
+    key: "todas",
+    label: "Todas las hojas",
+    desc: "Genera Atendidas + Ejecución + Rechazadas",
+  },
+  {
+    key: "ATENDIDO",
+    label: "Solo Atendidas",
+    desc: "Una hoja solo con ventas ATENDIDAS",
+  },
+  {
+    key: "EJECUCION",
+    label: "Solo Ejecución",
+    desc: "Una hoja solo con ventas en EJECUCIÓN",
+  },
+  {
+    key: "RECHAZADO",
+    label: "Solo Rechazadas",
+    desc: "Una hoja solo con ventas RECHAZADAS",
+  },
+];
 
-function buildFiltrosApi(f: FiltrosLocales): VentaFiltros {
-  const { _pendientes, ...rest } = f;
-  if (_pendientes) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id_estado_sot, ...sinEstado } = rest;
-    return { ...sinEstado, id_estado_sot__isnull: true } as VentaFiltros;
-  }
-  return rest;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface VentasBackofficePageProps {
-  soloLectura?: boolean;
-}
-
-export function VentasBackofficePage({
-  soloLectura = false,
-}: VentasBackofficePageProps) {
-  const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
-    null,
-  );
-  const [filtros, setFiltros] = useState<FiltrosLocales>({});
-  const [busqueda, setBusqueda] = useState("");
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [page, setPage] = useState(1);
-
-  // ── Estado para exportación ──────────────────────────────────────────────
+// ─── Panel de exportación Excel ───────────────────────────────────────────────
+function ExcelPanel({ onClose }: { onClose: () => void }) {
+  const [estadoExcel, setEstadoExcel] = useState<EstadoExcel>("todas");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [exportando, setExportando] = useState(false);
-  const [fechaInicio, setFechaInicio] = useState("");
-  const [fechaFin, setFechaFin] = useState("");
-  const [mostrarExport, setMostrarExport] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const busquedaDebounced = useDebounce(busqueda, 350);
-  const isFirstRender = useRef(true);
-
+  // Cerrar al hacer click fuera
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    setFiltros((f) => ({ ...f, search: busquedaDebounced || undefined }));
-    setPage(1);
-  }, [busquedaDebounced]);
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
 
-  const filtrosApi = buildFiltrosApi({ ...filtros, page });
-
-  const { data, isLoading, refetch } = useVentas(filtrosApi);
-  const { data: estadosSOT = [] } = useEstadosSOT();
-  const { data: estadosAudio = [] } = useEstadosAudio();
-  const { data: productosRaw = [] } = useProductos();
-
-  const productos = Array.isArray(productosRaw)
-    ? productosRaw
-    : ((productosRaw as { results?: typeof productosRaw }).results ?? []);
-
-  const ventas = data?.results ?? [];
-
-  const filtrosActivos =
-    Object.entries(filtros).filter(
-      ([k, v]) =>
-        v !== undefined &&
-        v !== "" &&
-        v !== null &&
-        k !== "search" &&
-        k !== "page" &&
-        k !== "_pendientes",
-    ).length + (filtros._pendientes ? 1 : 0);
-
-  const limpiarFiltros = () => {
-    setFiltros({});
-    setBusqueda("");
-    setPage(1);
-  };
-
-  const idEjecucion = estadosSOT.find((e) => e.codigo === "EJECUCION")?.id;
-  const idAtendido = estadosSOT.find((e) => e.codigo === "ATENDIDO")?.id;
-  const idRechazado = estadosSOT.find((e) => e.codigo === "RECHAZADO")?.id;
-
-  const columns = buildColumnsBackoffice(
-    estadosSOT,
-    estadosAudio,
-    soloLectura ? null : (v) => setVentaSeleccionada(v),
-  );
-
-  // ── Handler de exportación ────────────────────────────────────────────────
   const handleExportar = async () => {
-    if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
-      toast.error("La fecha de inicio no puede ser posterior a la fecha fin.");
-      return;
-    }
+    setExportando(true);
     try {
-      setExportando(true);
-      toast.loading("Generando Excel…", { id: "export-excel" });
       await salesService.exportarExcel(
-        fechaInicio || undefined,
-        fechaFin || undefined,
+        fechaDesde || undefined,
+        fechaHasta || undefined,
+        estadoExcel === "todas" ? undefined : estadoExcel,
       );
-      toast.success("Excel descargado correctamente", { id: "export-excel" });
-      setMostrarExport(false);
+      toast.success("Excel generado correctamente");
+      onClose();
     } catch {
-      toast.error("Error al generar el Excel. Intenta de nuevo.", {
-        id: "export-excel",
-      });
+      toast.error("Error al generar el Excel. Inténtalo de nuevo.");
     } finally {
       setExportando(false);
     }
   };
 
   return (
-    <div className="font-sans min-h-screen bg-background text-foreground transition-colors duration-300">
-      <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* ── HEADER ── */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[11px] tracking-widest uppercase text-primary mb-1.5 font-semibold">
-              {soloLectura ? "Visión Global" : "Backoffice & Control"}
-            </p>
-            <h1 className="font-serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-1.5">
-              Gestión de Ventas
-            </h1>
-            <p className="text-sm text-muted-foreground font-light">
-              {isLoading ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-16 h-4 rounded bg-muted/60 animate-pulse inline-block" />
-                  <span className="text-muted-foreground/50">
-                    ventas encontradas
-                  </span>
-                </span>
-              ) : (
-                <>
-                  <strong className="text-primary font-mono font-semibold">
-                    {data?.count ?? 0}
-                  </strong>{" "}
-                  ventas encontradas
-                </>
-              )}
-            </p>
-          </div>
-
-          {/* Botones de acción del header */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => refetch()}
-              className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-xl bg-card border border-border text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all shadow-sm"
-            >
-              <RefreshCw size={16} /> Refrescar
-            </button>
-
-            {/* Botón Exportar Excel (solo para roles que pueden verlo) */}
-            <div className="relative">
-              <button
-                onClick={() => setMostrarExport(!mostrarExport)}
-                className="inline-flex justify-center items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
-              >
-                <FileDown size={16} /> Exportar Excel
-              </button>
-
-              {/* Panel de configuración de fechas para exportar */}
-              {mostrarExport && (
-                <>
-                  {/* Overlay para cerrar al hacer click fuera */}
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setMostrarExport(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 z-20 w-72 bg-card border border-border rounded-2xl shadow-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground mb-3 font-semibold">
-                      Rango de Fechas de Venta
-                    </p>
-                    <div className="space-y-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[11px] text-muted-foreground font-medium">
-                          Desde
-                        </label>
-                        <input
-                          type="date"
-                          value={fechaInicio}
-                          onChange={(e) => setFechaInicio(e.target.value)}
-                          className="h-10 px-3 rounded-xl bg-background border border-border text-sm text-foreground outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[11px] text-muted-foreground font-medium">
-                          Hasta
-                        </label>
-                        <input
-                          type="date"
-                          value={fechaFin}
-                          onChange={(e) => setFechaFin(e.target.value)}
-                          className="h-10 px-3 rounded-xl bg-background border border-border text-sm text-foreground outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                        />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-                        Si no seleccionas fechas, se exportarán{" "}
-                        <strong>todas las ventas</strong>.
-                      </p>
-                      <button
-                        onClick={handleExportar}
-                        disabled={exportando}
-                        className="w-full h-10 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                      >
-                        {exportando ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />{" "}
-                            Generando…
-                          </>
-                        ) : (
-                          <>
-                            <FileDown size={14} /> Descargar Excel
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+    <div
+      ref={ref}
+      className="absolute right-0 top-12 z-50 w-80 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
+    >
+      {/* Header del panel */}
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-3">
+        <FileSpreadsheet size={16} className="text-emerald-500 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-foreground leading-none">
+            Exportar Excel
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Configura qué datos descargar
+          </p>
         </div>
-
-        {/* ── CHIPS RÁPIDOS ── */}
-        <div className="flex flex-wrap gap-2.5">
-          <FilterChip
-            label="Todos"
-            active={Object.keys(filtros).length === 0}
-            colorClass="text-foreground"
-            bgClass="bg-muted"
-            onClick={limpiarFiltros}
-          />
-          <FilterChip
-            label="Pendientes"
-            active={!!filtros._pendientes}
-            colorClass="text-amber-500"
-            bgClass="bg-amber-500/10"
-            onClick={() =>
-              setFiltros((f) => {
-                if (f._pendientes) {
-                  const { _pendientes, ...rest } = f;
-                  return rest;
-                }
-                const { id_estado_sot, solicitud_correccion, ...rest } = f;
-                return { ...rest, _pendientes: true };
-              })
-            }
-          />
-          {idEjecucion && (
-            <FilterChip
-              label="En Ejecución"
-              active={filtros.id_estado_sot === String(idEjecucion)}
-              colorClass="text-blue-500"
-              bgClass="bg-blue-500/10"
-              onClick={() =>
-                setFiltros((f) => {
-                  const { _pendientes, ...rest } = f;
-                  return {
-                    ...rest,
-                    id_estado_sot:
-                      f.id_estado_sot === String(idEjecucion)
-                        ? undefined
-                        : String(idEjecucion),
-                  };
-                })
-              }
-            />
-          )}
-          {idAtendido && (
-            <FilterChip
-              label="Atendidas"
-              active={filtros.id_estado_sot === String(idAtendido)}
-              colorClass="text-emerald-500"
-              bgClass="bg-emerald-500/10"
-              onClick={() =>
-                setFiltros((f) => {
-                  const { _pendientes, ...rest } = f;
-                  return {
-                    ...rest,
-                    id_estado_sot:
-                      f.id_estado_sot === String(idAtendido)
-                        ? undefined
-                        : String(idAtendido),
-                  };
-                })
-              }
-            />
-          )}
-          {idRechazado && (
-            <FilterChip
-              label="Rechazadas"
-              active={filtros.id_estado_sot === String(idRechazado)}
-              colorClass="text-destructive"
-              bgClass="bg-destructive/10"
-              onClick={() =>
-                setFiltros((f) => {
-                  const { _pendientes, ...rest } = f;
-                  return {
-                    ...rest,
-                    id_estado_sot:
-                      f.id_estado_sot === String(idRechazado)
-                        ? undefined
-                        : String(idRechazado),
-                  };
-                })
-              }
-            />
-          )}
-          <FilterChip
-            label="En corrección"
-            active={filtros.solicitud_correccion === true}
-            colorClass="text-orange-500"
-            bgClass="bg-orange-500/10"
-            onClick={() =>
-              setFiltros((f) => {
-                if (f.solicitud_correccion === true) {
-                  const { solicitud_correccion, ...rest } = f;
-                  return rest;
-                }
-                const { id_estado_sot, _pendientes, ...rest } = f;
-                return { ...rest, solicitud_correccion: true };
-              })
-            }
-          />
-        </div>
-
-        {/* ── BÚSQUEDA Y FILTROS AVANZADOS ── */}
-        <div className="flex flex-col gap-3 bg-card border border-border p-3 rounded-2xl shadow-sm">
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="flex-1 w-full relative flex items-center">
-              <Search
-                size={16}
-                className="absolute left-4 text-muted-foreground pointer-events-none"
-              />
-              <input
-                type="text"
-                placeholder="Buscar por cliente, DNI, SOT, SEC, asesor…"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full h-11 bg-background border border-border rounded-xl pl-11 pr-10 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
-              />
-              {busqueda && (
-                <button
-                  type="button"
-                  onClick={() => setBusqueda("")}
-                  className="absolute right-3.5 text-muted-foreground/50 hover:text-foreground transition-colors"
-                  aria-label="Limpiar búsqueda"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            <div className="flex w-full sm:w-auto gap-2">
-              <button
-                onClick={() => setMostrarFiltros(!mostrarFiltros)}
-                className={cn(
-                  "flex-1 sm:flex-none h-11 px-5 flex items-center justify-center gap-2 rounded-xl border text-xs font-semibold transition-colors",
-                  mostrarFiltros
-                    ? "bg-primary/10 border-primary/30 text-primary"
-                    : "bg-background border-border text-muted-foreground hover:bg-muted",
-                )}
-              >
-                <Filter size={14} /> Filtros
-                {filtrosActivos > 0 && (
-                  <span className="w-4 h-4 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px]">
-                    {filtrosActivos}
-                  </span>
-                )}
-              </button>
-              {(filtrosActivos > 0 || busqueda) && (
-                <button
-                  onClick={limpiarFiltros}
-                  className="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-transparent border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center gap-2"
-                >
-                  <X size={14} />{" "}
-                  <span className="hidden sm:inline">Limpiar</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {mostrarFiltros && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-border animate-in fade-in slide-in-from-top-2">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
-                  Estado SOT
-                </label>
-                <Select
-                  value={
-                    filtros._pendientes
-                      ? "null"
-                      : filtros.id_estado_sot
-                        ? String(filtros.id_estado_sot)
-                        : "todos"
-                  }
-                  onChange={(v) => {
-                    if (v === "todos")
-                      setFiltros((f) => {
-                        const { id_estado_sot, _pendientes, ...rest } = f;
-                        return rest;
-                      });
-                    else if (v === "null")
-                      setFiltros((f) => {
-                        const { id_estado_sot, solicitud_correccion, ...rest } =
-                          f;
-                        return { ...rest, _pendientes: true };
-                      });
-                    else
-                      setFiltros((f) => {
-                        const { _pendientes, ...rest } = f;
-                        return { ...rest, id_estado_sot: v };
-                      });
-                  }}
-                  placeholder="Todos los estados"
-                >
-                  <option value="null">Sin estado (pendiente)</option>
-                  {estadosSOT.map((e) => (
-                    <option key={e.id} value={String(e.id)}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
-                  Estado Audios
-                </label>
-                <Select
-                  value={
-                    filtros.id_estado_audios
-                      ? String(filtros.id_estado_audios)
-                      : "todos"
-                  }
-                  onChange={(v) =>
-                    setFiltros({
-                      ...filtros,
-                      id_estado_audios: v === "todos" ? undefined : v,
-                    })
-                  }
-                  placeholder="Todos"
-                >
-                  {estadosAudio.map((ea) => (
-                    <option key={ea.id} value={String(ea.id)}>
-                      {ea.nombre}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground">
-                  Plan / Producto
-                </label>
-                <Select
-                  value={
-                    filtros.id_producto ? String(filtros.id_producto) : "todos"
-                  }
-                  onChange={(v) =>
-                    setFiltros({
-                      ...filtros,
-                      id_producto: v === "todos" ? undefined : v,
-                    })
-                  }
-                  placeholder="Todos los planes"
-                >
-                  {productos.map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.nombre_paquete}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── TABLA ── */}
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden mb-4">
-          <DataTable
-            columns={columns}
-            data={ventas}
-            isLoading={isLoading}
-            emptyMessage="No hay ventas que coincidan con los filtros aplicados"
-          />
-        </div>
-
-        {/* ── PAGINACIÓN ── */}
-        {data && (data.next || data.previous) && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
-            <span>
-              <strong className="text-foreground">{data.count}</strong> ventas
-              en total
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={!data.previous}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-4 py-2 rounded-lg bg-card border border-border disabled:opacity-50 hover:bg-muted transition-colors"
-              >
-                Anterior
-              </button>
-              <button
-                disabled={!data.next}
-                onClick={() => setPage((p) => p + 1)}
-                className="px-4 py-2 rounded-lg bg-card border border-border disabled:opacity-50 hover:bg-muted transition-colors"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {ventaSeleccionada && !soloLectura && (
+      <div className="p-5 flex flex-col gap-5">
+        {/* FIX #6: Selector de estado para el Excel */}
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-bold mb-2">
+            Incluir estados
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {OPCIONES_EXCEL.map((op) => (
+              <button
+                key={op.key}
+                onClick={() => setEstadoExcel(op.key)}
+                className={cn(
+                  "flex items-start gap-3 p-3 rounded-xl text-left border transition-all duration-150",
+                  estadoExcel === op.key
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                    : "bg-background border-border hover:bg-muted text-foreground",
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center",
+                    estadoExcel === op.key
+                      ? "border-emerald-500 bg-emerald-500"
+                      : "border-muted-foreground/40",
+                  )}
+                >
+                  {estadoExcel === op.key && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-[13px] font-medium leading-none mb-0.5">
+                    {op.label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    {op.desc}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Rango de fechas para el Excel (independiente del filtro de tabla) */}
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-bold mb-2">
+            Rango de fechas{" "}
+            <span className="normal-case font-normal">(opcional)</span>
+          </p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-border bg-background">
+              <Calendar size={12} className="text-muted-foreground shrink-0" />
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+                className="flex-1 text-sm bg-transparent outline-none text-foreground cursor-pointer"
+                placeholder="Desde"
+              />
+            </div>
+            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-border bg-background">
+              <Calendar size={12} className="text-muted-foreground shrink-0" />
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+                className="flex-1 text-sm bg-transparent outline-none text-foreground cursor-pointer"
+                placeholder="Hasta"
+              />
+            </div>
+            {(fechaDesde || fechaHasta) && (
+              <button
+                onClick={() => {
+                  setFechaDesde("");
+                  setFechaHasta("");
+                }}
+                className="text-[11px] text-muted-foreground hover:text-destructive text-left transition-colors"
+              >
+                ✕ Limpiar fechas
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Botones */}
+        <div className="flex gap-2 pt-1 border-t border-border">
+          <Button
+            variant="outline"
+            className="flex-1 h-10 rounded-xl text-sm"
+            onClick={onClose}
+            disabled={exportando}
+          >
+            Cancelar
+          </Button>
+          <Button
+            className="flex-1 h-10 rounded-xl text-sm bg-emerald-500 hover:bg-emerald-600 text-white font-semibold shadow-sm shadow-emerald-500/20 gap-2"
+            onClick={handleExportar}
+            disabled={exportando}
+          >
+            {exportando ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}
+            {exportando ? "Generando…" : "Descargar"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hook: construye VentaFiltros a partir del tab + fechas + search ──────────
+function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
+  const [tab, setTab] = useState<TabEstado>("todos");
+  const [search, setSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+
+  const filtros: VentaFiltros = useMemo(() => {
+    const base: VentaFiltros = {
+      search: search || undefined,
+      ...(fechaDesde ? { fecha_inicio: fechaDesde } : {}),
+      ...(fechaHasta ? { fecha_fin: fechaHasta } : {}),
+    } as VentaFiltros;
+
+    switch (tab) {
+      case "pendientes":
+        return { ...base, id_estado_sot__isnull: true };
+      case "correccion":
+        return { ...base, solicitud_correccion: true };
+      case "ejecucion": {
+        const e = estadosSOT.find(
+          (s) => s.codigo.toUpperCase() === "EJECUCION",
+        );
+        return e ? { ...base, id_estado_sot: e.id } : base;
+      }
+      case "atendidas": {
+        const e = estadosSOT.find((s) => s.codigo.toUpperCase() === "ATENDIDO");
+        return e ? { ...base, id_estado_sot: e.id } : base;
+      }
+      case "rechazadas": {
+        const e = estadosSOT.find(
+          (s) => s.codigo.toUpperCase() === "RECHAZADO",
+        );
+        return e ? { ...base, id_estado_sot: e.id } : base;
+      }
+      default:
+        return base;
+    }
+  }, [tab, search, fechaDesde, fechaHasta, estadosSOT]);
+
+  return {
+    tab,
+    setTab,
+    search,
+    setSearch,
+    fechaDesde,
+    setFechaDesde,
+    fechaHasta,
+    setFechaHasta,
+    filtros,
+  };
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+interface BackofficePageProps {
+  /** Pasar null si el rol es DUEÑO (solo lectura, sin botón Gestionar) */
+  soloLectura?: boolean;
+}
+
+export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
+  const { data: estadosSOTData = [] } = useEstadosSOT();
+  const { data: estadosAudio = [] } = useEstadosAudio();
+
+  const {
+    tab,
+    setTab,
+    search,
+    setSearch,
+    fechaDesde,
+    setFechaDesde,
+    fechaHasta,
+    setFechaHasta,
+    filtros,
+  } = useFiltrosBackoffice(estadosSOTData);
+
+  const { data, isLoading, refetch } = useVentas(filtros);
+  const ventas = data?.results ?? [];
+
+  const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
+    null,
+  );
+  const [excelOpen, setExcelOpen] = useState(false);
+
+  const handleGestionar = (v: Venta) => setVentaSeleccionada(v);
+  const handleCerrarForm = () => setVentaSeleccionada(null);
+
+  const columns = useMemo(
+    () =>
+      buildColumnsBackoffice(
+        estadosSOTData,
+        estadosAudio,
+        soloLectura ? null : handleGestionar,
+      ),
+    [estadosSOTData, estadosAudio, soloLectura],
+  );
+
+  const tieneFechas = !!fechaDesde || !!fechaHasta;
+
+  return (
+    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-[1400px] mx-auto">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground tracking-tight">
+            Gestión de Ventas
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Revisa, procesa y controla el estado de todas las ventas
+          </p>
+        </div>
+
+        {/* FIX #6: Botón Excel con panel desplegable */}
+        <div className="relative">
+          <Button
+            variant="outline"
+            onClick={() => setExcelOpen((v) => !v)}
+            className="h-11 px-5 rounded-xl gap-2 font-medium"
+          >
+            <Download size={15} />
+            <span className="hidden sm:inline">Exportar Excel</span>
+            <ChevronDown
+              size={13}
+              className={cn(
+                "transition-transform duration-200",
+                excelOpen && "rotate-180",
+              )}
+            />
+          </Button>
+
+          {excelOpen && <ExcelPanel onClose={() => setExcelOpen(false)} />}
+        </div>
+      </div>
+
+      {/* ── Filtros ── */}
+      <div className="flex flex-col gap-3">
+        {/* Fila 1: Búsqueda + fechas + refresh */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Buscador */}
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <Search
+              size={13}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Cliente, DNI, asesor, SOT, SEC…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-background border border-border text-sm font-sans outline-none transition-all focus:ring-4 focus:ring-primary/10 focus:border-primary"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* FIX #5: Rango de fechas */}
+          <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
+            <Calendar size={12} className="text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              title="Desde"
+              className="text-sm text-foreground bg-transparent outline-none w-[7.5rem] cursor-pointer"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground select-none">—</span>
+          <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
+            <Calendar size={12} className="text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              title="Hasta"
+              className="text-sm text-foreground bg-transparent outline-none w-[7.5rem] cursor-pointer"
+            />
+          </div>
+          {tieneFechas && (
+            <button
+              onClick={() => {
+                setFechaDesde("");
+                setFechaHasta("");
+              }}
+              className="h-10 px-3 rounded-xl border border-border text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Limpiar fechas"
+            >
+              <X size={13} />
+            </button>
+          )}
+
+          {/* Contador + refresh */}
+          <div className="ml-auto flex items-center gap-2">
+            {data?.count !== undefined && (
+              <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                {data.count} resultado{data.count !== 1 ? "s" : ""}
+              </span>
+            )}
+            <button
+              onClick={() => refetch()}
+              className="h-10 w-10 rounded-xl border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Refrescar"
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* FIX #5: Fila 2 — Tabs de estado */}
+        <div className="flex gap-1.5 flex-wrap">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                "h-8 px-3.5 rounded-full text-[11px] font-mono font-semibold uppercase tracking-widest border transition-all duration-150 whitespace-nowrap",
+                tab === t.key
+                  ? t.colorActivo + " shadow-sm"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/30 hover:text-foreground",
+              )}
+            >
+              {t.label}
+              {t.key !== "todos" &&
+                tab === t.key &&
+                data?.count !== undefined && (
+                  <span className="ml-1.5 opacity-70">({data.count})</span>
+                )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tabla ── */}
+      <DataTable
+        columns={columns}
+        data={ventas}
+        isLoading={isLoading}
+        emptyMessage={
+          tab === "pendientes"
+            ? "No hay ventas pendientes de gestión"
+            : tab === "correccion"
+              ? "No hay ventas en corrección"
+              : tab === "atendidas"
+                ? "No hay ventas atendidas con estos filtros"
+                : "No se encontraron ventas con los filtros aplicados"
+        }
+      />
+
+      {/* ── Form Backoffice ── */}
+      {ventaSeleccionada && (
         <VentaFormBackoffice
-          key={ventaSeleccionada.id}
           open={!!ventaSeleccionada}
-          onClose={() => setVentaSeleccionada(null)}
+          onClose={handleCerrarForm}
           venta={ventaSeleccionada}
         />
       )}

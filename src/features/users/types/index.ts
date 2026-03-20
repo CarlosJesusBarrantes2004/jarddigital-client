@@ -70,6 +70,7 @@ export interface UserFilters {
   search?: string;
   id_rol?: number;
   id_modalidad_sede?: number;
+  activo?: boolean;
 }
 
 // ── Opción de workspace para selects ─────────

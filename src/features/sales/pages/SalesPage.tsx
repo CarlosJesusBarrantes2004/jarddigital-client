@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/auth/context/useAuth";
-import { VentasAsesorPage } from "./Ventasasesorpage";
-import { VentasBackofficePage } from "./Ventasbackofficepage";
+import { AsesorPage } from "./Ventasasesorpage";
+import { BackofficePage } from "./Ventasbackofficepage";
 
 /**
  * Punto de entrada único para /sales
@@ -13,9 +13,9 @@ export const SalesPage = () => {
   const { user } = useAuth();
   const rol = user?.rol?.codigo ?? "";
 
-  if (rol === "ASESOR") return <VentasAsesorPage />;
+  if (rol === "ASESOR") return <AsesorPage></AsesorPage>;
 
   // El DUEÑO puede ver todo pero NO gestionar ventas
   const soloLectura = rol === "DUENO";
-  return <VentasBackofficePage soloLectura={soloLectura} />;
+  return <BackofficePage soloLectura={soloLectura} />;
 };

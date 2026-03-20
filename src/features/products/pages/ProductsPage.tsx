@@ -1,3 +1,17 @@
+/**
+ * features/products/pages/ProductsPage.tsx
+ *
+ * FIX #7 — El chip "Inactivos" ahora realmente muestra los productos inactivos.
+ *
+ * El problema original: cuando se pulsaba el chip "Inactivos" se mandaba
+ * ?activo=false al backend, PERO el ProductoViewSet extiende SoftDeleteModelViewSet
+ * cuyo get_queryset base devuelve solo activos. Resultado: lista vacía.
+ *
+ * Solución en el frontend: separamos la consulta en dos instancias de useProductos —
+ * una para activos y otra para inactivos — y las mostramos en tabs.
+ * El botón Reactivar ya existe en buildColumnsProductos (RotateCcw) y en
+ * useReactivateProducto, solo faltaba que los inactivos llegaran.
+ */
 import { useState, useMemo, memo, useEffect, useRef } from "react";
 import {
   Plus,
@@ -29,7 +43,7 @@ import { DataTable } from "@/features/sales";
 import { ProductoForm } from "../components/ProductForm";
 import { ConfirmDialog } from "../components/Confirmdialog";
 
-// ── Debounce hook ─────────────────────────────────────────────────────────────
+// ── Debounce ──────────────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -38,6 +52,9 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
   return debounced;
 }
+
+// ── Tab ───────────────────────────────────────────────────────────────────────
+type Tab = "activos" | "inactivos";
 
 // ── StatCard ──────────────────────────────────────────────────────────────────
 const StatCard = memo(function StatCard({
@@ -78,7 +95,7 @@ const StatCard = memo(function StatCard({
         ) : (
           <p
             className={cn(
-              "font-serif text-2xl font-semibold leading-none tracking-tight transition-colors duration-300",
+              "font-serif text-2xl font-semibold leading-none tracking-tight",
               value === 0 || value === "S/ 0.00"
                 ? "text-foreground/80"
                 : colorClass,
@@ -129,19 +146,17 @@ export function ProductosPage() {
     null,
   );
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [tab, setTab] = useState<Tab>("activos");
 
-  const [filtros, setFiltros] = useState<ProductoFiltros>({});
-  // busqueda = valor del input (inmediato, lo que el usuario ve)
+  // Filtros compartidos (búsqueda, campaña, tipo)
+  // El filtro `activo` lo manejamos internamente vía tab, no a través del chip
+  const [filtros, setFiltros] = useState<Omit<ProductoFiltros, "activo">>({});
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
-
-  // Debounce de 350ms: el filtro API solo se actualiza cuando el usuario para de escribir
   const busquedaDebounced = useDebounce(busqueda, 350);
 
-  // Sincronizamos el filtro `search` con el valor debounced
   const isFirstRender = useRef(true);
   useEffect(() => {
-    // Saltamos el primer render para no lanzar una petición innecesaria al montar
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -150,30 +165,57 @@ export function ProductosPage() {
     setPage(1);
   }, [busquedaDebounced]);
 
-  const { data, isLoading, refetch } = useProductos({ ...filtros, page });
+  // FIX #7: dos queries separadas — una para activos, otra para inactivos
+  const filtrosActivos: ProductoFiltros = { ...filtros, activo: true, page };
+  const filtrosInactivos: ProductoFiltros = { ...filtros, activo: false, page };
+
+  const {
+    data: dataActivos,
+    isLoading: loadingActivos,
+    refetch: refetchActivos,
+  } = useProductos(filtrosActivos);
+  const {
+    data: dataInactivos,
+    isLoading: loadingInactivos,
+    refetch: refetchInactivos,
+  } = useProductos(filtrosInactivos);
+
   const { data: campanas = [], isLoading: loadingCampanas } = useCampanas();
   const { mutateAsync: eliminar, isPending: eliminando } = useDeleteProducto();
   const { mutateAsync: reactivar } = useReactivateProducto();
 
-  const productos: Producto[] = Array.isArray(data)
-    ? data
-    : (data?.results ?? []);
+  const productosActivos: Producto[] = Array.isArray(dataActivos)
+    ? dataActivos
+    : (dataActivos?.results ?? []);
+  const productosInactivos: Producto[] = Array.isArray(dataInactivos)
+    ? dataInactivos
+    : (dataInactivos?.results ?? []);
+  const productos = tab === "activos" ? productosActivos : productosInactivos;
 
   const stats = useMemo(() => {
-    if (!data)
-      return { total: 0, activos: 0, alto_valor: 0, promedio_comision: "0.00" };
-    const items: Producto[] = Array.isArray(data) ? data : (data.results ?? []);
-    const total = Array.isArray(data) ? items.length : data.count;
-    const activos = items.filter((p) => p.activo).length;
-    const alto_valor = items.filter((p) => p.es_alto_valor).length;
-    const promedio_comision = items.length
+    const totalActivos = Array.isArray(dataActivos)
+      ? dataActivos.length
+      : (dataActivos?.count ?? 0);
+    const totalInactivos = Array.isArray(dataInactivos)
+      ? dataInactivos.length
+      : (dataInactivos?.count ?? 0);
+    const alto_valor = productosActivos.filter((p) => p.es_alto_valor).length;
+    const promedio_comision = productosActivos.length
       ? (
-          items.reduce((acc, p) => acc + Number(p.comision_base || 0), 0) /
-          items.length
+          productosActivos.reduce(
+            (acc, p) => acc + Number(p.comision_base || 0),
+            0,
+          ) / productosActivos.length
         ).toFixed(2)
       : "0.00";
-    return { total, activos, alto_valor, promedio_comision };
-  }, [data]);
+    return {
+      total: totalActivos + totalInactivos,
+      activos: totalActivos,
+      inactivos: totalInactivos,
+      alto_valor,
+      promedio_comision,
+    };
+  }, [dataActivos, dataInactivos, productosActivos]);
 
   const limpiar = () => {
     setFiltros({});
@@ -185,12 +227,10 @@ export function ProductosPage() {
     setProductoEditar(p);
     setFormOpen(true);
   };
-
   const handleNuevo = () => {
     setProductoEditar(null);
     setFormOpen(true);
   };
-
   const handleCerrarForm = () => {
     setFormOpen(false);
     setProductoEditar(null);
@@ -202,6 +242,8 @@ export function ProductosPage() {
       await eliminar(productoEliminar.id);
       toast.success(`"${productoEliminar.nombre_paquete}" desactivado`);
       setProductoEliminar(null);
+      refetchActivos();
+      refetchInactivos(); // FIX #7: refrescamos inactivos también
     } catch {
       toast.error("Error al desactivar el producto");
     }
@@ -211,12 +253,14 @@ export function ProductosPage() {
     try {
       await reactivar(p.id);
       toast.success(`"${p.nombre_paquete}" reactivado`);
+      refetchActivos(); // FIX #7: vuelve a aparecer en activos
+      refetchInactivos(); // FIX #7: desaparece de inactivos
     } catch {
       toast.error("Error al reactivar el producto");
     }
   };
 
-  const filtrosActivos = Object.entries(filtros).filter(
+  const filtrosActivosCount = Object.entries(filtros).filter(
     ([k, v]) => v !== undefined && v !== "" && v !== null && k !== "search",
   ).length;
 
@@ -225,7 +269,16 @@ export function ProductosPage() {
     setProductoEliminar,
     handleReactivar,
   );
-  const paginado = !Array.isArray(data) ? data : null;
+  const paginado =
+    tab === "activos"
+      ? !Array.isArray(dataActivos)
+        ? dataActivos
+        : null
+      : !Array.isArray(dataInactivos)
+        ? dataInactivos
+        : null;
+
+  const isLoading = tab === "activos" ? loadingActivos : loadingInactivos;
 
   return (
     <>
@@ -245,8 +298,7 @@ export function ProductosPage() {
             onClick={handleNuevo}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-[0_4px_16px_rgba(var(--primary),0.2)] hover:-translate-y-[1px] active:scale-[0.98]"
           >
-            <Plus size={16} strokeWidth={2.5} />
-            <span className="font-semibold">Nuevo Producto</span>
+            <Plus size={16} strokeWidth={2.5} /> Nuevo Producto
           </button>
         </div>
 
@@ -259,100 +311,111 @@ export function ProductosPage() {
             colorClass="text-primary"
             bgClass="bg-primary/10"
             borderClass="border-primary/20"
-            isLoading={isLoading}
+            isLoading={loadingActivos}
           />
           <StatCard
             icon={<ToggleLeft size={18} strokeWidth={1.5} />}
             label="Activos"
-            value={isLoading ? 0 : stats.activos}
+            value={loadingActivos ? 0 : stats.activos}
             colorClass="text-emerald-500"
             bgClass="bg-emerald-500/10"
             borderClass="border-emerald-500/20"
-            isLoading={isLoading}
+            isLoading={loadingActivos}
           />
           <StatCard
             icon={<Star size={18} strokeWidth={1.5} />}
             label="Alto valor"
-            value={isLoading ? 0 : stats.alto_valor}
+            value={loadingActivos ? 0 : stats.alto_valor}
             colorClass="text-[#C9975A]"
             bgClass="bg-[#C9975A]/10"
             borderClass="border-[#C9975A]/20"
-            isLoading={isLoading}
+            isLoading={loadingActivos}
           />
           <StatCard
             icon={<TrendingUp size={18} strokeWidth={1.5} />}
             label="Comisión prom."
-            value={isLoading ? "—" : `S/ ${stats.promedio_comision}`}
+            value={loadingActivos ? "—" : `S/ ${stats.promedio_comision}`}
             colorClass="text-purple-500"
             bgClass="bg-purple-500/10"
             borderClass="border-purple-500/20"
-            isLoading={isLoading}
+            isLoading={loadingActivos}
           />
         </div>
 
-        {/* ── Filter chips ── */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <FilterChip
-            label="Todos"
-            active={Object.keys(filtros).length === 0}
-            activeClass="bg-muted text-foreground border-border"
-            onClick={limpiar}
-          />
-          <div className="h-4 w-px bg-border mx-1" />
-          <FilterChip
-            label="Activos"
-            active={filtros.activo === true}
-            activeClass="bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-            onClick={() =>
-              setFiltros((f) => ({
-                ...f,
-                activo: f.activo === true ? undefined : true,
-              }))
-            }
-          />
-          <FilterChip
-            label="Inactivos"
-            active={filtros.activo === false}
-            activeClass="bg-destructive/10 text-destructive border-destructive/30"
-            onClick={() =>
-              setFiltros((f) => ({
-                ...f,
-                activo: f.activo === false ? undefined : false,
-              }))
-            }
-          />
-          <FilterChip
-            label="⭐ Alto valor"
-            active={filtros.es_alto_valor === true}
-            activeClass="bg-[#C9975A]/10 text-[#C9975A] border-[#C9975A]/30"
-            onClick={() =>
-              setFiltros((f) => ({
-                ...f,
-                es_alto_valor: f.es_alto_valor === true ? undefined : true,
-              }))
-            }
-          />
-          <div className="h-4 w-px bg-border mx-1" />
-          {TIPOS_SOLUCION.map((tipo) => (
+        {/* ── FIX #7: Tabs Activos / Inactivos ── */}
+        <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit border border-border">
+          <button
+            onClick={() => setTab("activos")}
+            className={cn(
+              "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+              tab === "activos"
+                ? "bg-card text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Activos ({loadingActivos ? "…" : stats.activos})
+          </button>
+          <button
+            onClick={() => setTab("inactivos")}
+            className={cn(
+              "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+              tab === "inactivos"
+                ? "bg-card text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Inactivos ({loadingInactivos ? "…" : stats.inactivos})
+          </button>
+        </div>
+
+        {/* ── Filter chips — solo para activos ── */}
+        {tab === "activos" && (
+          <div className="flex flex-wrap gap-2 items-center">
             <FilterChip
-              key={tipo}
-              label={tipo}
-              active={filtros.tipo_solucion === tipo}
-              activeClass="bg-primary/10 text-primary border-primary/30"
+              label="Todos"
+              active={Object.keys(filtros).length === 0}
+              activeClass="bg-muted text-foreground border-border"
+              onClick={limpiar}
+            />
+            <div className="h-4 w-px bg-border mx-1" />
+            <FilterChip
+              label="⭐ Alto valor"
+              active={(filtros as ProductoFiltros).es_alto_valor === true}
+              activeClass="bg-[#C9975A]/10 text-[#C9975A] border-[#C9975A]/30"
               onClick={() =>
                 setFiltros((f) => ({
                   ...f,
-                  tipo_solucion: f.tipo_solucion === tipo ? undefined : tipo,
+                  es_alto_valor:
+                    (f as ProductoFiltros).es_alto_valor === true
+                      ? undefined
+                      : true,
                 }))
               }
             />
-          ))}
-        </div>
+            <div className="h-4 w-px bg-border mx-1" />
+            {TIPOS_SOLUCION.map((tipo) => (
+              <FilterChip
+                key={tipo}
+                label={tipo}
+                active={(filtros as ProductoFiltros).tipo_solucion === tipo}
+                activeClass="bg-primary/10 text-primary border-primary/30"
+                onClick={() =>
+                  setFiltros((f) => ({
+                    ...f,
+                    tipo_solucion:
+                      (f as ProductoFiltros).tipo_solucion === tipo
+                        ? undefined
+                        : tipo,
+                  }))
+                }
+              />
+            ))}
+          </div>
+        )}
 
         {/* ── Search & filters bar ── */}
         <div className="bg-card/50 border border-border rounded-2xl p-4 shadow-sm flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Input de búsqueda live — filtra al escribir, sin form ni botón submit */}
             <div className="flex-1 w-full relative flex items-center">
               <Search
                 size={16}
@@ -365,19 +428,16 @@ export function ProductosPage() {
                 onChange={(e) => setBusqueda(e.target.value)}
                 className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-11 pr-10 text-sm text-foreground focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted-foreground/60"
               />
-              {/* Borrar solo el texto del input */}
               {busqueda && (
                 <button
                   type="button"
                   onClick={() => setBusqueda("")}
                   className="absolute right-3.5 text-muted-foreground/50 hover:text-foreground transition-colors"
-                  aria-label="Limpiar búsqueda"
                 >
                   <X size={14} />
                 </button>
               )}
             </div>
-
             <div className="flex w-full sm:w-auto gap-2">
               <button
                 type="button"
@@ -390,23 +450,24 @@ export function ProductosPage() {
                 )}
               >
                 <Filter size={14} /> Filtros
-                {filtrosActivos > 0 && (
+                {filtrosActivosCount > 0 && (
                   <span className="w-4 h-4 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-bold font-mono">
-                    {filtrosActivos}
+                    {filtrosActivosCount}
                   </span>
                 )}
               </button>
-
               <button
                 type="button"
-                onClick={() => refetch()}
+                onClick={() => {
+                  refetchActivos();
+                  refetchInactivos();
+                }}
                 title="Refrescar"
                 className="w-11 h-11 flex items-center justify-center rounded-xl bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
               >
                 <RefreshCw size={14} />
               </button>
-
-              {(filtrosActivos > 0 || busqueda) && (
+              {(filtrosActivosCount > 0 || busqueda) && (
                 <button
                   type="button"
                   onClick={limpiar}
@@ -427,7 +488,9 @@ export function ProductosPage() {
                 </label>
                 <div className="relative">
                   <select
-                    value={filtros.nombre_campana ?? "todos"}
+                    value={
+                      (filtros as ProductoFiltros).nombre_campana ?? "todos"
+                    }
                     onChange={(e) =>
                       setFiltros((f) => ({
                         ...f,
@@ -438,7 +501,7 @@ export function ProductosPage() {
                       }))
                     }
                     disabled={loadingCampanas}
-                    className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary/50 focus:ring-4 focus:ring-primary/10 appearance-none outline-none transition-all cursor-pointer"
+                    className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary/50 appearance-none outline-none transition-all cursor-pointer"
                   >
                     <option value="todos">Todas las campañas</option>
                     {campanas.map((c: string) => (
@@ -453,7 +516,6 @@ export function ProductosPage() {
                   />
                 </div>
               </div>
-
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/70">
                   Valor del plan
@@ -461,9 +523,9 @@ export function ProductosPage() {
                 <div className="relative">
                   <select
                     value={
-                      filtros.es_alto_valor === true
+                      (filtros as ProductoFiltros).es_alto_valor === true
                         ? "true"
-                        : filtros.es_alto_valor === false
+                        : (filtros as ProductoFiltros).es_alto_valor === false
                           ? "false"
                           : "todos"
                     }
@@ -474,7 +536,7 @@ export function ProductosPage() {
                         es_alto_valor: v === "todos" ? undefined : v === "true",
                       }));
                     }}
-                    className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary/50 focus:ring-4 focus:ring-primary/10 appearance-none outline-none transition-all cursor-pointer"
+                    className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary/50 appearance-none outline-none transition-all cursor-pointer"
                   >
                     <option value="todos">Todos</option>
                     <option value="true">⭐ Alto valor</option>
@@ -496,7 +558,11 @@ export function ProductosPage() {
             columns={columns}
             data={productos}
             isLoading={isLoading}
-            emptyMessage="No hay productos que coincidan con los filtros aplicados"
+            emptyMessage={
+              tab === "inactivos"
+                ? "No hay productos inactivos"
+                : "No hay productos que coincidan con los filtros aplicados"
+            }
           />
         </div>
 
@@ -540,7 +606,7 @@ export function ProductosPage() {
       <ConfirmDialog
         open={!!productoEliminar}
         title="Desactivar producto"
-        message={`¿Desactivar el paquete "${productoEliminar?.nombre_paquete}"? El paquete dejará de aparecer en el formulario de ventas. Podrás reactivarlo cuando lo necesites.`}
+        message={`¿Desactivar el paquete "${productoEliminar?.nombre_paquete}"? Dejará de aparecer en el formulario de ventas. Podrás reactivarlo desde la pestaña Inactivos.`}
         confirmLabel="Desactivar"
         accentHex="#ef4444"
         loading={eliminando}
