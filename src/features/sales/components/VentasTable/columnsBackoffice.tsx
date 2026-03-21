@@ -8,6 +8,9 @@ import {
   CheckCircle2,
   Mic,
   XCircle,
+  ArrowUp,
+  ArrowDown,
+  ChevronsUpDown,
 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT, EstadoAudio } from "../../types/sales.types";
@@ -18,11 +21,15 @@ import { cn } from "@/lib/utils";
  * @param onGestionar  Callback para abrir el form de gestión.
  *                     Si se pasa `null`, la columna de acciones muestra solo
  *                     un ícono de "solo lectura" (rol DUEÑO).
+ * @param ordenFecha   Estado actual del ordenamiento: "asc" | "desc" | null
+ * @param onToggleOrdenFecha  Callback para cambiar el ordenamiento
  */
 export function buildColumnsBackoffice(
   estadosSOT: EstadoSOT[],
   estadosAudio: EstadoAudio[],
   onGestionar: ((v: Venta) => void) | null,
+  ordenFecha?: "asc" | "desc" | null,
+  onToggleOrdenFecha?: () => void,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -106,6 +113,13 @@ export function buildColumnsBackoffice(
         const estadoId = v.id_estado_sot;
         const estadoData = estadosSOT.find((e) => e.id === estadoId);
         const enCorreccion = v.solicitud_correccion;
+        const codigoEstado = estadoData?.codigo?.toUpperCase() ?? "";
+
+        // FIX #4: Sub-estado visible debajo de EJECUCION
+        // Buscamos el nombre del sub-estado si hay id_sub_estado_sot
+        // Lo mostramos siempre que el estado sea EJECUCION y haya sub-estado
+        const tieneSubEstado =
+          codigoEstado === "EJECUCION" && v.id_sub_estado_sot !== null;
 
         return (
           <div className="flex flex-col gap-1.5 items-start">
@@ -125,6 +139,13 @@ export function buildColumnsBackoffice(
                     : null
                 }
               />
+            )}
+
+            {/* FIX #4: Sub-estado debajo de EJECUCION */}
+            {tieneSubEstado && v.nombre_sub_estado && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 max-w-[180px] truncate">
+                {v.nombre_sub_estado}
+              </span>
             )}
 
             {v.comentario_gestion &&
@@ -230,13 +251,54 @@ export function buildColumnsBackoffice(
       },
     },
     {
-      accessorKey: "fecha_creacion",
-      header: "Fecha",
-      cell: ({ row }) => (
-        <span className="font-mono text-[10px] text-muted-foreground">
-          {format(new Date(row.original.fecha_creacion), "dd/MM/yy HH:mm")}
-        </span>
-      ),
+      // FIX #2: Columna de fecha con ordenamiento asc/desc
+      accessorKey: "fecha_venta",
+      header: () => {
+        // Si no se pasaron callbacks de ordenamiento, mostramos texto simple
+        if (!onToggleOrdenFecha) {
+          return <span>Fecha venta</span>;
+        }
+
+        const Icon =
+          ordenFecha === "asc"
+            ? ArrowUp
+            : ordenFecha === "desc"
+              ? ArrowDown
+              : ChevronsUpDown;
+
+        return (
+          <button
+            type="button"
+            onClick={onToggleOrdenFecha}
+            className={cn(
+              "flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors",
+              ordenFecha
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            title={
+              ordenFecha === "asc"
+                ? "Ordenado: más antiguas primero. Click para invertir."
+                : ordenFecha === "desc"
+                  ? "Ordenado: más recientes primero. Click para quitar orden."
+                  : "Click para ordenar por fecha de venta"
+            }
+          >
+            Fecha venta
+            <Icon size={12} className="shrink-0" />
+          </button>
+        );
+      },
+      cell: ({ row }) => {
+        const fechaStr = row.original.fecha_venta;
+        return fechaStr ? (
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {format(new Date(fechaStr), "dd/MM/yy HH:mm")}
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground/40">—</span>
+        );
+      },
     },
     {
       id: "acciones",
@@ -244,6 +306,7 @@ export function buildColumnsBackoffice(
       cell: ({ row }) => {
         const v = row.original;
         const esAtendida = v.codigo_estado?.toUpperCase() === "ATENDIDO";
+        const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
 
         // DUEÑO: sin botón de gestión, solo indicador visual
         if (onGestionar === null) {
@@ -259,6 +322,16 @@ export function buildColumnsBackoffice(
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">
               <CheckCircle2 size={12} /> Finalizada
             </div>
+          );
+        }
+
+        // FIX #7: Si está rechazada y ya fue reingresada, no mostrar botón Gestionar
+        // (la venta rechazada ya no se puede volver a gestionar)
+        if (esRechazada && v.ya_reingresada) {
+          return (
+            <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary/60 bg-primary/5 px-2 py-1 rounded-full border border-primary/15 uppercase tracking-widest whitespace-nowrap">
+              <RefreshCw size={8} /> Ya reingresada
+            </span>
           );
         }
 

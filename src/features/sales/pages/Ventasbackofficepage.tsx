@@ -2,10 +2,10 @@
  * features/sales/pages/BackofficePage.tsx
  *
  * Fixes incluidos:
- *   #5 (BO) — Filtros de fecha + tabs de estado (pendientes, ejecución,
- *              atendidas, rechazadas, corrección)
- *   #6      — Exportar Excel con selector de estado (Atendidas / Ejecución /
- *              Rechazadas / Todas) y rango de fechas independiente
+ *   #2  — Ordenamiento asc/desc por fecha de venta (flecha en cabecera de tabla)
+ *   #3  — Filtro de estado de audio
+ *   #5  — Filtros de fecha + tabs de estado
+ *   #6  — Exportar Excel con selector de estado y rango de fechas
  */
 import { useState, useMemo, useRef, useEffect } from "react";
 import {
@@ -17,6 +17,7 @@ import {
   Loader2,
   ChevronDown,
   FileSpreadsheet,
+  Mic,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -79,7 +80,7 @@ const TABS: {
   },
 ];
 
-// ─── Opciones para exportar Excel (FIX #6) ───────────────────────────────────
+// ─── Opciones para exportar Excel ─────────────────────────────────────────────
 type EstadoExcel = "todas" | "ATENDIDO" | "EJECUCION" | "RECHAZADO";
 
 const OPCIONES_EXCEL: { key: EstadoExcel; label: string; desc: string }[] = [
@@ -113,7 +114,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
   const [exportando, setExportando] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Cerrar al hacer click fuera
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
@@ -144,7 +144,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
       ref={ref}
       className="absolute right-0 top-12 z-50 w-80 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
     >
-      {/* Header del panel */}
       <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-3">
         <FileSpreadsheet size={16} className="text-emerald-500 shrink-0" />
         <div>
@@ -158,7 +157,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="p-5 flex flex-col gap-5">
-        {/* FIX #6: Selector de estado para el Excel */}
         <div>
           <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-bold mb-2">
             Incluir estados
@@ -200,7 +198,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Rango de fechas para el Excel (independiente del filtro de tabla) */}
         <div>
           <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-bold mb-2">
             Rango de fechas{" "}
@@ -214,7 +211,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)}
                 className="flex-1 text-sm bg-transparent outline-none text-foreground cursor-pointer"
-                placeholder="Desde"
               />
             </div>
             <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-border bg-background">
@@ -224,7 +220,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)}
                 className="flex-1 text-sm bg-transparent outline-none text-foreground cursor-pointer"
-                placeholder="Hasta"
               />
             </div>
             {(fechaDesde || fechaHasta) && (
@@ -241,7 +236,6 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Botones */}
         <div className="flex gap-2 pt-1 border-t border-border">
           <Button
             variant="outline"
@@ -269,18 +263,38 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Hook: construye VentaFiltros a partir del tab + fechas + search ──────────
+// ─── Hook: construye VentaFiltros ─────────────────────────────────────────────
 function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
   const [tab, setTab] = useState<TabEstado>("todos");
   const [search, setSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  // FIX #3: filtro de estado de audio
+  const [filtroEstadoAudio, setFiltroEstadoAudio] = useState<number | "">("");
+  // FIX #2: ordenamiento por fecha de venta
+  const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc" | null>("desc");
+
+  const handleToggleOrdenFecha = () => {
+    setOrdenFecha((prev) => {
+      if (prev === "desc") return "asc";
+      if (prev === "asc") return null;
+      return "desc";
+    });
+  };
 
   const filtros: VentaFiltros = useMemo(() => {
     const base: VentaFiltros = {
       search: search || undefined,
       ...(fechaDesde ? { fecha_inicio: fechaDesde } : {}),
       ...(fechaHasta ? { fecha_fin: fechaHasta } : {}),
+      // FIX #3: estado de audio
+      ...(filtroEstadoAudio !== ""
+        ? { id_estado_audios: filtroEstadoAudio }
+        : {}),
+      // FIX #2: ordering
+      ...(ordenFecha
+        ? { ordering: ordenFecha === "asc" ? "fecha_venta" : "-fecha_venta" }
+        : {}),
     } as VentaFiltros;
 
     switch (tab) {
@@ -307,7 +321,15 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
       default:
         return base;
     }
-  }, [tab, search, fechaDesde, fechaHasta, estadosSOT]);
+  }, [
+    tab,
+    search,
+    fechaDesde,
+    fechaHasta,
+    filtroEstadoAudio,
+    ordenFecha,
+    estadosSOT,
+  ]);
 
   return {
     tab,
@@ -318,13 +340,16 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
     setFechaDesde,
     fechaHasta,
     setFechaHasta,
+    filtroEstadoAudio,
+    setFiltroEstadoAudio,
+    ordenFecha,
+    handleToggleOrdenFecha,
     filtros,
   };
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 interface BackofficePageProps {
-  /** Pasar null si el rol es DUEÑO (solo lectura, sin botón Gestionar) */
   soloLectura?: boolean;
 }
 
@@ -341,6 +366,10 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
     setFechaDesde,
     fechaHasta,
     setFechaHasta,
+    filtroEstadoAudio,
+    setFiltroEstadoAudio,
+    ordenFecha,
+    handleToggleOrdenFecha,
     filtros,
   } = useFiltrosBackoffice(estadosSOTData);
 
@@ -355,14 +384,17 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   const handleGestionar = (v: Venta) => setVentaSeleccionada(v);
   const handleCerrarForm = () => setVentaSeleccionada(null);
 
+  // FIX #2: pasamos ordenFecha y handler a buildColumnsBackoffice
   const columns = useMemo(
     () =>
       buildColumnsBackoffice(
         estadosSOTData,
         estadosAudio,
         soloLectura ? null : handleGestionar,
+        ordenFecha,
+        handleToggleOrdenFecha,
       ),
-    [estadosSOTData, estadosAudio, soloLectura],
+    [estadosSOTData, estadosAudio, soloLectura, ordenFecha],
   );
 
   const tieneFechas = !!fechaDesde || !!fechaHasta;
@@ -380,7 +412,6 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           </p>
         </div>
 
-        {/* FIX #6: Botón Excel con panel desplegable */}
         <div className="relative">
           <Button
             variant="outline"
@@ -404,7 +435,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
 
       {/* ── Filtros ── */}
       <div className="flex flex-col gap-3">
-        {/* Fila 1: Búsqueda + fechas + refresh */}
+        {/* Fila 1: Búsqueda + fechas + estado audio + refresh */}
         <div className="flex flex-wrap gap-2 items-center">
           {/* Buscador */}
           <div className="relative flex-1 min-w-[180px] max-w-sm">
@@ -429,7 +460,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             )}
           </div>
 
-          {/* FIX #5: Rango de fechas */}
+          {/* Rango de fechas */}
           <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
             <Calendar size={12} className="text-muted-foreground shrink-0" />
             <input
@@ -464,6 +495,39 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             </button>
           )}
 
+          {/* FIX #3: Filtro de estado de audio */}
+          <div className="relative flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background min-w-[160px]">
+            <Mic size={12} className="text-muted-foreground shrink-0" />
+            <select
+              value={filtroEstadoAudio}
+              onChange={(e) =>
+                setFiltroEstadoAudio(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                )
+              }
+              className="w-full text-sm text-foreground bg-transparent outline-none cursor-pointer appearance-none pr-5"
+            >
+              <option value="">Todos los audios</option>
+              {estadosAudio.map((ea) => (
+                <option key={ea.id} value={ea.id}>
+                  {ea.nombre}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={12}
+              className="absolute right-3 text-muted-foreground pointer-events-none"
+            />
+            {filtroEstadoAudio !== "" && (
+              <button
+                onClick={() => setFiltroEstadoAudio("")}
+                className="absolute right-7 text-muted-foreground hover:text-foreground"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+
           {/* Contador + refresh */}
           <div className="ml-auto flex items-center gap-2">
             {data?.count !== undefined && (
@@ -481,7 +545,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           </div>
         </div>
 
-        {/* FIX #5: Fila 2 — Tabs de estado */}
+        {/* Fila 2 — Tabs de estado */}
         <div className="flex gap-1.5 flex-wrap">
           {TABS.map((t) => (
             <button

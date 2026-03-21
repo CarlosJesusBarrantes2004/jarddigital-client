@@ -121,7 +121,6 @@ function TextInput({
   );
 }
 
-// ── Textarea con botón limpiar ────────────────────────────────────────────────
 function TextareaConLimpiar({
   label,
   error,
@@ -434,7 +433,6 @@ function AudioItemQA({
               <Play size={14} className="ml-0.5" />
             )}
           </button>
-          {/* Botones QA — deshabilitados si la venta ya no está en revisión activa */}
           <div
             className={cn(
               "flex gap-1.5 bg-background p-1 rounded-full border border-border",
@@ -514,7 +512,6 @@ function buildDefaultValues(venta: Venta): FormValues {
       ? venta.fecha_rechazo.split("T")[0]
       : null,
     comentario_gestion: venta.comentario_gestion ?? "",
-    // Toma siempre el valor real de la BD — nunca asumas el estado anterior
     solicitud_correccion: venta.solicitud_correccion ?? false,
     permitir_reingreso: venta.permitir_reingreso ?? false,
     audio_subido: venta.audio_subido ?? false,
@@ -545,43 +542,19 @@ export function VentaFormBackoffice({
     defaultValues: buildDefaultValues(venta),
   });
 
-  // ── Reset completo cuando se abre el drawer o cambia la venta ────────────
   useEffect(() => {
     if (!open) return;
-
-    // Reseteamos la bandera: el backoffice aún no ha tocado nada en esta apertura
     backofficeInteractuoRef.current = false;
-
-    // Reseteamos el form con los valores reales de la BD
     form.reset(buildDefaultValues(venta));
-
-    // Cargamos los audios tal como vienen — sin modificar nada
     setAudiosQA(venta.audios ? JSON.parse(JSON.stringify(venta.audios)) : []);
-
     setTab("gestion");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, venta.id]);
-  // ↑ Solo dependemos de open y venta.id.
-  //   Cuando el asesor corrige y el componente se cierra+abre,
-  //   venta.id sigue siendo el mismo PERO open pasa de false→true,
-  //   lo cual dispara el reset con los datos frescos de la BD.
 
-  // ── Auto-activar solicitud_correccion SOLO si el backoffice actuó ────────
-  //
-  // BUG ORIGINAL: este efecto corría siempre que audiosQA cambiaba, incluso
-  // al cargar los datos históricos. Si había un audio con conforme=false de
-  // una corrección ANTERIOR ya resuelta, ponía solicitud_correccion=true
-  // aunque la BD lo tenía en false.
-  //
-  // SOLUCIÓN: Solo actuamos si backofficeInteractuoRef.current === true,
-  // es decir, si el backoffice cambió manualmente el estado de un audio
-  // en esta sesión activa del form.
   const watchSolicitud = form.watch("solicitud_correccion");
 
   useEffect(() => {
-    // Si el backoffice no ha interactuado aún, no tocamos el toggle
     if (!backofficeInteractuoRef.current) return;
-
     const hayRechazados = audiosQA.some((a) => a.conforme === false);
     if (hayRechazados && !watchSolicitud) {
       form.setValue("solicitud_correccion", true);
@@ -594,15 +567,13 @@ export function VentaFormBackoffice({
     }
   }, [audiosQA, watchSolicitud, form]);
 
-  // ── Handler QA — marca que el backoffice interactuó ─────────────────────
   const handleQAUpdate = (id: number, conforme: boolean, motivo: string) => {
-    backofficeInteractuoRef.current = true; // ← bandera activa
+    backofficeInteractuoRef.current = true;
     setAudiosQA((prev) =>
       prev.map((a) => (a.id === id ? { ...a, conforme, motivo } : a)),
     );
   };
 
-  // ── Flags de contexto ─────────────────────────────────────────────────────
   const esPrimeraGestion =
     venta.id_estado_sot === null && !venta.solicitud_correccion;
   const esReingreso = !!venta.venta_origen && venta.id_estado_sot === null;
@@ -635,7 +606,6 @@ export function VentaFormBackoffice({
   const audioEsRechazado =
     estadoAudioSeleccionado?.codigo.toUpperCase() === "RECHAZADO";
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   const onSubmit = form.handleSubmit(async (values) => {
     if (values.solicitud_correccion) {
       if (!values.comentario_gestion?.trim()) {
@@ -722,13 +692,22 @@ export function VentaFormBackoffice({
       motivo: a.motivo,
     }));
 
+    // FIX #5: Si el estado destino es RECHAZADO o ATENDIDO y la venta tenía un
+    // sub-estado en SOT, lo limpiamos enviando null para que no quede esa validación.
+    const estadoDestinoCode = estadoSeleccionado?.codigo?.toUpperCase();
+    const subEstadoFinal =
+      estadoDestinoCode === "RECHAZADO" || estadoDestinoCode === "ATENDIDO"
+        ? null
+        : (values.id_sub_estado_sot ?? null);
+
     try {
       await updateVenta({
         codigo_sec: values.codigo_sec || undefined,
         codigo_sot: values.codigo_sot || undefined,
         fecha_visita_programada: values.fecha_visita_programada || null,
         bloque_horario: values.bloque_horario || null,
-        id_sub_estado_sot: values.id_sub_estado_sot ?? null,
+        // FIX #5: sub-estado limpiado si destino es RECHAZADO/ATENDIDO
+        id_sub_estado_sot: subEstadoFinal,
         id_estado_sot: values.id_estado_sot ?? null,
         fecha_real_inst: values.fecha_real_inst || null,
         fecha_rechazo: values.fecha_rechazo || null,
@@ -782,7 +761,6 @@ export function VentaFormBackoffice({
                     <RefreshCw size={10} /> Origen #{venta.venta_origen}
                   </span>
                 )}
-                {/* Badge lee la BD directamente, no el estado del form */}
                 {venta.solicitud_correccion && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 border border-orange-500/20">
                     <AlertTriangle size={10} /> En Corrección
@@ -1009,7 +987,22 @@ export function VentaFormBackoffice({
                       <NativeSelect
                         label="Estado SOT"
                         value={field.value ?? ""}
-                        onChange={(v) => field.onChange(v ? Number(v) : null)}
+                        onChange={(v) => {
+                          const nuevoId = v ? Number(v) : null;
+                          field.onChange(nuevoId);
+                          // FIX #5: Si cambia a RECHAZADO o ATENDIDO, limpiamos el sub-estado
+                          const nuevoEstado = estadosSOT.find(
+                            (e) => e.id === nuevoId,
+                          );
+                          const nuevoCode =
+                            nuevoEstado?.codigo?.toUpperCase() ?? "";
+                          if (
+                            nuevoCode === "RECHAZADO" ||
+                            nuevoCode === "ATENDIDO"
+                          ) {
+                            form.setValue("id_sub_estado_sot", null);
+                          }
+                        }}
                         placeholder="Seleccionar"
                         disabled={codigoEstadoActual === "ATENDIDO"}
                       >

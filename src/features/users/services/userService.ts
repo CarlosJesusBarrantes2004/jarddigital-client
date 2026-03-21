@@ -1,9 +1,9 @@
 /**
  * features/users/services/userService.ts
  *
- * FIX #7 — Cambios:
- *   1. `getAll` ahora acepta `activo?: boolean` en los filtros y lo manda al backend
- *   2. `reactivate(id)` — nuevo método que hace PATCH { activo: true }
+ * FIX #1 — reactivate ahora usa PATCH { activo: true } al endpoint normal /{id}/
+ *           en lugar del inexistente /reactivar/.
+ * FIX #7 — getAll acepta activo?: boolean
  */
 import { api } from "@/api/axios";
 import type {
@@ -88,15 +88,15 @@ export const userService = {
   },
 
   /**
-   * FIX #7: Reactivar un colaborador que fue desactivado.
-   * Hace PATCH { activo: true } sobre el mismo endpoint de edición.
+   * FIX #1: Reactivar un colaborador usando el endpoint de detalle normal con PATCH { activo: true }.
+   * El backend SoftDeleteModelViewSet lo maneja nativamente — no existe /reactivar/.
    * El signal gestionar_grabador_automatico en signals.py re-crea o reactiva
    * su entrada en la tabla grabadores_audio automáticamente.
    */
   reactivate: async (id: number): Promise<User> => {
-    const { data } = await api.patch<RawUser>(
-      `/users/empleados/${id}/reactivar/`,
-    );
+    const { data } = await api.patch<RawUser>(`/users/empleados/${id}/`, {
+      activo: true,
+    });
     return normalizeUser(data);
   },
 

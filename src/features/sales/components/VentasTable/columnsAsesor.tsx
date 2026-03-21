@@ -5,12 +5,20 @@
  *   #2 — Badge "En corrección" solo si solicitud_correccion sigue true
  *   #3 — Botón Editar solo cuando el asesor tiene permiso real de edición
  *   #4 — Botón Eliminar solo en pendientes o en corrección
+ *   #4b — Sub-estado debajo de EJECUCION
+ *   #6 — Tooltip con motivo de rechazo al pasar el cursor sobre venta rechazada
  *   #8 — Botón Reingresar oculto si ya_reingresada = true
  */
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Pencil, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Pencil,
+  AlertTriangle,
+  RefreshCw,
+  Trash2,
+  MessageCircle,
+} from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
 import { ActionBtn } from "@/components/ActionBtn";
@@ -19,7 +27,7 @@ export function buildColumnsAsesor(
   estadosSOT: EstadoSOT[],
   onEditar: (v: Venta) => void,
   onReingresar: (v: Venta) => void,
-  onEliminar: (v: Venta) => void, // FIX #4: nuevo parámetro
+  onEliminar: (v: Venta) => void,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -86,24 +94,64 @@ export function buildColumnsAsesor(
       cell: ({ row }) => {
         const v = row.original;
         const estadoData = estadosSOT.find((e) => e.id === v.id_estado_sot);
+        const codigoEstado = estadoData?.codigo?.toUpperCase() ?? "";
+        const esRechazada = codigoEstado === "RECHAZADO";
+        const esEjecucion = codigoEstado === "EJECUCION";
+
+        // FIX #4b: Sub-estado solo bajo EJECUCION
+        const tieneSubEstado = esEjecucion && v.id_sub_estado_sot !== null;
 
         return (
           <div className="flex flex-col gap-1.5 items-start">
-            <EstadoBadge
-              estado={
-                estadoData
-                  ? {
-                      nombre: estadoData.nombre,
-                      codigo: estadoData.codigo,
-                      color_hex: estadoData.color_hex,
-                    }
-                  : null
-              }
-            />
+            {/* FIX #6: Badge de rechazada con tooltip de motivo */}
+            {esRechazada && v.comentario_gestion ? (
+              <div className="relative group/tooltip">
+                <EstadoBadge
+                  estado={
+                    estadoData
+                      ? {
+                          nombre: estadoData.nombre,
+                          codigo: estadoData.codigo,
+                          color_hex: estadoData.color_hex,
+                        }
+                      : null
+                  }
+                />
+                {/* Icono indicador de que hay motivo */}
+                <MessageCircle
+                  size={11}
+                  className="absolute -top-1 -right-1 text-destructive bg-background rounded-full"
+                />
+                {/* Tooltip con motivo */}
+                <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/tooltip:block w-56 pointer-events-none">
+                  <div className="bg-card border border-destructive/30 rounded-xl shadow-xl p-3">
+                    <p className="text-[10px] font-mono font-bold text-destructive uppercase tracking-widest mb-1.5">
+                      Motivo del rechazo
+                    </p>
+                    <p className="text-[11px] text-foreground/80 leading-snug">
+                      {v.comentario_gestion}
+                    </p>
+                  </div>
+                  {/* Flechita del tooltip */}
+                  <div className="w-2.5 h-2.5 bg-card border-b border-r border-destructive/30 rotate-45 ml-3 -mt-1.5" />
+                </div>
+              </div>
+            ) : (
+              <EstadoBadge
+                estado={
+                  estadoData
+                    ? {
+                        nombre: estadoData.nombre,
+                        codigo: estadoData.codigo,
+                        color_hex: estadoData.color_hex,
+                      }
+                    : null
+                }
+              />
+            )}
+
             {/*
              * FIX #2: El badge solo aparece si solicitud_correccion === true.
-             * Cuando el asesor guarda la corrección, el backend lo pone en false
-             * y el caché se invalida → el badge desaparece automáticamente.
              */}
             {v.solicitud_correccion && (
               <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-[200px]">
@@ -122,6 +170,13 @@ export function buildColumnsAsesor(
                   )}
                 </div>
               </div>
+            )}
+
+            {/* FIX #4b: Sub-estado bajo EJECUCION */}
+            {tieneSubEstado && v.nombre_sub_estado && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 max-w-[180px] truncate">
+                {v.nombre_sub_estado}
+              </span>
             )}
           </div>
         );
@@ -186,15 +241,8 @@ export function buildColumnsAsesor(
 
         const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
         const esEjecucion = v.codigo_estado?.toUpperCase() === "EJECUCION";
-        // Pendiente pura: sin estado SOT y sin que esté en corrección
         const esPendiente = v.id_estado_sot === null && !v.solicitud_correccion;
 
-        /*
-         * FIX #3: El asesor puede tocar el form SOLO cuando:
-         *   A) solicitud_correccion = true  → Backoffice pidió corrección
-         *   B) esPendiente                 → nunca tuvo gestión aún
-         *   C) esEjecucion && !tieneAudios → puede subir los primeros audios
-         */
         const tieneAudios = Array.isArray(v.audios) && v.audios.length > 0;
         const puedeEditar =
           !esRechazada &&
@@ -202,16 +250,8 @@ export function buildColumnsAsesor(
             esPendiente ||
             (esEjecucion && !tieneAudios));
 
-        /*
-         * FIX #4: Solo puede eliminar si está pendiente o en corrección.
-         * Una venta en EJECUCIÓN/ATENDIDO/RECHAZADO NO se puede borrar.
-         */
         const puedeEliminar = esPendiente || v.solicitud_correccion;
 
-        /*
-         * FIX #8: Ocultamos "Reingresar" si la venta ya generó una derivada.
-         * Requiere el campo ya_reingresada en el serializer (ver GUIA).
-         */
         const yaReingresada = !!(v as Venta & { ya_reingresada?: boolean })
           .ya_reingresada;
 

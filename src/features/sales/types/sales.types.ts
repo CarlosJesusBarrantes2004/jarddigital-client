@@ -180,13 +180,7 @@ export interface Venta {
   es_full_claro: boolean;
   score_crediticio: string;
 
-  /**
-   * TRUE → El Backoffice pidió corrección al Asesor.
-   * El Asesor puede editar la venta.
-   * FALSE → La venta está en manos del Backoffice (bloqueada).
-   */
   solicitud_correccion: boolean;
-
   permitir_reingreso: boolean;
 
   // Operativo
@@ -198,6 +192,11 @@ export interface Venta {
   fecha_visita_programada: string | null;
   bloque_horario: string | null;
   id_sub_estado_sot: number | null;
+  /**
+   * FIX #4: Nombre del sub-estado (campo calculado que el serializer puede incluir).
+   * Si el backend no lo manda, queda undefined y no se muestra nada.
+   */
+  nombre_sub_estado?: string | null;
 
   // Estados finales
   fecha_real_inst: string | null;
@@ -273,7 +272,6 @@ export interface CreateVentaPayload {
 }
 
 export interface UpdateVentaAsesorPayload {
-  // Solo campos permitidos para edición en corrección
   id_producto?: number;
   tecnologia?: string;
   id_tipo_documento?: number;
@@ -327,8 +325,6 @@ export interface UpdateVentaBackofficePayload {
 
 export interface VentaFiltros {
   id_estado_sot?: number | string;
-  // ↓ NUEVO: para filtrar ventas sin estado (pendientes)
-  // El backend de Django-filter lo acepta como ?id_estado_sot__isnull=true
   id_estado_sot__isnull?: boolean;
   id_sub_estado_sot?: number | string;
   id_estado_audios?: number | string;
@@ -338,6 +334,7 @@ export interface VentaFiltros {
   es_full_claro?: boolean;
   solicitud_correccion?: boolean;
   search?: string;
+  /** FIX #2: ordering por fecha. Ej: "fecha_venta" | "-fecha_venta" */
   ordering?: string;
   page?: number;
   fecha_inicio?: string;
@@ -357,11 +354,11 @@ export interface PaginatedResponse<T> {
 
 export interface EstadisticasAsesor {
   total: number;
-  pendientes: number; // id_estado_sot = null
-  en_ejecucion: number; // codigo = EJECUCION
-  atendidas: number; // codigo = ATENDIDO
-  rechazadas: number; // codigo = RECHAZADO
-  en_correccion: number; // solicitud_correccion = true
+  pendientes: number;
+  en_ejecucion: number;
+  atendidas: number;
+  rechazadas: number;
+  en_correccion: number;
 }
 
 // ==========================================

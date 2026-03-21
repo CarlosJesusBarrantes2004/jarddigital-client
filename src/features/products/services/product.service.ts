@@ -53,11 +53,14 @@ export const productosService = {
     return data;
   },
 
-  /** Reactivar (activo=true) */
+  /**
+   * FIX #1: Reactivar usando el endpoint de detalle normal con PATCH { activo: true }.
+   * El backend SoftDeleteModelViewSet lo maneja nativamente — no existe /reactivar/.
+   */
   reactivate: async (id: number): Promise<Producto> => {
-    const { data } = await api.patch<Producto>(
-      `/sales/productos/${id}/reactivar/`,
-    );
+    const { data } = await api.patch<Producto>(`/sales/productos/${id}/`, {
+      activo: true,
+    });
     return data;
   },
 
