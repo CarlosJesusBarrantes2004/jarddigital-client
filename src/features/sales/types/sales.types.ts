@@ -152,6 +152,10 @@ export interface Venta {
   provincia_instalacion_nombre: string | null;
   departamento_instalacion_nombre: string | null;
 
+  distrito_nacimiento_nombre: string | null;
+  provincia_nacimiento_nombre: string | null;
+  departamento_nacimiento_nombre: string | null;
+
   // Producto & cliente
   id_producto: number;
   producto_campana: string;
@@ -270,7 +274,7 @@ export interface CreateVentaPayload {
   coordenadas_gps?: string;
   es_full_claro: boolean;
   score_crediticio?: string;
-  id_grabador_audios: number;
+  id_grabador_audios?: number | null;
   nombre_grabador_externo?: string | null;
   audios: AudioVentaForm[];
   venta_origen?: number | null;
@@ -301,7 +305,7 @@ export interface UpdateVentaAsesorPayload {
   coordenadas_gps?: string;
   es_full_claro?: boolean;
   score_crediticio?: string;
-  id_grabador_audios?: number;
+  id_grabador_audios?: number | null;
   nombre_grabador_externo?: string | null;
   audios?: Partial<AudioVenta>[];
 }

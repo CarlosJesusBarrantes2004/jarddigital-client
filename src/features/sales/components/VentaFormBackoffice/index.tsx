@@ -1249,6 +1249,22 @@ export function VentaFormBackoffice({
                 <ReadonlyField label="Tipo venta" value={venta.tipo_venta} />
               </div>
               <Divider />
+              <SectionTitle>Lugar de Nacimiento</SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ReadonlyField
+                  label="Departamento"
+                  value={venta.departamento_nacimiento_nombre}
+                />
+                <ReadonlyField
+                  label="Provincia"
+                  value={venta.provincia_nacimiento_nombre}
+                />
+                <ReadonlyField
+                  label="Distrito"
+                  value={venta.distrito_nacimiento_nombre}
+                />
+              </div>
+              <Divider />
               <SectionTitle className="text-blue-500">
                 Ubicación de Instalación
               </SectionTitle>

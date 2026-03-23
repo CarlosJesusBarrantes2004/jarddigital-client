@@ -228,10 +228,10 @@ export const catalogosService = {
     return normalizeList<Producto>(data).results;
   },
   getGrabadores: async (
-    includeId?: number | null,
+    idVentaActual?: number | null,
   ): Promise<GrabadorAudio[]> => {
-    const url = includeId
-      ? `/sales/grabadores/?include_id=${includeId}`
+    const url = idVentaActual
+      ? `/sales/grabadores/?id_venta_actual=${idVentaActual}`
       : "/sales/grabadores/";
     const { data } = await api.get(url);
     return normalizeList<GrabadorAudio>(data).results;

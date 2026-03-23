@@ -73,9 +73,7 @@ const schema = z
     coordenadas_gps: z.string().optional(),
     es_full_claro: z.boolean().default(false),
     score_crediticio: z.string().optional(),
-    id_grabador_audios: z
-      .number({ error: "Selecciona un grabador" })
-      .min(1, "Selecciona un grabador"),
+    id_grabador_audios: z.number().optional(),
     nombre_grabador_externo: z.string().optional(),
     audio_urls: z.array(z.string().optional()).optional(),
   })
@@ -334,6 +332,11 @@ export function VentaFormAsesor({
     !tieneAudiosEnBD;
   const todosBloqueado =
     esEdicion && !ventaOrigen?.solicitud_correccion && tieneAudiosEnBD;
+  const esPendienteSinAudios =
+    esEdicion &&
+    !ventaOrigen?.solicitud_correccion &&
+    !tieneAudiosEnBD &&
+    !ventaOrigen?.codigo_estado;
 
   const { mutateAsync: crearVenta, isPending: creando } = useCreateVenta();
   const { mutateAsync: editarVenta, isPending: editando } =
@@ -342,8 +345,8 @@ export function VentaFormAsesor({
 
   const { data: tiposDoc = [] } = useTiposDocumento();
   const { data: productos = [] } = useProductos();
-  const grabadorActualId = ventaOrigen?.id_grabador_audios ?? null;
-  const { data: grabadores = [] } = useGrabadores(grabadorActualId);
+  const idVentaActual = ventaOrigen?.id ?? null; // ID de la VENTA para el Pase VIP
+  const { data: grabadores = [] } = useGrabadores(idVentaActual);
 
   const [filtroCampana, setFiltroCampana] = useState("");
   const [filtroSolucion, setFiltroSolucion] = useState("");
@@ -379,6 +382,8 @@ export function VentaFormAsesor({
 
   const isInitialMount = useRef(true);
   const prevLengthRef = useRef(0);
+
+  const tieneAlMenosUnAudio = audioUrls.some(Boolean);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
@@ -431,6 +436,13 @@ export function VentaFormAsesor({
         p.tipo_solucion === filtroSolucion,
     );
   }, [productos, filtroCampana, filtroSolucion]);
+
+  useEffect(() => {
+    if (!tieneAlMenosUnAudio && !esEdicion) {
+      form.setValue("id_grabador_audios", undefined);
+      form.setValue("nombre_grabador_externo", "");
+    }
+  }, [tieneAlMenosUnAudio, esEdicion, form]);
 
   // ── Inicialización ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -675,7 +687,6 @@ export function VentaFormAsesor({
         n[i] = null;
         return n;
       });
-      // audioIdsOriginales NO se toca aquí — el ID sigue siendo el de la BD
     },
     [],
   );
@@ -789,18 +800,6 @@ export function VentaFormAsesor({
       return;
     }
 
-    /*
-     * FIX ANTI-DUPLICACIÓN: construimos el payload usando audioIdsOriginales.
-     *
-     * Para cada slot que tiene una URL activa:
-     *   - Si audioIdsOriginales[i] existe → incluimos { id } → backend hace UPDATE
-     *   - Si no existe (audio nuevo en venta nueva) → no incluimos id → backend hace INSERT
-     *
-     * Esto funciona tanto para:
-     *   A) Audio que nunca fue quitado: audioIdsOriginales[i] + audioUrls[i] = URL original
-     *   B) Audio que fue quitado y re-subido: audioIdsOriginales[i] (conservado) + audioUrls[i] = URL nueva
-     *   C) Audio completamente nuevo en corrección: audioIdsOriginales[i] = undefined → INSERT
-     */
     const audiosPayload: AudioPayloadItem[] = etiquetasAudio
       .map((etiqueta, i) => ({
         idOriginal: audioIdsOriginales[i], // ← siempre el ID de BD, nunca undefined por reemplazo
@@ -814,9 +813,16 @@ export function VentaFormAsesor({
         url_audio: a.url_audio as string,
       }));
 
-    if (soloAudios) {
+    if (soloAudios || esPendienteSinAudios) {
       try {
-        await editarVenta({ audios: audiosPayload });
+        await editarVenta({
+          id_grabador_audios: values.id_grabador_audios ?? null,
+          nombre_grabador_externo:
+            values.id_grabador_audios === 1
+              ? (values.nombre_grabador_externo ?? null)
+              : null,
+          audios: audiosPayload,
+        });
         toast.success("Audios subidos y enviados al Backoffice");
         handleClose();
       } catch (err) {
@@ -828,8 +834,17 @@ export function VentaFormAsesor({
     const distritoInstalacion = values.id_distrito_instalacion as number;
 
     try {
+      const hayAudios = audiosPayload.length > 0;
+
       const payload = {
         ...values,
+        id_grabador_audios: hayAudios
+          ? (values.id_grabador_audios ?? null)
+          : null,
+        nombre_grabador_externo:
+          hayAudios && values.id_grabador_audios === 1
+            ? (values.nombre_grabador_externo ?? null)
+            : null,
         representante_legal_dni: esRUC
           ? (values.representante_legal_dni ?? null)
           : null,
@@ -838,10 +853,6 @@ export function VentaFormAsesor({
           : null,
         id_distrito_instalacion: distritoInstalacion,
         id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-        nombre_grabador_externo:
-          values.id_grabador_audios === 1
-            ? (values.nombre_grabador_externo ?? null)
-            : null,
         audios: audiosPayload,
       };
 
@@ -957,6 +968,14 @@ export function VentaFormAsesor({
               <p className="text-xs text-muted-foreground leading-relaxed">
                 <strong>Venta bloqueada.</strong> Ya fue enviada al Backoffice.
                 No puedes editar nada hasta que soliciten una corrección.
+              </p>
+            </div>
+          )}
+          {esPendienteSinAudios && (
+            <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+              <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-500/90 leading-relaxed">
+                <strong>Venta pendiente sin audios.</strong>
               </p>
             </div>
           )}
@@ -1179,7 +1198,7 @@ export function VentaFormAsesor({
                         label="Nombre completo / Razón Social"
                         required
                         disabled={soloAudios || todosBloqueado}
-                        placeholder="Ej: JUAN PEREZ"
+                        placeholder="Ej: CARLOS"
                         {...field}
                         error={errorsObj.cliente_nombre?.message}
                       />
@@ -1386,8 +1405,9 @@ export function VentaFormAsesor({
                     render={({ field }) => (
                       <NativeSelect
                         label="Grabador Asignado"
-                        required
-                        disabled={soloAudios || todosBloqueado}
+                        disabled={
+                          soloAudios || todosBloqueado || !tieneAlMenosUnAudio
+                        }
                         value={field.value ?? ""}
                         onChange={(v) =>
                           field.onChange(v ? Number(v) : undefined)
@@ -1403,6 +1423,17 @@ export function VentaFormAsesor({
                       </NativeSelect>
                     )}
                   />
+                  {!tieneAlMenosUnAudio && !soloAudios && !todosBloqueado && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1 italic">
+                      <AlertTriangle
+                        size={12}
+                        className="shrink-0 mt-0.5 text-amber-500"
+                      />
+                      <span>
+                        Sube al menos un audio para poder asignar un grabador.
+                      </span>
+                    </p>
+                  )}
                   {isGrabadorOtros && (
                     <Controller
                       control={form.control}
@@ -1412,7 +1443,7 @@ export function VentaFormAsesor({
                           label="Nombre del Grabador"
                           required
                           disabled={soloAudios || todosBloqueado}
-                          placeholder="Ej: JUAN PEREZ"
+                          placeholder="Ej: CARLOS"
                           {...field}
                           value={field.value ?? ""}
                           error={errorsObj.nombre_grabador_externo?.message}
@@ -1600,7 +1631,7 @@ export function VentaFormAsesor({
                 <p className="text-xs text-muted-foreground mt-1">
                   {esReingreso
                     ? "Al reingresar debes subir audios nuevos desde cero."
-                    : "Sube los archivos en formato .mp3. Si reemplazas un audio rechazado, el ID original se mantiene para actualizar en lugar de duplicar."}
+                    : "Sube los archivos en formato .mp3."}
                 </p>
               </div>
 

@@ -225,10 +225,11 @@ export function useDistritoById(distritoId: number | null | undefined) {
   });
 }
 
+// DESPUÉS — apuntar al hard-delete:
 export function useDeleteVentaAsesor() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.delete(`/sales/ventas/${id}/`),
+    mutationFn: (id: number) => api.delete(`/sales/ventas/${id}/hard-delete/`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.lists() });
     },
