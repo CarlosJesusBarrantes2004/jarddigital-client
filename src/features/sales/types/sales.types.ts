@@ -147,6 +147,11 @@ export interface Venta {
   id_supervisor_vigente: number;
   nombre_supervisor: string;
 
+  // Ubigeo de instalación (nombres resueltos)
+  distrito_instalacion_nombre: string | null;
+  provincia_instalacion_nombre: string | null;
+  departamento_instalacion_nombre: string | null;
+
   // Producto & cliente
   id_producto: number;
   producto_campana: string;

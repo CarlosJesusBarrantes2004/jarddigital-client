@@ -1,20 +1,3 @@
-/**
- * features/sales/components/VentaFormAsesor/index.tsx
- *
- * FIX anti-duplicación de audios:
- *
- * El bug era que handleAudioRemove() borraba audioIds[i] para "limpiar" el slot.
- * Cuando el asesor subía el audio nuevo, el ID ya no existía y el backend
- * creaba un INSERT en lugar de UPDATE → audio duplicado.
- *
- * Solución: dos arrays separados:
- *   - audioIdsOriginales: IDs que vienen de la BD. NUNCA se borran al reemplazar.
- *     Solo se limpian al cerrar/resetear el form.
- *   - audioUrls: URLs activas (la que se va a enviar). Sí se borra al quitar.
- *
- * Al construir el payload final, si existe audioIdsOriginales[i] se incluye
- * el id aunque el asesor haya quitado y vuelto a subir el audio.
- */
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";

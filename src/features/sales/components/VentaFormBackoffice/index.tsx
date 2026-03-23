@@ -1254,6 +1254,18 @@ export function VentaFormBackoffice({
               </SectionTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ReadonlyField
+                  label="Departamento"
+                  value={venta.departamento_instalacion_nombre}
+                />
+                <ReadonlyField
+                  label="Provincia"
+                  value={venta.provincia_instalacion_nombre}
+                />
+                <ReadonlyField
+                  label="Distrito"
+                  value={venta.distrito_instalacion_nombre}
+                />
+                <ReadonlyField
                   label="Dirección"
                   value={venta.direccion_detalle}
                 />
@@ -1267,6 +1279,14 @@ export function VentaFormBackoffice({
                 <ReadonlyField
                   label="Score crediticio"
                   value={venta.score_crediticio}
+                />
+              </div>
+              <Divider />
+              <SectionTitle>Grabador de Audios</SectionTitle>
+              <div className="grid grid-cols-1 gap-4">
+                <ReadonlyField
+                  label="Grabador asignado"
+                  value={venta.grabador_real}
                 />
               </div>
             </div>
