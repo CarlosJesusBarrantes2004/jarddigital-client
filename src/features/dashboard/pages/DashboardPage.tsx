@@ -1,66 +1,36 @@
-import { useAuth } from "@/features/auth/context/useAuth";
-import { QuickActions } from "../components/QuickActions";
-import { StatGrid } from "../components/StatGrid";
-import { SystemStatus } from "../components/SystemStatus";
+// import { useAuth } from "@/features/auth/context/useAuth";
+// import { QuickActions } from "../components/QuickActions";
+// import { StatGrid } from "../components/StatGrid";
+// import { SystemStatus } from "../components/SystemStatus";
 
 export const DashboardPage = () => {
-  const { user } = useAuth();
-  const isOwner = user?.rol.codigo === "DUENO";
+  // const { user } = useAuth();
+  // const isOwner = user?.rol.codigo === "DUENO";
 
-  const branchRaw = sessionStorage.getItem("currentBranch");
-  const branchData = branchRaw
+  // const branchRaw = sessionStorage.getItem("currentBranch");
+  /*const branchData = branchRaw
     ? JSON.parse(branchRaw)
-    : { name: "Todas las Sedes" };
+    : { name: "Todas las Sedes" };*/
 
-  const modalityRaw = sessionStorage.getItem("currentModality");
-  const modality = modalityRaw ? JSON.parse(modalityRaw) : { name: "GLOBAL" };
+  // const modalityRaw = sessionStorage.getItem("currentModality");
+  // const modality = modalityRaw ? JSON.parse(modalityRaw) : { name: "GLOBAL" };
 
-  const modalityDisplay =
+  /*const modalityDisplay =
     modality.name === "CALL CENTER"
       ? "Centro de Llamadas"
       : modality.name === "GLOBAL"
         ? "Acceso Total"
-        : "Ventas de Campo";
+        : "Ventas de Campo";*/
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Panel de Control
-          </h1>
-          <p className="text-slate-500 mt-1 font-medium">
-            Gestión operativa para Jard Digital
-          </p>
-        </div>
-
-        <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-          <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-              {isOwner ? "Vista General" : "Sucursal Activa"}
-            </span>
-            <span className="text-sm font-bold text-primary">
-              {branchData.name}
-            </span>
-          </div>
-          <div className="h-8 w-[1px] bg-slate-100 mx-1"></div>
-          <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-              Modalidad
-            </span>
-            <span className="text-sm font-bold text-slate-700">
-              {modalityDisplay}
-            </span>
-          </div>
-        </div>
+    <div className="flex flex-col items-center justify-center h-[60vh] animate-in fade-in duration-500 space-y-4 text-center">
+      <div className="bg-primary/10 w-16 h-16 rounded-2xl flex items-center justify-center mb-4">
+        <span className="text-3xl">🛠️</span>
       </div>
-
-      <StatGrid></StatGrid>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <QuickActions></QuickActions>
-        <SystemStatus></SystemStatus>
-      </div>
+      <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
+        Proximamente, nuevos detalles
+      </h1>
+      <p className="text-muted-foreground font-medium text-lg">PD: Carlos</p>
     </div>
   );
 };
