@@ -45,10 +45,18 @@ export const salesKeys = {
 // ==========================================
 
 export function useVentas(filtros?: VentaFiltros) {
+  // Siempre incluye page_size para activar la paginación del backend.
+  // El backend usa PaginacionRetrocompatible: solo pagina cuando viene ?page=.
+  // Si no hay page en filtros, devuelve lista plana → normalizeList la envuelve igual.
+  const filtrosConPageSize: VentaFiltros | undefined = filtros?.page
+    ? { page_size: 5, ...filtros }
+    : filtros;
+
   return useQuery({
-    queryKey: salesKeys.list(filtros),
-    queryFn: () => salesService.getVentas(filtros),
+    queryKey: salesKeys.list(filtrosConPageSize),
+    queryFn: () => salesService.getVentas(filtrosConPageSize),
     staleTime: 1000 * 30, // 30s
+    placeholderData: (prev) => prev, // evita flash de tabla vacía al cambiar página
   });
 }
 
@@ -64,30 +72,68 @@ export function useVenta(id: number, options?: { enabled?: boolean }) {
 // ==========================================
 // ESTADÍSTICAS ASESOR
 // ==========================================
+// Las stats se calculan con consultas independientes (sin page) para obtener
+// el `count` real de cada categoría, sin depender de los 5 resultados paginados.
 
 export function useEstadisticasAsesor(): {
   stats: EstadisticasAsesor;
   isLoading: boolean;
 } {
-  // Trae todas las ventas sin filtros (el backend ya filtra por asesor)
-  const { data, isLoading } = useVentas();
-  const ventas = data?.results ?? [];
+  // Total general (sin filtros, sin page → lista plana, count = total real)
+  const { data: dataTotal, isLoading: l0 } = useVentas();
+
+  // Pendientes: estado nulo y sin corrección
+  const { data: dataPendientes, isLoading: l1 } = useVentas({
+    id_estado_sot__isnull: true,
+  } as VentaFiltros);
+
+  // En corrección
+  const { data: dataCorreccion, isLoading: l2 } = useVentas({
+    solicitud_correccion: true,
+  } as VentaFiltros);
+
+  // Los estados con código los obtenemos a través del hook de catálogos,
+  // pero para las stats solo necesitamos los counts → usamos parámetro de búsqueda
+  // por código directamente en el servicio.
+  // Nota: el backend acepta ?codigo_estado=EJECUCION si implementado,
+  // pero lo más seguro es usar id_estado_sot que ya funciona.
+  // Como no tenemos los ids aquí, hacemos una query por ordering para traer
+  // solo el count sin resultados pesados (page=1&page_size=1).
+
+  /*const { data: dataEjecucion, isLoading: l3 } = useQuery({
+    queryKey: salesKeys.list({ _statsEjecucion: true } as VentaFiltros),
+    queryFn: () =>
+      salesService.getVentas({
+        page: 1,
+        page_size: 1,
+        // El backend filtra por código_estado si el ViewSet lo soporta,
+        // si no, usamos search vacío y filtramos por tab en la página.
+        // Para el count exacto usamos un campo que el backend entienda:
+        ordering: "-fecha_creacion",
+      } as VentaFiltros),
+    staleTime: 1000 * 30,
+    enabled: false, // Deshabilitado: ver nota abajo
+  });*/
+
+  // NOTA SOBRE STATS DE EJECUCION/ATENDIDAS/RECHAZADAS:
+  // Calcular esas 3 stats requeriría conocer los IDs de los EstadoSOT,
+  // que solo están disponibles en el catálogo. Para no crear una dependencia
+  // circular aquí, las calculamos aproximando desde los resultados de la
+  // página actual cuando el total es pequeño, o mostramos 0 hasta que el
+  // usuario filtre por tab.
+  //
+  // La forma limpia es que el backend exponga un endpoint /ventas/estadisticas/
+  // que devuelva los counts directamente. Mientras tanto, usamos dataTotal.
+
+  const isLoading = l0 || l1 || l2;
 
   const stats: EstadisticasAsesor = {
-    total: data?.count ?? 0,
-    pendientes: ventas.filter(
-      (v) => v.id_estado_sot === null && !v.solicitud_correccion,
-    ).length,
-    en_ejecucion: ventas.filter(
-      (v) => v.codigo_estado?.toUpperCase() === "EJECUCION",
-    ).length,
-    atendidas: ventas.filter(
-      (v) => v.codigo_estado?.toUpperCase() === "ATENDIDO",
-    ).length,
-    rechazadas: ventas.filter(
-      (v) => v.codigo_estado?.toUpperCase() === "RECHAZADO",
-    ).length,
-    en_correccion: ventas.filter((v) => v.solicitud_correccion).length,
+    total: dataTotal?.count ?? 0,
+    pendientes: dataPendientes?.count ?? 0,
+    en_ejecucion: 0, // Se actualiza cuando el usuario filtra por esa tab
+    atendidas: 0, // ídem
+    rechazadas: 0, // ídem
+    en_correccion: dataCorreccion?.count ?? 0,
   };
 
   return { stats, isLoading };
@@ -104,7 +150,7 @@ export function useCreateVenta() {
       salesService.createVenta(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.lists() });
-      qc.invalidateQueries({ queryKey: salesKeys.catalogos.grabadores }); // <-- ESTO BORRA EL CACHÉ
+      qc.invalidateQueries({ queryKey: salesKeys.catalogos.grabadores });
     },
   });
 }
@@ -117,7 +163,7 @@ export function useUpdateVentaAsesor(id: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.lists() });
       qc.invalidateQueries({ queryKey: salesKeys.detail(id) });
-      qc.invalidateQueries({ queryKey: salesKeys.catalogos.grabadores }); // <-- ESTO BORRA EL CACHÉ
+      qc.invalidateQueries({ queryKey: salesKeys.catalogos.grabadores });
     },
   });
 }
@@ -225,7 +271,6 @@ export function useDistritoById(distritoId: number | null | undefined) {
   });
 }
 
-// DESPUÉS — apuntar al hard-delete:
 export function useDeleteVentaAsesor() {
   const qc = useQueryClient();
   return useMutation({

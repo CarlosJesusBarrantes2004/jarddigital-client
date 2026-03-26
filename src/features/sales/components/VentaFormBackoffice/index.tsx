@@ -1298,6 +1298,29 @@ export function VentaFormBackoffice({
                 />
               </div>
               <Divider />
+              <SectionTitle>Equipos Adicionales</SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {venta.cant_decos_adicionales > 0 && (
+                  <ReadonlyField
+                    label="Decos adicionales"
+                    value={`${venta.cant_decos_adicionales} deco${venta.cant_decos_adicionales !== 1 ? "s" : ""}`}
+                  />
+                )}
+                {venta.cant_repetidores_adicionales > 0 && (
+                  <ReadonlyField
+                    label="Repetidores adicionales"
+                    value={`${venta.cant_repetidores_adicionales} repetidor${venta.cant_repetidores_adicionales !== 1 ? "es" : ""}`}
+                  />
+                )}
+                {venta.cant_decos_adicionales === 0 &&
+                  venta.cant_repetidores_adicionales === 0 && (
+                    <p className="text-sm text-muted-foreground/50 col-span-2">
+                      Sin equipos adicionales
+                    </p>
+                  )}
+              </div>
+
+              <Divider />
               <SectionTitle>Grabador de Audios</SectionTitle>
               <div className="grid grid-cols-1 gap-4">
                 <ReadonlyField

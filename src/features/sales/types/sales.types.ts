@@ -346,6 +346,7 @@ export interface VentaFiltros {
   /** FIX #2: ordering por fecha. Ej: "fecha_venta" | "-fecha_venta" */
   ordering?: string;
   page?: number;
+  page_size?: number;
   fecha_inicio?: string;
   fecha_fin?: string;
 }

@@ -1,11 +1,5 @@
 /**
  * features/sales/pages/BackofficePage.tsx
- *
- * Fixes incluidos:
- *   #2  — Ordenamiento asc/desc por fecha de venta (flecha en cabecera de tabla)
- *   #3  — Filtro de estado de audio
- *   #5  — Filtros de fecha + tabs de estado
- *   #6  — Exportar Excel con selector de estado y rango de fechas
  */
 import { useState, useMemo, useRef, useEffect } from "react";
 import {
@@ -29,8 +23,10 @@ import type { Venta, VentaFiltros, EstadoSOT } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
 import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
+import { PaginationControls } from "../components/PaginationControls";
 
-// ─── Tabs de estado ───────────────────────────────────────────────────────────
+const PAGE_SIZE = 5;
+
 type TabEstado =
   | "todos"
   | "pendientes"
@@ -39,11 +35,7 @@ type TabEstado =
   | "rechazadas"
   | "correccion";
 
-const TABS: {
-  key: TabEstado;
-  label: string;
-  colorActivo: string;
-}[] = [
+const TABS: { key: TabEstado; label: string; colorActivo: string }[] = [
   {
     key: "todos",
     label: "Todas",
@@ -80,7 +72,6 @@ const TABS: {
   },
 ];
 
-// ─── Opciones para exportar Excel ─────────────────────────────────────────────
 type EstadoExcel = "todas" | "ATENDIDO" | "EJECUCION" | "RECHAZADO";
 
 const OPCIONES_EXCEL: { key: EstadoExcel; label: string; desc: string }[] = [
@@ -106,7 +97,6 @@ const OPCIONES_EXCEL: { key: EstadoExcel; label: string; desc: string }[] = [
   },
 ];
 
-// ─── Panel de exportación Excel ───────────────────────────────────────────────
 function ExcelPanel({ onClose }: { onClose: () => void }) {
   const [estadoExcel, setEstadoExcel] = useState<EstadoExcel>("todas");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -263,15 +253,13 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Hook: construye VentaFiltros ─────────────────────────────────────────────
+// Construye los filtros de API (sin page ni page_size)
 function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
   const [tab, setTab] = useState<TabEstado>("todos");
   const [search, setSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
-  // FIX #3: filtro de estado de audio
   const [filtroEstadoAudio, setFiltroEstadoAudio] = useState<number | "">("");
-  // FIX #2: ordenamiento por fecha de venta
   const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc" | null>("desc");
 
   const handleToggleOrdenFecha = () => {
@@ -284,18 +272,16 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
 
   const filtros: VentaFiltros = useMemo(() => {
     const base: VentaFiltros = {
-      search: search || undefined,
+      ...(search ? { search } : {}),
       ...(fechaDesde ? { fecha_inicio: fechaDesde } : {}),
       ...(fechaHasta ? { fecha_fin: fechaHasta } : {}),
-      // FIX #3: estado de audio
       ...(filtroEstadoAudio !== ""
         ? { id_estado_audios: filtroEstadoAudio }
         : {}),
-      // FIX #2: ordering
       ...(ordenFecha
         ? { ordering: ordenFecha === "asc" ? "fecha_venta" : "-fecha_venta" }
         : {}),
-    } as VentaFiltros;
+    };
 
     switch (tab) {
       case "pendientes":
@@ -348,7 +334,6 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
   };
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 interface BackofficePageProps {
   soloLectura?: boolean;
 }
@@ -373,7 +358,21 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
     filtros,
   } = useFiltrosBackoffice(estadosSOTData);
 
-  const { data, isLoading, refetch } = useVentas(filtros);
+  // ── Paginación ──────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+
+  // Cuando cambia cualquier filtro, volver a la primera página
+  useEffect(() => {
+    setPage(1);
+  }, [filtros]);
+
+  // Filtros finales: agrega page y page_size
+  const filtrosConPagina: VentaFiltros = useMemo(
+    () => ({ ...filtros, page, page_size: PAGE_SIZE }),
+    [filtros, page],
+  );
+
+  const { data, isLoading, isFetching, refetch } = useVentas(filtrosConPagina);
   const ventas = data?.results ?? [];
 
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
@@ -384,7 +383,6 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   const handleGestionar = (v: Venta) => setVentaSeleccionada(v);
   const handleCerrarForm = () => setVentaSeleccionada(null);
 
-  // FIX #2: pasamos ordenFecha y handler a buildColumnsBackoffice
   const columns = useMemo(
     () =>
       buildColumnsBackoffice(
@@ -394,10 +392,12 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
         ordenFecha,
         handleToggleOrdenFecha,
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [estadosSOTData, estadosAudio, soloLectura, ordenFecha],
   );
 
   const tieneFechas = !!fechaDesde || !!fechaHasta;
+  const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 0;
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-[1400px] mx-auto">
@@ -435,9 +435,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
 
       {/* ── Filtros ── */}
       <div className="flex flex-col gap-3">
-        {/* Fila 1: Búsqueda + fechas + estado audio + refresh */}
         <div className="flex flex-wrap gap-2 items-center">
-          {/* Buscador */}
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search
               size={13}
@@ -460,7 +458,6 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             )}
           </div>
 
-          {/* Rango de fechas */}
           <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
             <Calendar size={12} className="text-muted-foreground shrink-0" />
             <input
@@ -495,7 +492,6 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             </button>
           )}
 
-          {/* FIX #3: Filtro de estado de audio */}
           <div className="relative flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background min-w-[160px]">
             <Mic size={12} className="text-muted-foreground shrink-0" />
             <select
@@ -528,7 +524,6 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             )}
           </div>
 
-          {/* Contador + refresh */}
           <div className="ml-auto flex items-center gap-2">
             {data?.count !== undefined && (
               <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
@@ -537,7 +532,10 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             )}
             <button
               onClick={() => refetch()}
-              className="h-10 w-10 rounded-xl border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className={cn(
+                "h-10 w-10 rounded-xl border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                isFetching && "animate-spin text-primary",
+              )}
               title="Refrescar"
             >
               <RefreshCw size={13} />
@@ -545,7 +543,6 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           </div>
         </div>
 
-        {/* Fila 2 — Tabs de estado */}
         <div className="flex gap-1.5 flex-wrap">
           {TABS.map((t) => (
             <button
@@ -584,6 +581,16 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
                 : "No se encontraron ventas con los filtros aplicados"
         }
       />
+
+      {/* ── Paginación ── */}
+      {totalPages > 1 && (
+        <PaginationControls
+          count={data?.count ?? 0}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
 
       {/* ── Form Backoffice ── */}
       {ventaSeleccionada && (

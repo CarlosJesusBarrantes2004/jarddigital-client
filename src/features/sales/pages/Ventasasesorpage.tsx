@@ -1,14 +1,7 @@
 /**
  * features/sales/pages/AsesorPage.tsx
- *
- * Página principal del ROL ASESOR.
- * Fixes incluidos:
- *   #3  — Botón Editar solo aparece cuando el asesor tiene permiso real
- *   #4  — Botón Eliminar solo en ventas pendientes o en corrección
- *   #5  — Filtros por fecha + tabs de estado
- *   #8  — Botón Reingresar oculto si la venta ya fue reingresada (ya_reingresada)
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -33,8 +26,10 @@ import type { Venta, VentaFiltros, EstadoSOT } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
 import { buildColumnsAsesor } from "../components/VentasTable/columnsAsesor";
 import { VentaFormAsesor } from "../components/VentaFormAsesor";
+import { PaginationControls } from "../components/PaginationControls";
 
-// ─── Tipos de filtro de estado ────────────────────────────────────────────────
+const PAGE_SIZE = 5;
+
 type TabEstado =
   | "todos"
   | "pendientes"
@@ -80,7 +75,7 @@ const TABS: { key: TabEstado; label: string; colorActivo: string }[] = [
   },
 ];
 
-// ─── Hook: construye VentaFiltros a partir del tab + fechas + search ──────────
+// Construye los filtros de API a partir del estado de UI (sin page ni page_size)
 function useFiltrosAsesor(estadosSOT: EstadoSOT[]) {
   const [tab, setTab] = useState<TabEstado>("todos");
   const [search, setSearch] = useState("");
@@ -89,11 +84,10 @@ function useFiltrosAsesor(estadosSOT: EstadoSOT[]) {
 
   const filtros: VentaFiltros = useMemo(() => {
     const base: VentaFiltros = {
-      search: search || undefined,
-      // FIX #5: fechas van directo al query; el backend filtra por fecha_creacion
+      ...(search ? { search } : {}),
       ...(fechaDesde ? { fecha_inicio: fechaDesde } : {}),
       ...(fechaHasta ? { fecha_fin: fechaHasta } : {}),
-    } as VentaFiltros;
+    };
 
     switch (tab) {
       case "pendientes":
@@ -140,7 +134,6 @@ function useFiltrosAsesor(estadosSOT: EstadoSOT[]) {
   };
 }
 
-// ─── Modal de confirmación de borrado ────────────────────────────────────────
 interface ConfirmDeleteModalProps {
   venta: Venta | null;
   onConfirm: () => void;
@@ -221,7 +214,6 @@ function ConfirmDeleteModal({
   );
 }
 
-// ─── Tarjeta de estadística ───────────────────────────────────────────────────
 function StatCard({
   label,
   value,
@@ -255,7 +247,6 @@ function StatCard({
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export function AsesorPage() {
   const { data: estadosSOTData = [] } = useEstadosSOT();
 
@@ -272,13 +263,26 @@ export function AsesorPage() {
     filtros,
   } = useFiltrosAsesor(estadosSOTData);
 
-  const { data, isLoading, refetch } = useVentas(filtros);
+  // ── Paginación ──────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+
+  // Cuando cambia cualquier filtro, volver a la primera página
+  useEffect(() => {
+    setPage(1);
+  }, [filtros]);
+
+  // Filtros finales: agrega page y page_size para activar paginación en el backend
+  const filtrosConPagina: VentaFiltros = useMemo(
+    () => ({ ...filtros, page, page_size: PAGE_SIZE }),
+    [filtros, page],
+  );
+
+  const { data, isLoading, isFetching, refetch } = useVentas(filtrosConPagina);
   const ventas = data?.results ?? [];
 
-  // Stats (siempre sin filtros para que los conteos sean globales)
+  // Stats: usan filtros sin page para obtener counts reales
   const { stats } = useEstadisticasAsesor();
 
-  // Modales
   const [formOpen, setFormOpen] = useState(false);
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(
     null,
@@ -290,25 +294,21 @@ export function AsesorPage() {
   const { mutateAsync: eliminarVenta, isPending: eliminando } =
     useDeleteVentaAsesor();
 
-  // ── Handlers ────────────────────────────────────────────────
   const handleNuevaVenta = () => {
     setVentaSeleccionada(null);
     setFormOpen(true);
   };
 
-  // FIX #3: handleEditar — solo se llama desde columnsAsesor cuando puedeEditar=true
   const handleEditar = (v: Venta) => {
     setVentaSeleccionada(v);
     setFormOpen(true);
   };
 
-  // FIX #8: handleReingresar — columnsAsesor ya oculta el botón si ya_reingresada=true
   const handleReingresar = (v: Venta) => {
     setVentaSeleccionada(v);
     setFormOpen(true);
   };
 
-  // FIX #4: handleEliminar — columnsAsesor solo muestra el botón si puedeEliminar=true
   const handleEliminar = (v: Venta) => {
     setVentaParaEliminar(v);
   };
@@ -331,19 +331,20 @@ export function AsesorPage() {
     setVentaSeleccionada(null);
   };
 
-  // ── Columnas ─────────────────────────────────────────────────
   const columns = useMemo(
     () =>
       buildColumnsAsesor(
         estadosSOTData,
         handleEditar,
         handleReingresar,
-        handleEliminar, // FIX #4: cuarto parámetro
+        handleEliminar,
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [estadosSOTData],
   );
 
   const tieneFechas = !!fechaDesde || !!fechaHasta;
+  const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 0;
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-[1400px] mx-auto">
@@ -414,9 +415,7 @@ export function AsesorPage() {
 
       {/* ── Filtros ── */}
       <div className="flex flex-col gap-3">
-        {/* Fila 1: Búsqueda + Fechas + refresh */}
         <div className="flex flex-wrap gap-2 items-center">
-          {/* Buscador */}
           <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search
               size={13}
@@ -439,7 +438,6 @@ export function AsesorPage() {
             )}
           </div>
 
-          {/* FIX #5: Rango de fechas */}
           <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background">
             <Calendar size={12} className="text-muted-foreground shrink-0" />
             <input
@@ -471,7 +469,6 @@ export function AsesorPage() {
             </button>
           )}
 
-          {/* Contador + refresh */}
           <div className="ml-auto flex items-center gap-2">
             {data?.count !== undefined && (
               <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
@@ -480,7 +477,10 @@ export function AsesorPage() {
             )}
             <button
               onClick={() => refetch()}
-              className="h-10 w-10 rounded-xl border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className={cn(
+                "h-10 w-10 rounded-xl border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                isFetching && "animate-spin text-primary",
+              )}
               title="Refrescar"
             >
               <RefreshCw size={13} />
@@ -488,7 +488,6 @@ export function AsesorPage() {
           </div>
         </div>
 
-        {/* FIX #5: Fila 2 — Tabs de estado */}
         <div className="flex gap-1.5 flex-wrap">
           {TABS.map((t) => (
             <button
@@ -502,7 +501,6 @@ export function AsesorPage() {
               )}
             >
               {t.label}
-              {/* Muestra conteo en el tab activo */}
               {t.key !== "todos" &&
                 tab === t.key &&
                 data?.count !== undefined && (
@@ -527,14 +525,24 @@ export function AsesorPage() {
         }
       />
 
-      {/* ── Form Asesor (Nueva / Editar / Reingresar) ── */}
+      {/* ── Paginación ── */}
+      {totalPages > 1 && (
+        <PaginationControls
+          count={data?.count ?? 0}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
+
+      {/* ── Form Asesor ── */}
       <VentaFormAsesor
         open={formOpen}
         onClose={handleCloseForm}
         ventaOrigen={ventaSeleccionada}
       />
 
-      {/* FIX #4: Modal de confirmación de borrado */}
+      {/* ── Modal confirmación borrado ── */}
       <ConfirmDeleteModal
         venta={ventaParaEliminar}
         onConfirm={confirmarEliminar}
