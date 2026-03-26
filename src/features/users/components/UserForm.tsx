@@ -191,6 +191,7 @@ export const UserForm = ({
     setIsSubmitting(true);
     const payload: CreateUserPayload | UpdateUserPayload = isEditing
       ? {
+          username: values.username,
           nombre_completo: values.nombre_completo,
           email: values.email,
           id_rol: values.id_rol,
@@ -248,18 +249,14 @@ export const UserForm = ({
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
-              Username
+              Nombre de usuario
             </label>
             <input
               type="text"
-              placeholder="maria_garcia"
-              disabled={isEditing}
+              placeholder="carlos_b"
               className={cn(
                 "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50 disabled:cursor-not-allowed",
                 errors.username ? "border-destructive" : "border-border",
-                isEditing
-                  ? "text-muted-foreground bg-muted"
-                  : "text-foreground",
               )}
               {...register("username")}
             />

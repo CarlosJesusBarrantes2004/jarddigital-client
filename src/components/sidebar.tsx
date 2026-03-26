@@ -388,12 +388,12 @@ export const Sidebar = ({
       {/* ── Sidebar ── */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border z-50 flex flex-col font-sans transition-all duration-300 ease-in-out overflow-hidden shadow-2xl lg:shadow-none",
-          expanded ? "w-[240px]" : "w-[72px]", // Aumenté a 72px cuando está cerrado para que respire más
+          "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border z-50 flex flex-col font-sans transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none",
+          expanded ? "w-[240px]" : "w-[72px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* Header */}
+        {/* 1. Header FIJO */}
         <div className="h-[64px] flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
           <div
             className={cn(
@@ -419,69 +419,72 @@ export const Sidebar = ({
           </button>
         </div>
 
-        {/* User info */}
-        {user && (
-          <div
-            className={cn(
-              "p-4 border-b border-sidebar-border flex items-center gap-3 overflow-hidden shrink-0",
-              !expanded && "justify-center",
-            )}
-          >
-            <div className="w-[32px] h-[32px] rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-[12px] font-bold text-primary shrink-0">
-              {user.nombre_completo.substring(0, 2).toUpperCase()}
-            </div>
-            {expanded && (
-              <div className="overflow-hidden flex-1">
-                <span className="block text-[13px] font-semibold text-sidebar-foreground truncate">
-                  {user.nombre_completo}
-                </span>
-                <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate mt-0.5">
-                  {user.rol?.codigo}
-                </span>
+        {/* 2. CONTENEDOR SCROLLEABLE (Usuario + Nav + Bottom) */}
+        <div className="flex-1 overflow-y-auto flex flex-col [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
+          {/* User info */}
+          {user && (
+            <div
+              className={cn(
+                "p-4 border-b border-sidebar-border flex items-center gap-3 overflow-hidden shrink-0",
+                !expanded && "justify-center",
+              )}
+            >
+              <div className="w-[32px] h-[32px] rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-[12px] font-bold text-primary shrink-0">
+                {user.nombre_completo.substring(0, 2).toUpperCase()}
               </div>
-            )}
+              {expanded && (
+                <div className="overflow-hidden flex-1">
+                  <span className="block text-[13px] font-semibold text-sidebar-foreground truncate">
+                    {user.nombre_completo}
+                  </span>
+                  <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate mt-0.5">
+                    {user.rol?.codigo}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Nav */}
+          <nav className="flex-1 p-3 flex flex-col gap-1">
+            {SECTIONS.map((section) => (
+              <NavSection
+                key={section.title}
+                section={section}
+                roleCode={roleCode}
+                expanded={expanded}
+                onClickItem={() => setMobileOpen(false)}
+              />
+            ))}
+          </nav>
+
+          {/* Bottom (usamos mt-auto para empujarlo al fondo si la pantalla es alta) */}
+          <div className="mt-auto border-t border-sidebar-border p-3 flex flex-col gap-2 shrink-0">
+            <WorkspaceSwitcher expanded={expanded} />
+
+            {/* Botón Theme */}
+            <button
+              type="button"
+              className="group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap"
+              onClick={cycleTheme}
+            >
+              {getThemeIcon()}
+              {expanded && <span>{getThemeLabel()}</span>}
+            </button>
+
+            {/* Logout */}
+            <button
+              type="button"
+              className="group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap"
+              onClick={logout}
+            >
+              <LogOut
+                size={14}
+                className="shrink-0 group-hover:-translate-x-0.5 transition-transform"
+              />
+              {expanded && "Cerrar sesión"}
+            </button>
           </div>
-        )}
-
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
-          {SECTIONS.map((section) => (
-            <NavSection
-              key={section.title}
-              section={section}
-              roleCode={roleCode}
-              expanded={expanded}
-              onClickItem={() => setMobileOpen(false)}
-            />
-          ))}
-        </nav>
-
-        {/* Bottom */}
-        <div className="border-t border-sidebar-border p-3 flex flex-col gap-2 shrink-0">
-          <WorkspaceSwitcher expanded={expanded} />
-
-          {/* Botón Theme */}
-          <button
-            type="button"
-            className="group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap"
-            onClick={cycleTheme}
-          >
-            {getThemeIcon()}
-            {expanded && <span>{getThemeLabel()}</span>}
-          </button>
-
-          {/* Logout */}
-          <button
-            type="button"
-            className="group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap"
-            onClick={logout}
-          >
-            <LogOut
-              size={14}
-              className="shrink-0 group-hover:-translate-x-0.5 transition-transform"
-            />
-            {expanded && "Cerrar sesión"}
-          </button>
         </div>
       </aside>
     </>
