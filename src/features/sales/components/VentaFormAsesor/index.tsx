@@ -1372,7 +1372,7 @@ export function VentaFormAsesor({
                     name="cant_decos_adicionales"
                     render={({ field }) => (
                       <TextInput
-                        label="Decos adicionales"
+                        label="Decos asignados"
                         type="number"
                         min="0"
                         disabled={soloAudios || todosBloqueado}
@@ -1387,7 +1387,7 @@ export function VentaFormAsesor({
                     name="cant_repetidores_adicionales"
                     render={({ field }) => (
                       <TextInput
-                        label="Repetidores adicionales"
+                        label="Repetidores asignados"
                         type="number"
                         min="0"
                         disabled={soloAudios || todosBloqueado}
