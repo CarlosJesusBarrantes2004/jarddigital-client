@@ -1,13 +1,12 @@
 /**
  * features/sales/components/VentasTable/columnsAsesor.tsx
  *
- * Fixes incluidos:
- *   #2 — Badge "En corrección" solo si solicitud_correccion sigue true
- *   #3 — Botón Editar solo cuando el asesor tiene permiso real de edición
- *   #4 — Botón Eliminar solo en pendientes o en corrección
- *   #4b — Sub-estado debajo de EJECUCION
- *   #6 — Tooltip con motivo de rechazo al pasar el cursor sobre venta rechazada
- *   #8 — Botón Reingresar oculto si ya_reingresada = true
+ * CAMBIOS:
+ *   ✓ Columna "Visita" muestra fecha + bloque horario debajo
+ *   ✓ Sub-estados debajo de SOT EJECUCION (ya existía, mejorado)
+ *   ✓ Popup al pasar cursor por comentario de gestión (corrección)
+ *   ✓ Botón "ojo" para ver detalles (todos los roles)
+ *   ✓ Todos los fixes anteriores (#2, #3, #4, #4b, #6, #8) mantenidos
  */
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -18,6 +17,8 @@ import {
   RefreshCw,
   Trash2,
   MessageCircle,
+  Eye,
+  Clock,
 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
@@ -28,6 +29,7 @@ export function buildColumnsAsesor(
   onEditar: (v: Venta) => void,
   onReingresar: (v: Venta) => void,
   onEliminar: (v: Venta) => void,
+  onVerDetalle?: (v: Venta) => void,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -97,13 +99,11 @@ export function buildColumnsAsesor(
         const codigoEstado = estadoData?.codigo?.toUpperCase() ?? "";
         const esRechazada = codigoEstado === "RECHAZADO";
         const esEjecucion = codigoEstado === "EJECUCION";
-
-        // FIX #4b: Sub-estado solo bajo EJECUCION
         const tieneSubEstado = esEjecucion && v.id_sub_estado_sot !== null;
 
         return (
           <div className="flex flex-col gap-1.5 items-start">
-            {/* FIX #6: Badge de rechazada con tooltip de motivo */}
+            {/* Badge de rechazada con tooltip de motivo */}
             {esRechazada && v.comentario_gestion ? (
               <div className="relative group/tooltip">
                 <EstadoBadge
@@ -117,12 +117,10 @@ export function buildColumnsAsesor(
                       : null
                   }
                 />
-                {/* Icono indicador de que hay motivo */}
                 <MessageCircle
                   size={11}
                   className="absolute -top-1 -right-1 text-destructive bg-background rounded-full"
                 />
-                {/* Tooltip con motivo */}
                 <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/tooltip:block w-56 pointer-events-none">
                   <div className="bg-card border border-destructive/30 rounded-xl shadow-xl p-3">
                     <p className="text-[10px] font-mono font-bold text-destructive uppercase tracking-widest mb-1.5">
@@ -132,7 +130,6 @@ export function buildColumnsAsesor(
                       {v.comentario_gestion}
                     </p>
                   </div>
-                  {/* Flechita del tooltip */}
                   <div className="w-2.5 h-2.5 bg-card border-b border-r border-destructive/30 rotate-45 ml-3 -mt-1.5" />
                 </div>
               </div>
@@ -150,29 +147,44 @@ export function buildColumnsAsesor(
               />
             )}
 
-            {/*
-             * FIX #2: El badge solo aparece si solicitud_correccion === true.
-             */}
+            {/* Badge "En corrección" con tooltip del comentario de gestión */}
             {v.solicitud_correccion && (
-              <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-[200px]">
-                <AlertTriangle
-                  size={12}
-                  className="text-orange-500 shrink-0 mt-0.5"
-                />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider leading-none">
-                    En corrección
-                  </span>
-                  {v.comentario_gestion && (
-                    <span className="text-[10px] text-orange-600/70 dark:text-orange-400/70 mt-1 line-clamp-2 leading-tight">
-                      {v.comentario_gestion}
+              <div className="relative group/correccion">
+                <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-[200px] cursor-default">
+                  <AlertTriangle
+                    size={12}
+                    className="text-orange-500 shrink-0 mt-0.5"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider leading-none">
+                      En corrección
                     </span>
+                  </div>
+                  {v.comentario_gestion && (
+                    <MessageCircle
+                      size={10}
+                      className="text-orange-400 shrink-0 mt-0.5 ml-auto"
+                    />
                   )}
                 </div>
+                {/* Popup con el comentario de gestión */}
+                {v.comentario_gestion && (
+                  <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/correccion:block w-64 pointer-events-none">
+                    <div className="bg-card border border-orange-500/30 rounded-xl shadow-xl p-3">
+                      <p className="text-[10px] font-mono font-bold text-orange-500 uppercase tracking-widest mb-1.5">
+                        Qué debe corregir
+                      </p>
+                      <p className="text-[11px] text-foreground/80 leading-snug">
+                        {v.comentario_gestion}
+                      </p>
+                    </div>
+                    <div className="w-2.5 h-2.5 bg-card border-b border-r border-orange-500/30 rotate-45 ml-3 -mt-1.5" />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* FIX #4b: Sub-estado bajo EJECUCION */}
+            {/* Sub-estado bajo EJECUCION */}
             {tieneSubEstado && v.nombre_sub_estado && (
               <span className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 max-w-[180px] truncate">
                 {v.nombre_sub_estado}
@@ -210,17 +222,36 @@ export function buildColumnsAsesor(
       accessorKey: "fecha_visita_programada",
       header: "Visita",
       cell: ({ row }) => {
-        const fechaStr = row.original.fecha_visita_programada;
-        return fechaStr ? (
-          <span className="text-[13px] text-foreground/80">
-            {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
-              locale: es,
-            })}
-          </span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground/40">
-            Sin programar
-          </span>
+        const v = row.original;
+        const fechaStr = v.fecha_visita_programada;
+
+        if (!fechaStr) {
+          return (
+            <span className="text-[10px] text-muted-foreground/40">
+              Sin programar
+            </span>
+          );
+        }
+
+        // Extraer el bloque corto: "PM1", "AM2", etc.
+        const bloqueCorto = v.bloque_horario
+          ? (v.bloque_horario.match(/\(([^)]+)\)/)?.[1] ?? v.bloque_horario)
+          : null;
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] text-foreground/80">
+              {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
+                locale: es,
+              })}
+            </span>
+            {bloqueCorto && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                <Clock size={10} />
+                {bloqueCorto}
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -251,12 +282,22 @@ export function buildColumnsAsesor(
             (esEjecucion && !tieneAudios));
 
         const puedeEliminar = esPendiente;
-
         const yaReingresada = !!(v as Venta & { ya_reingresada?: boolean })
           .ya_reingresada;
 
         return (
           <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Botón ojo — ver detalles (todos los roles) */}
+            {onVerDetalle && (
+              <ActionBtn
+                onClick={() => onVerDetalle(v)}
+                variant="default"
+                title="Ver detalles de la venta"
+              >
+                <Eye size={12} />
+              </ActionBtn>
+            )}
+
             {puedeEditar && (
               <ActionBtn
                 onClick={() => onEditar(v)}
@@ -273,14 +314,12 @@ export function buildColumnsAsesor(
               </ActionBtn>
             )}
 
-            {/* Rechazada sin permiso */}
             {esRechazada && !v.permitir_reingreso && (
               <span className="text-[10px] font-mono text-destructive/50 uppercase tracking-widest px-1">
                 Rechazada
               </span>
             )}
 
-            {/* FIX #8: Reingresar — solo si tiene permiso Y no fue reingresada */}
             {esRechazada && v.permitir_reingreso && !yaReingresada && (
               <ActionBtn
                 onClick={() => onReingresar(v)}
@@ -291,19 +330,17 @@ export function buildColumnsAsesor(
               </ActionBtn>
             )}
 
-            {/* Si ya fue reingresada: chip informativo en lugar del botón */}
             {esRechazada && v.permitir_reingreso && yaReingresada && (
               <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary/60 bg-primary/5 px-2 py-1 rounded-full border border-primary/15 uppercase tracking-widest whitespace-nowrap">
                 <RefreshCw size={8} /> Ya reingresada
               </span>
             )}
 
-            {/* FIX #4: Papelera */}
             {puedeEliminar && (
               <ActionBtn
                 onClick={() => onEliminar(v)}
                 variant="warning"
-                title="Eliminar venta (solo pendientes o en corrección)"
+                title="Eliminar venta (solo pendientes)"
               >
                 <Trash2 size={12} />
               </ActionBtn>
@@ -311,7 +348,7 @@ export function buildColumnsAsesor(
           </div>
         );
       },
-      size: 160,
+      size: 180,
     },
   ];
 }

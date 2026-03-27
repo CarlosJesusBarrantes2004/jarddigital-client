@@ -24,6 +24,7 @@ import { DataTable } from "../components/VentasTable";
 import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoffice";
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 import { PaginationControls } from "../components/PaginationControls";
+import { VentaDetalleModal } from "../components/VentaDetalleModal";
 
 const PAGE_SIZE = 5;
 
@@ -342,6 +343,8 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   const { data: estadosSOTData = [] } = useEstadosSOT();
   const { data: estadosAudio = [] } = useEstadosAudio();
 
+  const [ventaDetalle, setVentaDetalle] = useState<Venta | null>(null);
+
   const {
     tab,
     setTab,
@@ -391,6 +394,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
         soloLectura ? null : handleGestionar,
         ordenFecha,
         handleToggleOrdenFecha,
+        setVentaDetalle,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [estadosSOTData, estadosAudio, soloLectura, ordenFecha],
@@ -598,6 +602,14 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           open={!!ventaSeleccionada}
           onClose={handleCerrarForm}
           venta={ventaSeleccionada}
+        />
+      )}
+
+      {ventaDetalle && (
+        <VentaDetalleModal
+          open={!!ventaDetalle}
+          onClose={() => setVentaDetalle(null)}
+          venta={ventaDetalle}
         />
       )}
     </div>

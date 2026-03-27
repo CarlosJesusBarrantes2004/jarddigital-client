@@ -1,3 +1,14 @@
+/**
+ * features/sales/components/VentasTable/columnsBackoffice.tsx
+ *
+ * CAMBIOS:
+ *   ✓ Columna "Visita" muestra fecha + bloque horario debajo
+ *   ✓ Sub-estados debajo de SOT EJECUCION
+ *   ✓ Popup al pasar cursor por comentario de gestión (corrección)
+ *   ✓ Botón "ojo" para ver detalles (todos los roles)
+ *   ✓ Backoffice ve número móvil Y número de instalación en la tabla
+ *   ✓ Fixes anteriores mantenidos
+ */
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -11,25 +22,23 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronsUpDown,
+  MessageCircle,
+  Phone,
+  Hash,
+  Clock,
 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT, EstadoAudio } from "../../types/sales.types";
 import { ActionBtnBackoffice } from "@/components/ActionBtnBackoffice";
 import { cn } from "@/lib/utils";
 
-/**
- * @param onGestionar  Callback para abrir el form de gestión.
- *                     Si se pasa `null`, la columna de acciones muestra solo
- *                     un ícono de "solo lectura" (rol DUEÑO).
- * @param ordenFecha   Estado actual del ordenamiento: "asc" | "desc" | null
- * @param onToggleOrdenFecha  Callback para cambiar el ordenamiento
- */
 export function buildColumnsBackoffice(
   estadosSOT: EstadoSOT[],
   estadosAudio: EstadoAudio[],
   onGestionar: ((v: Venta) => void) | null,
   ordenFecha?: "asc" | "desc" | null,
   onToggleOrdenFecha?: () => void,
+  onVerDetalle?: (v: Venta) => void,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -76,6 +85,21 @@ export function buildColumnsBackoffice(
             <p className="font-mono text-[11px] text-muted-foreground">
               {v.cliente_numero_doc}
             </p>
+            {/* ── Dos teléfonos: móvil + instalación ── */}
+            <div className="flex flex-col gap-0.5 mt-0.5">
+              {v.cliente_telefono && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-foreground/60">
+                  <Phone size={9} className="shrink-0" />
+                  {v.cliente_telefono}
+                </span>
+              )}
+              {v.numero_instalacion && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-foreground/50">
+                  <Hash size={9} className="shrink-0" />
+                  {v.numero_instalacion}
+                </span>
+              )}
+            </div>
           </div>
         );
       },
@@ -114,19 +138,34 @@ export function buildColumnsBackoffice(
         const estadoData = estadosSOT.find((e) => e.id === estadoId);
         const enCorreccion = v.solicitud_correccion;
         const codigoEstado = estadoData?.codigo?.toUpperCase() ?? "";
-
-        // FIX #4: Sub-estado visible debajo de EJECUCION
-        // Buscamos el nombre del sub-estado si hay id_sub_estado_sot
-        // Lo mostramos siempre que el estado sea EJECUCION y haya sub-estado
         const tieneSubEstado =
           codigoEstado === "EJECUCION" && v.id_sub_estado_sot !== null;
 
         return (
           <div className="flex flex-col gap-1.5 items-start">
             {enCorreccion ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold tracking-widest bg-orange-500/10 border border-orange-500/30 text-orange-500 uppercase">
-                <AlertTriangle size={11} /> En corrección
-              </span>
+              /* Badge corrección con popup del comentario */
+              <div className="relative group/correccion">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold tracking-widest bg-orange-500/10 border border-orange-500/30 text-orange-500 uppercase cursor-default">
+                  <AlertTriangle size={11} /> En corrección
+                  {v.comentario_gestion && (
+                    <MessageCircle size={10} className="ml-0.5 opacity-70" />
+                  )}
+                </span>
+                {v.comentario_gestion && (
+                  <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/correccion:block w-64 pointer-events-none">
+                    <div className="bg-card border border-orange-500/30 rounded-xl shadow-xl p-3">
+                      <p className="text-[10px] font-mono font-bold text-orange-500 uppercase tracking-widest mb-1.5">
+                        Comentario de gestión
+                      </p>
+                      <p className="text-[11px] text-foreground/80 leading-snug">
+                        {v.comentario_gestion}
+                      </p>
+                    </div>
+                    <div className="w-2.5 h-2.5 bg-card border-b border-r border-orange-500/30 rotate-45 ml-3 -mt-1.5" />
+                  </div>
+                )}
+              </div>
             ) : (
               <EstadoBadge
                 estado={
@@ -141,13 +180,14 @@ export function buildColumnsBackoffice(
               />
             )}
 
-            {/* FIX #4: Sub-estado debajo de EJECUCION */}
+            {/* Sub-estado debajo de EJECUCION */}
             {tieneSubEstado && v.nombre_sub_estado && (
               <span className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 max-w-[180px] truncate">
                 {v.nombre_sub_estado}
               </span>
             )}
 
+            {/* Comentario de gestión en estados no-corrección (chips) */}
             {v.comentario_gestion &&
               !enCorreccion &&
               v.id_estado_sot !== null && (
@@ -236,25 +276,42 @@ export function buildColumnsBackoffice(
       accessorKey: "fecha_visita_programada",
       header: "Visita",
       cell: ({ row }) => {
-        const fechaStr = row.original.fecha_visita_programada;
-        return fechaStr ? (
-          <span className="text-[13px] text-foreground/80">
-            {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
-              locale: es,
-            })}
-          </span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground/40">
-            Sin programar
-          </span>
+        const v = row.original;
+        const fechaStr = v.fecha_visita_programada;
+
+        if (!fechaStr) {
+          return (
+            <span className="text-[10px] text-muted-foreground/40">
+              Sin programar
+            </span>
+          );
+        }
+
+        // Extrae el código de bloque entre paréntesis, ej: "(PM1)" → "PM1"
+        const bloqueCorto = v.bloque_horario
+          ? (v.bloque_horario.match(/\(([^)]+)\)/)?.[1] ?? v.bloque_horario)
+          : null;
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] text-foreground/80">
+              {format(new Date(`${fechaStr}T00:00:00`), "dd MMM yyyy", {
+                locale: es,
+              })}
+            </span>
+            {bloqueCorto && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                <Clock size={10} />
+                {bloqueCorto}
+              </span>
+            )}
+          </div>
         );
       },
     },
     {
-      // FIX #2: Columna de fecha con ordenamiento asc/desc
       accessorKey: "fecha_venta",
       header: () => {
-        // Si no se pasaron callbacks de ordenamiento, mostramos texto simple
         if (!onToggleOrdenFecha) {
           return <span>Fecha venta</span>;
         }
@@ -276,13 +333,6 @@ export function buildColumnsBackoffice(
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground",
             )}
-            title={
-              ordenFecha === "asc"
-                ? "Ordenado: más antiguas primero. Click para invertir."
-                : ordenFecha === "desc"
-                  ? "Ordenado: más recientes primero. Click para quitar orden."
-                  : "Click para ordenar por fecha de venta"
-            }
           >
             Fecha venta
             <Icon size={12} className="shrink-0" />
@@ -308,44 +358,46 @@ export function buildColumnsBackoffice(
         const esAtendida = v.codigo_estado?.toUpperCase() === "ATENDIDO";
         const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
 
-        // DUEÑO: sin botón de gestión, solo indicador visual
-        if (onGestionar === null) {
-          return (
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">
-              <Eye size={12} /> Solo lectura
-            </div>
-          );
-        }
-
-        if (esAtendida) {
-          return (
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">
-              <CheckCircle2 size={12} /> Finalizada
-            </div>
-          );
-        }
-
-        // FIX #7: Si está rechazada y ya fue reingresada, no mostrar botón Gestionar
-        // (la venta rechazada ya no se puede volver a gestionar)
-        if (esRechazada && v.ya_reingresada) {
-          return (
-            <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary/60 bg-primary/5 px-2 py-1 rounded-full border border-primary/15 uppercase tracking-widest whitespace-nowrap">
-              <RefreshCw size={8} /> Ya reingresada
-            </span>
-          );
-        }
-
         return (
-          <ActionBtnBackoffice
-            onClick={() => onGestionar(v)}
-            variant="primary"
-            title="Gestionar venta"
-          >
-            <Eye size={14} /> Gestionar
-          </ActionBtnBackoffice>
+          <div className="flex items-center gap-1.5">
+            {/* Botón ojo — ver detalles (siempre visible para todos) */}
+            {onVerDetalle && (
+              <button
+                type="button"
+                onClick={() => onVerDetalle(v)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-background text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all"
+                title="Ver detalles de la venta"
+              >
+                <Eye size={14} />
+              </button>
+            )}
+
+            {/* Botón gestionar */}
+            {onGestionar === null ? (
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+                <Eye size={12} /> Solo lectura
+              </div>
+            ) : esAtendida ? (
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">
+                <CheckCircle2 size={12} /> Finalizada
+              </div>
+            ) : esRechazada && v.ya_reingresada ? (
+              <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary/60 bg-primary/5 px-2 py-1 rounded-full border border-primary/15 uppercase tracking-widest whitespace-nowrap">
+                <RefreshCw size={8} /> Ya reingresada
+              </span>
+            ) : (
+              <ActionBtnBackoffice
+                onClick={() => onGestionar(v)}
+                variant="primary"
+                title="Gestionar venta"
+              >
+                <Eye size={14} /> Gestionar
+              </ActionBtnBackoffice>
+            )}
+          </div>
         );
       },
-      size: 110,
+      size: 130,
     },
   ];
 }

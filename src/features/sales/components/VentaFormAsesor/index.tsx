@@ -35,6 +35,7 @@ import { UbigeoCascada } from "./UbigeoCascada";
 import { AudioUploadField } from "./AudioUploadField";
 import { Button } from "@/components/ui/button";
 import { extractApiError } from "@/lib/api-errors";
+import { getValorClienteParaAudio } from "./audioHelpers";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 const schema = z
@@ -318,6 +319,13 @@ export function VentaFormAsesor({
 }: VentaFormAsesorProps) {
   const [paso, setPaso] = useState(0);
 
+  const [nombresInst, setNombresInst] = useState({
+    dep: "",
+    prov: "",
+    dist: "",
+  });
+  const [nombresNac, setNombresNac] = useState({ dep: "", prov: "", dist: "" });
+
   const esRechazada = ventaOrigen?.codigo_estado?.toUpperCase() === "RECHAZADO";
   const esReingreso = !!ventaOrigen && esRechazada;
   const esEdicion = !!ventaOrigen && !esRechazada;
@@ -330,6 +338,8 @@ export function VentaFormAsesor({
     esEjecucion &&
     !ventaOrigen?.solicitud_correccion &&
     !tieneAudiosEnBD;
+  //const esCorreccionSinAudios =
+  //  esEdicion && !!ventaOrigen?.solicitud_correccion && !tieneAudiosEnBD;
   const todosBloqueado =
     esEdicion && !ventaOrigen?.solicitud_correccion && tieneAudiosEnBD;
   const esPendienteSinAudios =
@@ -438,11 +448,13 @@ export function VentaFormAsesor({
   }, [productos, filtroCampana, filtroSolucion]);
 
   useEffect(() => {
-    if (!tieneAlMenosUnAudio && !esEdicion) {
+    if (!tieneAlMenosUnAudio) {
       form.setValue("id_grabador_audios", undefined);
       form.setValue("nombre_grabador_externo", "");
+      // Limpiamos los errores por si react-hook-form se quedó "enganchado"
+      form.clearErrors(["id_grabador_audios", "nombre_grabador_externo"]);
     }
-  }, [tieneAlMenosUnAudio, esEdicion, form]);
+  }, [tieneAlMenosUnAudio, form]);
 
   // ── Inicialización ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -790,11 +802,13 @@ export function VentaFormAsesor({
         "plano",
         "direccion_detalle",
       ];
+
       let primerPasoConError = 0;
       if (Object.keys(errors).some((k) => paso0Fields.includes(k)))
         primerPasoConError = 0;
       else if (Object.keys(errors).some((k) => paso1Fields.includes(k)))
         primerPasoConError = 1;
+
       setPaso(primerPasoConError);
       toast.error("Por favor, revisa los campos en rojo antes de continuar.");
       return;
@@ -802,7 +816,7 @@ export function VentaFormAsesor({
 
     const audiosPayload: AudioPayloadItem[] = etiquetasAudio
       .map((etiqueta, i) => ({
-        idOriginal: audioIdsOriginales[i], // ← siempre el ID de BD, nunca undefined por reemplazo
+        idOriginal: audioIdsOriginales[i],
         nombre_etiqueta: etiqueta,
         url_audio: audioUrls[i],
       }))
@@ -813,14 +827,36 @@ export function VentaFormAsesor({
         url_audio: a.url_audio as string,
       }));
 
+    // 1. Armamos el payload completo PRIMERO para evitar errores de inicialización
+    const hayAudios = audiosPayload.length > 0;
+    const distritoInstalacion = values.id_distrito_instalacion as number;
+
+    const payload = {
+      ...values,
+      id_grabador_audios: hayAudios
+        ? (values.id_grabador_audios ?? null)
+        : null,
+      nombre_grabador_externo:
+        hayAudios && values.id_grabador_audios === 1
+          ? (values.nombre_grabador_externo ?? null)
+          : null,
+      representante_legal_dni: esRUC
+        ? (values.representante_legal_dni ?? null)
+        : null,
+      representante_legal_nombre: esRUC
+        ? (values.representante_legal_nombre ?? null)
+        : null,
+      id_distrito_instalacion: distritoInstalacion,
+      id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
+      audios: audiosPayload,
+    };
+
+    // 2. Flujo Exclusivo de Audios (Ventas en ejecución o pendientes exclusivas de audio)
     if (soloAudios || esPendienteSinAudios) {
       try {
         await editarVenta({
-          id_grabador_audios: values.id_grabador_audios ?? null,
-          nombre_grabador_externo:
-            values.id_grabador_audios === 1
-              ? (values.nombre_grabador_externo ?? null)
-              : null,
+          id_grabador_audios: payload.id_grabador_audios,
+          nombre_grabador_externo: payload.nombre_grabador_externo,
           audios: audiosPayload,
         });
         toast.success("Audios subidos y enviados al Backoffice");
@@ -831,31 +867,9 @@ export function VentaFormAsesor({
       return;
     }
 
-    const distritoInstalacion = values.id_distrito_instalacion as number;
-
+    // 3. Flujo Normal (Creación, Reingreso o Correcciones generales)
+    // Aquí esCorreccionSinAudios entra sin problemas, con los audios vacíos si no subieron nada.
     try {
-      const hayAudios = audiosPayload.length > 0;
-
-      const payload = {
-        ...values,
-        id_grabador_audios: hayAudios
-          ? (values.id_grabador_audios ?? null)
-          : null,
-        nombre_grabador_externo:
-          hayAudios && values.id_grabador_audios === 1
-            ? (values.nombre_grabador_externo ?? null)
-            : null,
-        representante_legal_dni: esRUC
-          ? (values.representante_legal_dni ?? null)
-          : null,
-        representante_legal_nombre: esRUC
-          ? (values.representante_legal_nombre ?? null)
-          : null,
-        id_distrito_instalacion: distritoInstalacion,
-        id_distrito_nacimiento: values.id_distrito_nacimiento ?? null,
-        audios: audiosPayload,
-      };
-
       if (esEdicion) {
         await editarVenta(payload);
         toast.success("Corrección enviada al Backoffice");
@@ -876,6 +890,34 @@ export function VentaFormAsesor({
       toast.error(extractApiError(err));
     }
   };
+
+  const getValorAudio = useCallback(
+    (i: number) =>
+      getValorClienteParaAudio(i, esRUC, {
+        cliente_nombre: form.getValues("cliente_nombre"),
+        cliente_numero_doc: form.getValues("cliente_numero_doc"),
+        cliente_papa: form.getValues("cliente_papa"),
+        cliente_mama: form.getValues("cliente_mama"),
+        cliente_telefono: form.getValues("cliente_telefono"),
+        cliente_email: form.getValues("cliente_email"),
+        cliente_fecha_nacimiento: form.getValues("cliente_fecha_nacimiento"),
+        numero_instalacion: form.getValues("numero_instalacion"),
+        representante_legal_nombre:
+          form.getValues("representante_legal_nombre") ?? undefined,
+        representante_legal_dni:
+          form.getValues("representante_legal_dni") ?? undefined,
+        direccion_detalle: form.getValues("direccion_detalle"),
+
+        dep_nac_nombre: nombresNac.dep,
+        prov_nac_nombre: nombresNac.prov,
+        dist_nac_nombre: nombresNac.dist,
+        dep_inst_nombre: nombresInst.dep,
+        prov_inst_nombre: nombresInst.prov,
+        dist_inst_nombre: nombresInst.dist,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [esRUC, watchedValues, nombresNac, nombresInst],
+  );
 
   if (!open) return null;
   const errorsObj = form.formState.errors;
@@ -1281,7 +1323,7 @@ export function VentaFormAsesor({
                         label="Número Instalación"
                         required
                         disabled={soloAudios || todosBloqueado}
-                        placeholder="Ej: 12345"
+                        placeholder="9XXXXXXXX"
                         {...field}
                         error={errorsObj.numero_instalacion?.message}
                       />
@@ -1485,6 +1527,7 @@ export function VentaFormAsesor({
                       }
                       onDistChange={(v) => field.onChange(v ?? undefined)}
                       error={errorsObj.id_distrito_instalacion?.message}
+                      onNamesChange={setNombresInst}
                     />
                   )}
                 />
@@ -1497,7 +1540,7 @@ export function VentaFormAsesor({
                         label="Dirección Detallada"
                         required
                         disabled={soloAudios || todosBloqueado}
-                        placeholder="Ej: AV LOS INCAS 123 PISO 2"
+                        placeholder="Ej: AV BALTA ..."
                         {...field}
                         error={errorsObj.direccion_detalle?.message}
                       />
@@ -1567,6 +1610,7 @@ export function VentaFormAsesor({
                         form.setValue("prov_nac_id", v ?? undefined)
                       }
                       onDistChange={(v) => field.onChange(v ?? undefined)}
+                      onNamesChange={setNombresNac}
                     />
                   )}
                 />
@@ -1640,6 +1684,7 @@ export function VentaFormAsesor({
                   <AudioUploadField
                     key={i}
                     etiqueta={etiqueta}
+                    valorCliente={getValorAudio(i)}
                     index={i}
                     url={audioUrls[i] ?? null}
                     deleteToken={audioTokens[i]}

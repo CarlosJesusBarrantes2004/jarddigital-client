@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import {
   Upload,
   X,
@@ -7,6 +7,11 @@ import {
   Music,
   AlertCircle,
   MessageSquare,
+  Mic,
+  Square,
+  Play,
+  Pause,
+  CircleDot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +21,8 @@ import {
 
 interface AudioUploadFieldProps {
   etiqueta: string;
+  /** Valor real del cliente para mostrar al lado de la etiqueta (ej: "MARCELA TRILCE ALIAGA CHAHUD") */
+  valorCliente?: string | null;
   index: number;
   url: string | null;
   deleteToken?: string | null;
@@ -30,8 +37,124 @@ interface AudioUploadFieldProps {
   motivoRechazo?: string | null;
 }
 
+// ── Grabador de audio interno ─────────────────────────────────────────────────
+
+function useAudioRecorder() {
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const isSupported =
+    typeof window !== "undefined" &&
+    !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+  const startRecording = useCallback(async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setRecordedBlob(blob);
+        setRecordedUrl(url);
+        setIsPreviewing(true);
+        stream.getTracks().forEach((t) => t.stop());
+      };
+
+      recorder.start(200);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message.includes("Permission")
+            ? "Permiso de micrófono denegado. Habilítalo en tu navegador."
+            : err.message
+          : "No se pudo acceder al micrófono",
+      );
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  }, [isRecording]);
+
+  const discardRecording = useCallback(() => {
+    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+    setRecordedBlob(null);
+    setRecordedUrl(null);
+    setIsPreviewing(false);
+    setRecordingSeconds(0);
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+  }, [recordedUrl]);
+
+  const reset = useCallback(() => {
+    discardRecording();
+    setError(null);
+  }, [discardRecording]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const formatTime = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  return {
+    isSupported,
+    isRecording,
+    isPreviewing,
+    recordedBlob,
+    recordedUrl,
+    recordingSeconds,
+    error,
+    formatTime,
+    startRecording,
+    stopRecording,
+    discardRecording,
+    reset,
+  };
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
+
 export function AudioUploadField({
   etiqueta,
+  valorCliente,
   index,
   url,
   deleteToken,
@@ -49,11 +172,39 @@ export function AudioUploadField({
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showRecorder, setShowRecorder] = useState(false);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewAudioElRef = useRef<HTMLAudioElement | null>(null);
+
+  const recorder = useAudioRecorder();
+
+  // Convierte el blob grabado en File y lo sube a Cloudinary
+  const handleUploadRecording = useCallback(async () => {
+    if (!recorder.recordedBlob) return;
+    const ext = recorder.recordedBlob.type.includes("webm") ? "webm" : "mp3";
+    const file = new File(
+      [recorder.recordedBlob],
+      `grabacion_audio_${index + 1}.${ext}`,
+      { type: recorder.recordedBlob.type },
+    );
+    onUploadStart();
+    setProgress(0);
+    try {
+      const result = await uploadAudioToCloudinary(file, setProgress);
+      recorder.discardRecording();
+      setShowRecorder(false);
+      onUploaded(result.url, result.deleteToken);
+    } catch (err) {
+      onUploadError(
+        err instanceof Error ? err.message : "Error al subir la grabación",
+      );
+    }
+  }, [recorder, index, onUploadStart, onUploaded, onUploadError]);
 
   const handleFile = useCallback(
     async (file: File) => {
       if (!file.type.includes("audio") && !file.name.endsWith(".mp3"))
-        return onUploadError("Solo archivos .mp3");
+        return onUploadError("Solo archivos de audio (.mp3, .wav, etc.)");
       if (file.size > 30 * 1024 * 1024)
         return onUploadError("El archivo no debe superar 30MB");
 
@@ -93,8 +244,6 @@ export function AudioUploadField({
 
   const handleRemoveClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    // Si tenemos un deleteToken significa que se acaba de subir y podemos destruirlo
     if (deleteToken) {
       setIsDeleting(true);
       try {
@@ -103,23 +252,53 @@ export function AudioUploadField({
         console.error("Fallo al borrar en Cloudinary", e);
       } finally {
         setIsDeleting(false);
-        onRemove(); // Eliminamos de la interfaz pase lo que pase
+        onRemove();
       }
     } else {
-      // Si es un audio antiguo (de Reingreso/Edicion) solo lo quitamos visualmente
       onRemove();
     }
   };
 
+  const togglePreview = () => {
+    if (!recorder.recordedUrl) return;
+    if (!previewAudioElRef.current) {
+      const el = new Audio(recorder.recordedUrl);
+      el.onended = () => setPreviewPlaying(false);
+      el.play();
+      previewAudioElRef.current = el;
+      setPreviewPlaying(true);
+    } else {
+      if (previewPlaying) {
+        previewAudioElRef.current.pause();
+        setPreviewPlaying(false);
+      } else {
+        previewAudioElRef.current.play();
+        setPreviewPlaying(true);
+      }
+    }
+  };
+
+  // Al descartar la grabación también pausamos el preview
+  const handleDiscard = () => {
+    if (previewAudioElRef.current) {
+      previewAudioElRef.current.pause();
+      previewAudioElRef.current = null;
+    }
+    setPreviewPlaying(false);
+    recorder.discardRecording();
+  };
+
   const hasUrl = !!url;
   const isError = !!error;
+  const isBusy = uploading || isDeleting;
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
+      {/* ── Etiqueta con valor del cliente ── */}
+      <div className="flex items-start gap-2">
         <span
           className={cn(
-            "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold shrink-0 border",
+            "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono font-bold shrink-0 border mt-0.5",
             hasUrl && !isRechazado
               ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/30"
               : isRechazado
@@ -129,29 +308,131 @@ export function AudioUploadField({
         >
           {index + 1}
         </span>
-        <p className="text-[11px] font-medium text-foreground/80 leading-tight truncate pr-2">
-          {etiqueta}
-        </p>
+        <div className="flex flex-col flex-1 min-w-0 pr-2">
+          <p className="text-[11px] font-medium text-foreground/80 leading-tight">
+            {etiqueta}
+          </p>
+          {valorCliente && (
+            <p
+              className="text-[10px] font-mono text-primary/70 leading-tight mt-0.5 truncate"
+              title={valorCliente}
+            >
+              {valorCliente}
+            </p>
+          )}
+        </div>
         {hasUrl && !isRechazado && (
           <CheckCircle2
             size={14}
-            className="text-emerald-500 ml-auto shrink-0"
+            className="text-emerald-500 shrink-0 mt-0.5"
           />
         )}
         {isRechazado && (
-          <AlertCircle
-            size={14}
-            className="text-destructive ml-auto shrink-0"
-          />
+          <AlertCircle size={14} className="text-destructive shrink-0 mt-0.5" />
         )}
       </div>
 
+      {/* ── Panel de grabación ── */}
+      {showRecorder && !hasUrl && !isBusy && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 flex flex-col gap-3">
+          {recorder.error && (
+            <p className="text-[11px] text-destructive flex items-center gap-1">
+              <AlertCircle size={12} /> {recorder.error}
+            </p>
+          )}
+
+          {!recorder.isRecording && !recorder.isPreviewing && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={recorder.startRecording}
+                className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold hover:bg-primary/90 transition-colors"
+              >
+                <CircleDot size={14} className="text-red-300" />
+                Iniciar grabación
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  recorder.reset();
+                  setShowRecorder(false);
+                }}
+                className="h-9 px-3 rounded-lg border border-border text-muted-foreground hover:text-foreground text-[11px] transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          {recorder.isRecording && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                <span className="text-[12px] font-mono text-red-500 font-bold">
+                  REC {recorder.formatTime(recorder.recordingSeconds)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={recorder.stopRecording}
+                className="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-destructive text-white text-[12px] font-semibold hover:bg-destructive/90 transition-colors"
+              >
+                <Square size={12} /> Detener
+              </button>
+            </div>
+          )}
+
+          {recorder.isPreviewing && recorder.recordedUrl && (
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                Vista previa — {recorder.formatTime(recorder.recordingSeconds)}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={togglePreview}
+                  className={cn(
+                    "w-8 h-8 rounded-full border flex items-center justify-center transition-all",
+                    previewPlaying
+                      ? "bg-primary/20 border-primary/40 text-primary"
+                      : "bg-background border-border text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {previewPlaying ? (
+                    <Pause size={13} />
+                  ) : (
+                    <Play size={13} className="ml-0.5" />
+                  )}
+                </button>
+                <div className="flex-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUploadRecording}
+                    className="flex-1 h-8 rounded-lg bg-emerald-500 text-white text-[11px] font-semibold hover:bg-emerald-600 transition-colors"
+                  >
+                    ✓ Usar esta grabación
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscard}
+                    className="h-8 px-3 rounded-lg border border-border text-[11px] text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Zona de subida ── */}
       <div
         onClick={() =>
           !disabled &&
-          !uploading &&
-          !isDeleting &&
+          !isBusy &&
           !hasUrl &&
+          !showRecorder &&
           inputRef.current?.click()
         }
         onDragOver={(e) => {
@@ -162,7 +443,7 @@ export function AudioUploadField({
         onDrop={handleDrop}
         className={cn(
           "relative flex flex-col justify-center p-3 rounded-xl border transition-all duration-200 min-h-[52px]",
-          disabled || uploading || isDeleting || hasUrl
+          disabled || isBusy || hasUrl || showRecorder
             ? "cursor-default"
             : "cursor-pointer hover:bg-muted/50 border-dashed",
           isError
@@ -179,13 +460,13 @@ export function AudioUploadField({
         <input
           ref={inputRef}
           type="file"
-          accept=".mp3,audio/*"
+          accept=".mp3,.wav,.ogg,.webm,audio/*"
           onChange={handleChange}
           className="hidden"
           disabled={disabled}
         />
 
-        {uploading || isDeleting ? (
+        {isBusy ? (
           <div className="flex items-center gap-3">
             <Loader2
               size={16}
@@ -234,7 +515,7 @@ export function AudioUploadField({
                   type="button"
                   onClick={handleRemoveClick}
                   className="w-6 h-6 flex items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-colors shrink-0"
-                  title="Eliminar audio y subir uno nuevo"
+                  title="Eliminar audio (también se borra de Cloudinary)"
                 >
                   <X size={12} />
                 </button>
@@ -269,8 +550,33 @@ export function AudioUploadField({
               </p>
             </div>
           </div>
+        ) : showRecorder ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Mic size={14} className="text-primary shrink-0" />
+            <p className="text-[11px]">
+              {recorder.isRecording
+                ? "Grabando en curso…"
+                : recorder.isPreviewing
+                  ? "Revisa la grabación arriba"
+                  : "Listo para grabar"}
+            </p>
+          </div>
         ) : (
           <div className="flex items-center gap-3">
+            {/* Botón micrófono */}
+            {recorder.isSupported && !disabled && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRecorder(true);
+                }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0 border border-primary/20"
+                title="Grabar desde el micrófono"
+              >
+                <Mic size={14} />
+              </button>
+            )}
             <div
               className={cn(
                 "w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0",
@@ -289,7 +595,7 @@ export function AudioUploadField({
             >
               {isDragging
                 ? "Suelta el archivo aquí"
-                : "Arrastra .mp3 o haz click"}
+                : "Arrastra archivo o haz click"}
             </p>
           </div>
         )}

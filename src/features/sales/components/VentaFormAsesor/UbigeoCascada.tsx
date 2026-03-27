@@ -74,6 +74,7 @@ interface UbigeoCascadaProps {
   onDepChange: (id: number | null) => void;
   onProvChange: (id: number | null) => void;
   onDistChange: (id: number | null) => void;
+  onNamesChange?: (names: { dep: string; prov: string; dist: string }) => void;
   error?: string;
   disabled?: boolean;
   required?: boolean;
@@ -87,6 +88,7 @@ export function UbigeoCascada({
   onDepChange,
   onProvChange,
   onDistChange,
+  onNamesChange,
   error,
   disabled,
   required,
@@ -107,6 +109,24 @@ export function UbigeoCascada({
       onProvChange(padresInfo.provinciaId);
     }
   }, [padresInfo, needsAutofill, onDepChange, onProvChange]);
+
+  useEffect(() => {
+    if (onNamesChange) {
+      const depName = departamentos.find((d) => d.id === depId)?.nombre || "";
+      const provName = provincias.find((p) => p.id === provId)?.nombre || "";
+      const distName = distritos.find((d) => d.id === distId)?.nombre || "";
+
+      onNamesChange({ dep: depName, prov: provName, dist: distName });
+    }
+  }, [
+    depId,
+    provId,
+    distId,
+    departamentos,
+    provincias,
+    distritos,
+    onNamesChange,
+  ]);
 
   // 🚀 LA MAGIA ESTÁ AQUÍ: Solo limpiamos los hijos cuando el usuario hace un cambio MANUAL
   const handleDepartamentoChange = (nuevoId: number | null) => {

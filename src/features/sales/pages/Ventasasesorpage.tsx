@@ -27,6 +27,7 @@ import { DataTable } from "../components/VentasTable";
 import { buildColumnsAsesor } from "../components/VentasTable/columnsAsesor";
 import { VentaFormAsesor } from "../components/VentaFormAsesor";
 import { PaginationControls } from "../components/PaginationControls";
+import { VentaDetalleModal } from "../components/VentaDetalleModal";
 
 const PAGE_SIZE = 5;
 
@@ -266,6 +267,8 @@ export function AsesorPage() {
   // ── Paginación ──────────────────────────────────────────────
   const [page, setPage] = useState(1);
 
+  const [ventaDetalle, setVentaDetalle] = useState<Venta | null>(null);
+
   // Cuando cambia cualquier filtro, volver a la primera página
   useEffect(() => {
     setPage(1);
@@ -338,6 +341,7 @@ export function AsesorPage() {
         handleEditar,
         handleReingresar,
         handleEliminar,
+        setVentaDetalle,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [estadosSOTData],
@@ -548,6 +552,12 @@ export function AsesorPage() {
         onConfirm={confirmarEliminar}
         onCancel={() => setVentaParaEliminar(null)}
         isPending={eliminando}
+      />
+
+      <VentaDetalleModal
+        open={!!ventaDetalle}
+        onClose={() => setVentaDetalle(null)}
+        venta={ventaDetalle!}
       />
     </div>
   );
