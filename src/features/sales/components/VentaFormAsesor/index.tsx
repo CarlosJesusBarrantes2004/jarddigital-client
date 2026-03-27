@@ -1675,7 +1675,7 @@ export function VentaFormAsesor({
                 <p className="text-xs text-muted-foreground mt-1">
                   {esReingreso
                     ? "Al reingresar debes subir audios nuevos desde cero."
-                    : "Sube los archivos en formato .mp3."}
+                    : "Sube los archivos de audio (cualquier formato)."}
                 </p>
               </div>
 

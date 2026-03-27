@@ -203,8 +203,8 @@ export function AudioUploadField({
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!file.type.includes("audio") && !file.name.endsWith(".mp3"))
-        return onUploadError("Solo archivos de audio (.mp3, .wav, etc.)");
+      if (!file.type.startsWith("audio/"))
+        return onUploadError("Solo se permiten archivos de audio");
       if (file.size > 30 * 1024 * 1024)
         return onUploadError("El archivo no debe superar 30MB");
 
@@ -460,7 +460,7 @@ export function AudioUploadField({
         <input
           ref={inputRef}
           type="file"
-          accept=".mp3,.wav,.ogg,.webm,audio/*"
+          accept="audio/*"
           onChange={handleChange}
           className="hidden"
           disabled={disabled}
