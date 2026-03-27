@@ -1,10 +1,3 @@
-/**
- * features/sales/components/VentaFormAsesor/audioHelpers.ts
- *
- * Función que devuelve el valor real del cliente para cada posición de audio.
- * Se muestra debajo de la etiqueta en AudioUploadField para guiar al asesor.
- */
-
 interface DatosClienteParaAudio {
   cliente_nombre?: string;
   cliente_numero_doc?: string;
@@ -27,30 +20,6 @@ interface DatosClienteParaAudio {
   dist_inst_nombre?: string;
 }
 
-/**
- * Dado el índice del audio (0-13) y los datos del cliente,
- * devuelve el texto que se muestra debajo de la etiqueta.
- *
- * Orden establecido por la empresa:
- *
- * Para DNI (12 audios):
- *  0  → nombre del cliente
- *  1  → número de documento
- *  2  → dep/prov/dist nacimiento + fecha nacimiento
- *  3  → dirección de instalación
- *  4  → "PAPA Y MAMA"
- *  5  → teléfono de contacto
- *  6  → correo electrónico
- *  7  → "NO"
- *  8  → "SI"
- *  9  → "SI ACEPTO"
- * 10  → "SI AUTORIZO"
- * 11  → "SI ACEPTO"
- *
- * Para RUC (14 audios) — igual + 2 extra:
- * 12  → RUC del representante legal (representante_legal_dni)
- * 13  → razón social / nombre del representante legal
- */
 export function getValorClienteParaAudio(
   index: number,
   esRUC: boolean,
@@ -103,7 +72,9 @@ export function getValorClienteParaAudio(
     case 0:
       return nombre || null;
     case 1:
-      return doc || null;
+      return esRUC
+        ? datos.representante_legal_dni?.trim() || null
+        : doc || null;
     case 2:
       return nacimiento;
     case 3:
@@ -127,7 +98,7 @@ export function getValorClienteParaAudio(
     // Solo para RUC:
     case 12:
       if (!esRUC) return null;
-      return datos.representante_legal_dni?.trim() || null;
+      return doc || null;
     case 13:
       if (!esRUC) return null;
       return datos.representante_legal_nombre?.toUpperCase().trim() || null;
