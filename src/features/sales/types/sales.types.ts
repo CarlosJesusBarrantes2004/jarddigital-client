@@ -118,7 +118,7 @@ export const ETIQUETAS_AUDIO_DNI: string[] = [
 
 export const ETIQUETAS_AUDIO_RUC: string[] = [
   "1. Nombre completo del cliente",
-  "2. Número de documento (RUC)",
+  "2. Número de documento (DNI)",
   "3. Lugar y fecha de nacimiento",
   "4. Dirección de instalación",
   "5. Nombre del padre y madre",
