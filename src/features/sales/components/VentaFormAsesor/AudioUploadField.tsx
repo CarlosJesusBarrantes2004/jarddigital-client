@@ -21,7 +21,6 @@ import {
 
 interface AudioUploadFieldProps {
   etiqueta: string;
-  /** Valor real del cliente para mostrar al lado de la etiqueta (ej: "MARCELA TRILCE ALIAGA CHAHUD") */
   valorCliente?: string | null;
   index: number;
   url: string | null;
@@ -203,10 +202,10 @@ export function AudioUploadField({
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (!file.type.startsWith("audio/"))
-        return onUploadError("Solo se permiten archivos de audio");
-      if (file.size > 30 * 1024 * 1024)
-        return onUploadError("El archivo no debe superar 30MB");
+      // ── Sin restricción de formato: cualquier archivo es aceptado ──
+      // Solo limitamos el tamaño máximo (50MB para cubrir audios largos)
+      if (file.size > 50 * 1024 * 1024)
+        return onUploadError("El archivo no debe superar 50MB");
 
       onUploadStart();
       setProgress(0);
@@ -457,10 +456,14 @@ export function AudioUploadField({
                   : "border-border bg-card",
         )}
       >
+        {/*
+         * Sin atributo "accept" para permitir absolutamente cualquier formato.
+         * El navegador no filtrará nada — el usuario puede subir mp3, m4a,
+         * opus, ogg, wav, amr, aac, wma, flac, mp4, 3gp, etc.
+         */}
         <input
           ref={inputRef}
           type="file"
-          accept="audio/*"
           onChange={handleChange}
           className="hidden"
           disabled={disabled}
@@ -595,7 +598,7 @@ export function AudioUploadField({
             >
               {isDragging
                 ? "Suelta el archivo aquí"
-                : "Arrastra archivo o haz click"}
+                : "Arrastra cualquier audio o haz click"}
             </p>
           </div>
         )}

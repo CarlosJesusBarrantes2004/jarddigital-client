@@ -156,6 +156,8 @@ export interface Venta {
   provincia_nacimiento_nombre: string | null;
   departamento_nacimiento_nombre: string | null;
 
+  celular_asesor?: string | null;
+
   // Producto & cliente
   id_producto: number;
   producto_campana: string;

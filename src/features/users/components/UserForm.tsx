@@ -29,7 +29,6 @@ interface UserFormProps {
   onCancel: () => void;
 }
 
-// Usamos colores de Tailwind en lugar de Hexadecimales fijos para que se adapten
 const ROLE_BADGE: Record<
   string,
   { label: string; colorClass: string; bgClass: string; borderClass: string }
@@ -94,6 +93,8 @@ export const UserForm = ({
       nombre_completo: user?.nombre_completo ?? "",
       username: user?.username ?? "",
       email: user?.email ?? "",
+      // null y undefined del backend se normalizan a "" para que el input no sea "uncontrolled"
+      celular: user?.celular ?? "",
       password: "",
       id_rol: user?.id_rol ?? 0,
       activo: user?.activo ?? true,
@@ -107,7 +108,7 @@ export const UserForm = ({
   const isAdvisor = roleCode === "ASESOR";
   const isSupervisor = roleCode === "SUPERVISOR";
   const isOwner = roleCode === "DUENO";
-  const needsWorkspace = !isOwner && watchedRolId !== 0; // Solo pide sede si ya eligió rol y no es dueño
+  const needsWorkspace = !isOwner && watchedRolId !== 0;
 
   const isRestrictedUser =
     currentUser?.rol?.codigo === "SUPERVISOR" ||
@@ -125,22 +126,16 @@ export const UserForm = ({
   const activeWsId = activeSessionSede?.id_modalidad_sede;
 
   const workspaceOptions = useMemo(() => {
-    // Si el usuario actual es DUENO, ve todas las sedes.
     if (currentUser?.rol?.codigo === "DUENO") {
       return rawWorkspaceOptions;
     }
-
-    // Si es SUPERVISOR o RRHH, extraemos los IDs de las sedes a las que pertenece
     const sedesPermitidasIds =
       currentUser?.sucursales?.map((s) => s.id_modalidad_sede) || [];
-
-    // Y filtramos las opciones crudas del backend
     return rawWorkspaceOptions.filter((ws) =>
       sedesPermitidasIds.includes(ws.id),
     );
   }, [rawWorkspaceOptions, currentUser]);
 
-  // ── Cargar opciones de workspace ─────────────
   useEffect(() => {
     userService
       .getWorkspaceOptions()
@@ -151,8 +146,6 @@ export const UserForm = ({
         } else {
           if (roles.length > 0 && watchedRolId === 0)
             setValue("id_rol", roles[0].id);
-
-          // Si quien crea es Supervisor/RRHH, le pre-seleccionamos obligatoriamente su sede de sesión
           if (isRestrictedUser && activeWsId) {
             setSelectedWsIds([activeWsId]);
           }
@@ -162,38 +155,39 @@ export const UserForm = ({
       .finally(() => setLoadingWs(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cuando cambia el rol
   useEffect(() => {
     if (isOwner) {
       setSelectedWsIds([]);
     } else if (isRestrictedUser && activeWsId && !isEditing) {
-      // Forzar Sede activa siempre
       setSelectedWsIds([activeWsId]);
     } else if (isAdvisor && selectedWsIds.length > 1) {
       setSelectedWsIds([selectedWsIds[0]]);
     }
   }, [isOwner, isAdvisor, isRestrictedUser, activeWsId, isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Toggle de workspace ───────────────────────
   const toggleWorkspace = (wsId: number) => {
     setSelectedWsIds((prev) => {
-      if (isAdvisor) return [wsId]; // Asesor: solo 1
+      if (isAdvisor) return [wsId];
       return prev.includes(wsId)
         ? prev.filter((id) => id !== wsId)
         : [...prev, wsId];
     });
   };
 
-  // ── Submit ────────────────────────────────────
   const onSubmit = async (values: UserFormValues) => {
     if (needsWorkspace && selectedWsIds.length === 0) return;
 
     setIsSubmitting(true);
+
+    // Celular vacío → null para que el backend no guarde un string vacío
+    const celularFinal = values.celular?.trim() || null;
+
     const payload: CreateUserPayload | UpdateUserPayload = isEditing
       ? {
           username: values.username,
           nombre_completo: values.nombre_completo,
           email: values.email,
+          celular: celularFinal,
           id_rol: values.id_rol,
           activo: values.activo,
           ids_modalidades_sede: isOwner ? [] : selectedWsIds,
@@ -203,6 +197,7 @@ export const UserForm = ({
           username: values.username,
           nombre_completo: values.nombre_completo,
           email: values.email,
+          celular: celularFinal,
           password: values.password ?? "",
           id_rol: values.id_rol,
           activo: values.activo,
@@ -225,6 +220,7 @@ export const UserForm = ({
           Datos de cuenta
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Nombre completo */}
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               Nombre completo
@@ -247,6 +243,7 @@ export const UserForm = ({
             )}
           </div>
 
+          {/* Usuario */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               Nombre de usuario
@@ -267,6 +264,7 @@ export const UserForm = ({
             )}
           </div>
 
+          {/* Email */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               Email
@@ -287,6 +285,38 @@ export const UserForm = ({
             )}
           </div>
 
+          {/* Celular */}
+          <div className="flex flex-col gap-1.5 md:col-span-2">
+            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
+              Celular
+              <span className="text-muted-foreground/50 text-[10px] normal-case font-sans tracking-normal ml-1">
+                (para WhatsApp)
+              </span>
+            </label>
+            <input
+              type="tel"
+              placeholder="Ej: 987654321"
+              className={cn(
+                "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                errors.celular
+                  ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+                  : "border-border",
+              )}
+              {...register("celular")}
+            />
+            {errors.celular ? (
+              <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
+                <AlertCircle size={11} /> {errors.celular.message}
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                9 dígitos comenzando en 9. Se usa para enviar el guión de
+                grabación.
+              </p>
+            )}
+          </div>
+
+          {/* Contraseña */}
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               {isEditing ? "Nueva contraseña (opcional)" : "Contraseña inicial"}
@@ -387,9 +417,7 @@ export const UserForm = ({
             <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full">
               {workspaceOptions.map((ws) => {
                 const isSelected = selectedWsIds.includes(ws.id);
-                // Si el usuario es supervisor/rrhh y estamos creando, se bloquean los clicks
                 const isLocked = isRestrictedUser && !isEditing;
-
                 return (
                   <div
                     key={ws.id}
@@ -432,7 +460,6 @@ export const UserForm = ({
                   </div>
                 );
               })}
-
               {workspaceOptions.length === 0 && (
                 <p className="text-[12px] text-muted-foreground text-center py-4 bg-muted/50 rounded-lg">
                   No tienes sedes asignadas para otorgar acceso.

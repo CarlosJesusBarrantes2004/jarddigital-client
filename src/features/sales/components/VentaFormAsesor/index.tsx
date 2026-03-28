@@ -393,6 +393,9 @@ export function VentaFormAsesor({
   const isInitialMount = useRef(true);
   const prevLengthRef = useRef(0);
 
+  const hasLoadedDraftRef = useRef(false);
+  const isClosingRef = useRef(false);
+
   const tieneAlMenosUnAudio = audioUrls.some(Boolean);
 
   const form = useForm<FormValues>({
@@ -561,8 +564,12 @@ export function VentaFormAsesor({
         isInitialMount.current = false;
       }, 500);
     } else {
+      if (hasLoadedDraftRef.current) return;
+
       isInitialMount.current = true;
+      hasLoadedDraftRef.current = true;
       setPaso(0);
+
       const draftStr = sessionStorage.getItem("jard_venta_draft");
       if (draftStr) {
         try {
@@ -622,7 +629,13 @@ export function VentaFormAsesor({
   }, [etiquetasAudio.length]);
 
   useEffect(() => {
-    if (open && esVentaNuevaPura && !isInitialMount.current) {
+    // 👉 FIX: Evita guardar si isClosingRef.current es true
+    if (
+      open &&
+      esVentaNuevaPura &&
+      !isInitialMount.current &&
+      !isClosingRef.current
+    ) {
       const timer = setTimeout(() => {
         sessionStorage.setItem(
           "jard_venta_draft",
@@ -666,13 +679,41 @@ export function VentaFormAsesor({
     toast.success("Borrador limpiado correctamente");
   };
 
-  const handleClose = () => {
+  // 👉 FIX: Añadimos skipSave para no interferir con envíos exitosos
+  const handleClose = (
+    skipSave: boolean | React.MouseEvent | React.KeyboardEvent = false,
+  ) => {
+    const skip = typeof skipSave === "boolean" ? skipSave : false;
+    isClosingRef.current = true;
+
+    if (esVentaNuevaPura && !skip) {
+      // Guardado forzado del estado exacto en el instante de cerrar
+      sessionStorage.setItem(
+        "jard_venta_draft",
+        JSON.stringify({
+          form: form.getValues(),
+          audios: audioUrls,
+          tokens: audioTokens,
+          campana: filtroCampana,
+          solucion: filtroSolucion,
+        }),
+      );
+      // Permitimos que el próximo open restaure el borrador
+      hasLoadedDraftRef.current = false;
+      // NO hacemos form.reset() ni limpiamos audioUrls aquí:
+      // el borrador quedó en sessionStorage y se restaurará al reabrir.
+      onClose();
+      return;
+    }
+
+    // Cierre post-envío exitoso o edición/reingreso → limpiar todo
     form.reset();
     setPaso(0);
     setAudioUrls([]);
     setAudioIdsOriginales([]);
     setFiltroCampana("");
     setFiltroSolucion("");
+    hasLoadedDraftRef.current = false;
     onClose();
   };
 
@@ -885,7 +926,8 @@ export function VentaFormAsesor({
         );
         if (esVentaNuevaPura) sessionStorage.removeItem("jard_venta_draft");
       }
-      handleClose();
+
+      handleClose(true);
     } catch (err) {
       toast.error(extractApiError(err));
     }

@@ -1,13 +1,3 @@
-/**
- * features/sales/components/VentasTable/columnsAsesor.tsx
- *
- * CAMBIOS:
- *   ✓ Columna "Visita" muestra fecha + bloque horario debajo
- *   ✓ Sub-estados debajo de SOT EJECUCION (ya existía, mejorado)
- *   ✓ Popup al pasar cursor por comentario de gestión (corrección)
- *   ✓ Botón "ojo" para ver detalles (todos los roles)
- *   ✓ Todos los fixes anteriores (#2, #3, #4, #4b, #6, #8) mantenidos
- */
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -23,6 +13,63 @@ import {
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT } from "../../types/sales.types";
 import { ActionBtn } from "@/components/ActionBtn";
+import { cn } from "@/lib/utils";
+
+// ── Popup de comentario (misma lógica que backoffice) ─────────────────────────
+
+function ComentarioPopup({
+  comentario,
+  colorClass = "text-muted-foreground bg-muted border-border",
+  borderClass = "border-border",
+  labelColor = "text-muted-foreground",
+  label = "Comentario de gestión",
+}: {
+  comentario: string;
+  colorClass?: string;
+  borderClass?: string;
+  labelColor?: string;
+  label?: string;
+}) {
+  return (
+    <div className="relative group/comentario inline-flex items-center cursor-default">
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md border",
+          colorClass,
+          borderClass,
+        )}
+      >
+        <MessageCircle size={10} />
+        Comentario
+      </span>
+      <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/comentario:block w-64 pointer-events-none">
+        <div
+          className={cn("bg-card rounded-xl shadow-xl p-3 border", borderClass)}
+        >
+          <p
+            className={cn(
+              "text-[10px] font-mono font-bold uppercase tracking-widest mb-1.5",
+              labelColor,
+            )}
+          >
+            {label}
+          </p>
+          <p className="text-[11px] text-foreground/80 leading-snug whitespace-pre-wrap">
+            {comentario}
+          </p>
+        </div>
+        <div
+          className={cn(
+            "w-2.5 h-2.5 bg-card border-b border-r rotate-45 ml-3 -mt-1.5",
+            borderClass,
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Columnas ──────────────────────────────────────────────────────────────────
 
 export function buildColumnsAsesor(
   estadosSOT: EstadoSOT[],
@@ -97,98 +144,76 @@ export function buildColumnsAsesor(
         const v = row.original;
         const estadoData = estadosSOT.find((e) => e.id === v.id_estado_sot);
         const codigoEstado = estadoData?.codigo?.toUpperCase() ?? "";
-        const esRechazada = codigoEstado === "RECHAZADO";
+        const esRechazada =
+          codigoEstado === "RECHAZADO" || codigoEstado === "RECHAZADA";
         const esEjecucion = codigoEstado === "EJECUCION";
         const tieneSubEstado = esEjecucion && v.id_sub_estado_sot !== null;
 
+        // Color del popup según estado
+        const popupConfig = v.solicitud_correccion
+          ? {
+              colorClass:
+                "text-orange-500 bg-orange-500/10 border-orange-500/30",
+              borderClass: "border-orange-500/30",
+              labelColor: "text-orange-500",
+              label: "Qué debes corregir",
+            }
+          : esRechazada
+            ? {
+                colorClass:
+                  "text-destructive bg-destructive/10 border-destructive/30",
+                borderClass: "border-destructive/30",
+                labelColor: "text-destructive",
+                label: "Motivo del rechazo",
+              }
+            : {
+                colorClass: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+                borderClass: "border-blue-500/20",
+                labelColor: "text-blue-500",
+                label: "Comentario de gestión",
+              };
+
         return (
           <div className="flex flex-col gap-1.5 items-start">
-            {/* Badge de rechazada con tooltip de motivo */}
-            {esRechazada && v.comentario_gestion ? (
-              <div className="relative group/tooltip">
-                <EstadoBadge
-                  estado={
-                    estadoData
-                      ? {
-                          nombre: estadoData.nombre,
-                          codigo: estadoData.codigo,
-                          color_hex: estadoData.color_hex,
-                        }
-                      : null
-                  }
-                />
-                <MessageCircle
-                  size={11}
-                  className="absolute -top-1 -right-1 text-destructive bg-background rounded-full"
-                />
-                <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/tooltip:block w-56 pointer-events-none">
-                  <div className="bg-card border border-destructive/30 rounded-xl shadow-xl p-3">
-                    <p className="text-[10px] font-mono font-bold text-destructive uppercase tracking-widest mb-1.5">
-                      Motivo del rechazo
-                    </p>
-                    <p className="text-[11px] text-foreground/80 leading-snug">
-                      {v.comentario_gestion}
-                    </p>
-                  </div>
-                  <div className="w-2.5 h-2.5 bg-card border-b border-r border-destructive/30 rotate-45 ml-3 -mt-1.5" />
-                </div>
-              </div>
-            ) : (
-              <EstadoBadge
-                estado={
-                  estadoData
-                    ? {
-                        nombre: estadoData.nombre,
-                        codigo: estadoData.codigo,
-                        color_hex: estadoData.color_hex,
-                      }
-                    : null
-                }
-              />
-            )}
+            {/* Badge de estado principal */}
+            <EstadoBadge
+              estado={
+                estadoData
+                  ? {
+                      nombre: estadoData.nombre,
+                      codigo: estadoData.codigo,
+                      color_hex: estadoData.color_hex,
+                    }
+                  : null
+              }
+            />
 
-            {/* Badge "En corrección" con tooltip del comentario de gestión */}
+            {/* Badge "En corrección" (adicional, debajo del estado) */}
             {v.solicitud_correccion && (
-              <div className="relative group/correccion">
-                <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 max-w-[200px] cursor-default">
-                  <AlertTriangle
-                    size={12}
-                    className="text-orange-500 shrink-0 mt-0.5"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider leading-none">
-                      En corrección
-                    </span>
-                  </div>
-                  {v.comentario_gestion && (
-                    <MessageCircle
-                      size={10}
-                      className="text-orange-400 shrink-0 mt-0.5 ml-auto"
-                    />
-                  )}
-                </div>
-                {/* Popup con el comentario de gestión */}
-                {v.comentario_gestion && (
-                  <div className="absolute bottom-full left-0 mb-2 z-50 hidden group-hover/correccion:block w-64 pointer-events-none">
-                    <div className="bg-card border border-orange-500/30 rounded-xl shadow-xl p-3">
-                      <p className="text-[10px] font-mono font-bold text-orange-500 uppercase tracking-widest mb-1.5">
-                        Qué debe corregir
-                      </p>
-                      <p className="text-[11px] text-foreground/80 leading-snug">
-                        {v.comentario_gestion}
-                      </p>
-                    </div>
-                    <div className="w-2.5 h-2.5 bg-card border-b border-r border-orange-500/30 rotate-45 ml-3 -mt-1.5" />
-                  </div>
-                )}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <AlertTriangle size={11} className="text-orange-500 shrink-0" />
+                <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider leading-none">
+                  En corrección
+                </span>
               </div>
             )}
 
-            {/* Sub-estado bajo EJECUCION */}
+            {/* Sub-estado (siempre que exista, principalmente en EJECUCION) */}
             {tieneSubEstado && v.nombre_sub_estado && (
               <span className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 max-w-[180px] truncate">
                 {v.nombre_sub_estado}
               </span>
+            )}
+
+            {/* Comentario de gestión — SIEMPRE visible si existe, en cualquier estado */}
+            {v.comentario_gestion && (
+              <ComentarioPopup
+                comentario={v.comentario_gestion}
+                colorClass={popupConfig.colorClass}
+                borderClass={popupConfig.borderClass}
+                labelColor={popupConfig.labelColor}
+                label={popupConfig.label}
+              />
             )}
           </div>
         );
@@ -224,20 +249,15 @@ export function buildColumnsAsesor(
       cell: ({ row }) => {
         const v = row.original;
         const fechaStr = v.fecha_visita_programada;
-
-        if (!fechaStr) {
+        if (!fechaStr)
           return (
             <span className="text-[10px] text-muted-foreground/40">
               Sin programar
             </span>
           );
-        }
-
-        // Extraer el bloque corto: "PM1", "AM2", etc.
         const bloqueCorto = v.bloque_horario
           ? (v.bloque_horario.match(/\(([^)]+)\)/)?.[1] ?? v.bloque_horario)
           : null;
-
         return (
           <div className="flex flex-col gap-0.5">
             <span className="text-[13px] text-foreground/80">
@@ -269,25 +289,21 @@ export function buildColumnsAsesor(
       header: "",
       cell: ({ row }) => {
         const v = row.original;
-
         const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
         const esEjecucion = v.codigo_estado?.toUpperCase() === "EJECUCION";
         const esPendiente = v.id_estado_sot === null && !v.solicitud_correccion;
-
         const tieneAudios = Array.isArray(v.audios) && v.audios.length > 0;
         const puedeEditar =
           !esRechazada &&
           (v.solicitud_correccion ||
             esPendiente ||
             (esEjecucion && !tieneAudios));
-
         const puedeEliminar = esPendiente;
         const yaReingresada = !!(v as Venta & { ya_reingresada?: boolean })
           .ya_reingresada;
 
         return (
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Botón ojo — ver detalles (todos los roles) */}
             {onVerDetalle && (
               <ActionBtn
                 onClick={() => onVerDetalle(v)}
@@ -297,7 +313,6 @@ export function buildColumnsAsesor(
                 <Eye size={12} />
               </ActionBtn>
             )}
-
             {puedeEditar && (
               <ActionBtn
                 onClick={() => onEditar(v)}
@@ -313,13 +328,11 @@ export function buildColumnsAsesor(
                 <Pencil size={12} /> Editar
               </ActionBtn>
             )}
-
             {esRechazada && !v.permitir_reingreso && (
               <span className="text-[10px] font-mono text-destructive/50 uppercase tracking-widest px-1">
                 Rechazada
               </span>
             )}
-
             {esRechazada && v.permitir_reingreso && !yaReingresada && (
               <ActionBtn
                 onClick={() => onReingresar(v)}
@@ -329,13 +342,11 @@ export function buildColumnsAsesor(
                 <RefreshCw size={12} /> Reingresar
               </ActionBtn>
             )}
-
             {esRechazada && v.permitir_reingreso && yaReingresada && (
               <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary/60 bg-primary/5 px-2 py-1 rounded-full border border-primary/15 uppercase tracking-widest whitespace-nowrap">
                 <RefreshCw size={8} /> Ya reingresada
               </span>
             )}
-
             {puedeEliminar && (
               <ActionBtn
                 onClick={() => onEliminar(v)}

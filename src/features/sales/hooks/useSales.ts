@@ -45,9 +45,6 @@ export const salesKeys = {
 // ==========================================
 
 export function useVentas(filtros?: VentaFiltros) {
-  // Siempre incluye page_size para activar la paginación del backend.
-  // El backend usa PaginacionRetrocompatible: solo pagina cuando viene ?page=.
-  // Si no hay page en filtros, devuelve lista plana → normalizeList la envuelve igual.
   const filtrosConPageSize: VentaFiltros | undefined = filtros?.page
     ? { page_size: 5, ...filtros }
     : filtros;
@@ -55,8 +52,8 @@ export function useVentas(filtros?: VentaFiltros) {
   return useQuery({
     queryKey: salesKeys.list(filtrosConPageSize),
     queryFn: () => salesService.getVentas(filtrosConPageSize),
-    staleTime: 1000 * 30, // 30s
-    placeholderData: (prev) => prev, // evita flash de tabla vacía al cambiar página
+    staleTime: 1000 * 30,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -70,69 +67,142 @@ export function useVenta(id: number, options?: { enabled?: boolean }) {
 }
 
 // ==========================================
-// ESTADÍSTICAS ASESOR
+// ESTADÍSTICAS ASESOR — CORREGIDO
 // ==========================================
-// Las stats se calculan con consultas independientes (sin page) para obtener
-// el `count` real de cada categoría, sin depender de los 5 resultados paginados.
+//
+// Estrategia: hacemos una query por cada categoría enviando page=1&page_size=1.
+// El backend devuelve { count: N, results: [...1 item] }.
+// Solo nos importa el `count` — ignoramos los resultados.
+// Así evitamos traer todos los registros solo para contarlos.
+//
+// Para ejecución/atendidas/rechazadas necesitamos el ID del EstadoSOT.
+// Lo resolvemos con useEstadosSOT() que ya está en caché (staleTime: Infinity).
 
 export function useEstadisticasAsesor(): {
   stats: EstadisticasAsesor;
   isLoading: boolean;
 } {
-  // Total general (sin filtros, sin page → lista plana, count = total real)
-  const { data: dataTotal, isLoading: l0 } = useVentas();
+  // Catálogo de estados (viene de caché en la mayoría de casos)
+  const { data: estadosSOT = [] } = useEstadosSOT();
 
-  // Pendientes: estado nulo y sin corrección
-  const { data: dataPendientes, isLoading: l1 } = useVentas({
-    id_estado_sot__isnull: true,
-  } as VentaFiltros);
+  // Resolvemos los IDs de los estados que necesitamos
+  const idEjecucion = estadosSOT.find(
+    (s) => s.codigo.toUpperCase() === "EJECUCION",
+  )?.id;
+  const idAtendido = estadosSOT.find(
+    (s) => s.codigo.toUpperCase() === "ATENDIDO",
+  )?.id;
+  const idRechazado = estadosSOT.find(
+    (s) => s.codigo.toUpperCase() === "RECHAZADO",
+  )?.id;
 
-  // En corrección
-  const { data: dataCorreccion, isLoading: l2 } = useVentas({
-    solicitud_correccion: true,
-  } as VentaFiltros);
+  // ── Total ────────────────────────────────────────────────────────────────────
+  const { data: dataTotal, isLoading: l0 } = useQuery({
+    queryKey: salesKeys.list({
+      _stat: "total",
+      page: 1,
+      page_size: 1,
+    } as VentaFiltros),
+    queryFn: () => salesService.getVentas({ page: 1, page_size: 1 }),
+    staleTime: 1000 * 30,
+  });
 
-  // Los estados con código los obtenemos a través del hook de catálogos,
-  // pero para las stats solo necesitamos los counts → usamos parámetro de búsqueda
-  // por código directamente en el servicio.
-  // Nota: el backend acepta ?codigo_estado=EJECUCION si implementado,
-  // pero lo más seguro es usar id_estado_sot que ya funciona.
-  // Como no tenemos los ids aquí, hacemos una query por ordering para traer
-  // solo el count sin resultados pesados (page=1&page_size=1).
-
-  /*const { data: dataEjecucion, isLoading: l3 } = useQuery({
-    queryKey: salesKeys.list({ _statsEjecucion: true } as VentaFiltros),
+  // ── Pendientes (estado nulo) ──────────────────────────────────────────────────
+  const { data: dataPendientes, isLoading: l1 } = useQuery({
+    queryKey: salesKeys.list({
+      _stat: "pendientes",
+      id_estado_sot__isnull: true,
+      page: 1,
+      page_size: 1,
+    } as VentaFiltros),
     queryFn: () =>
       salesService.getVentas({
+        id_estado_sot__isnull: true,
         page: 1,
         page_size: 1,
-        // El backend filtra por código_estado si el ViewSet lo soporta,
-        // si no, usamos search vacío y filtramos por tab en la página.
-        // Para el count exacto usamos un campo que el backend entienda:
-        ordering: "-fecha_creacion",
-      } as VentaFiltros),
+      }),
     staleTime: 1000 * 30,
-    enabled: false, // Deshabilitado: ver nota abajo
-  });*/
+  });
 
-  // NOTA SOBRE STATS DE EJECUCION/ATENDIDAS/RECHAZADAS:
-  // Calcular esas 3 stats requeriría conocer los IDs de los EstadoSOT,
-  // que solo están disponibles en el catálogo. Para no crear una dependencia
-  // circular aquí, las calculamos aproximando desde los resultados de la
-  // página actual cuando el total es pequeño, o mostramos 0 hasta que el
-  // usuario filtre por tab.
-  //
-  // La forma limpia es que el backend exponga un endpoint /ventas/estadisticas/
-  // que devuelva los counts directamente. Mientras tanto, usamos dataTotal.
+  // ── En ejecución ─────────────────────────────────────────────────────────────
+  const { data: dataEjecucion, isLoading: l2 } = useQuery({
+    queryKey: salesKeys.list({
+      _stat: "ejecucion",
+      id_estado_sot: idEjecucion,
+      page: 1,
+      page_size: 1,
+    } as VentaFiltros),
+    queryFn: () =>
+      salesService.getVentas({
+        id_estado_sot: idEjecucion,
+        page: 1,
+        page_size: 1,
+      }),
+    enabled: !!idEjecucion,
+    staleTime: 1000 * 30,
+  });
 
-  const isLoading = l0 || l1 || l2;
+  // ── Atendidas ────────────────────────────────────────────────────────────────
+  const { data: dataAtendidas, isLoading: l3 } = useQuery({
+    queryKey: salesKeys.list({
+      _stat: "atendidas",
+      id_estado_sot: idAtendido,
+      page: 1,
+      page_size: 1,
+    } as VentaFiltros),
+    queryFn: () =>
+      salesService.getVentas({
+        id_estado_sot: idAtendido,
+        page: 1,
+        page_size: 1,
+      }),
+    enabled: !!idAtendido,
+    staleTime: 1000 * 30,
+  });
+
+  // ── Rechazadas ───────────────────────────────────────────────────────────────
+  const { data: dataRechazadas, isLoading: l4 } = useQuery({
+    queryKey: salesKeys.list({
+      _stat: "rechazadas",
+      id_estado_sot: idRechazado,
+      page: 1,
+      page_size: 1,
+    } as VentaFiltros),
+    queryFn: () =>
+      salesService.getVentas({
+        id_estado_sot: idRechazado,
+        page: 1,
+        page_size: 1,
+      }),
+    enabled: !!idRechazado,
+    staleTime: 1000 * 30,
+  });
+
+  // ── En corrección ────────────────────────────────────────────────────────────
+  const { data: dataCorreccion, isLoading: l5 } = useQuery({
+    queryKey: salesKeys.list({
+      _stat: "correccion",
+      solicitud_correccion: true,
+      page: 1,
+      page_size: 1,
+    } as VentaFiltros),
+    queryFn: () =>
+      salesService.getVentas({
+        solicitud_correccion: true,
+        page: 1,
+        page_size: 1,
+      }),
+    staleTime: 1000 * 30,
+  });
+
+  const isLoading = l0 || l1 || l2 || l3 || l4 || l5;
 
   const stats: EstadisticasAsesor = {
     total: dataTotal?.count ?? 0,
     pendientes: dataPendientes?.count ?? 0,
-    en_ejecucion: 0, // Se actualiza cuando el usuario filtra por esa tab
-    atendidas: 0, // ídem
-    rechazadas: 0, // ídem
+    en_ejecucion: dataEjecucion?.count ?? 0,
+    atendidas: dataAtendidas?.count ?? 0,
+    rechazadas: dataRechazadas?.count ?? 0,
     en_correccion: dataCorreccion?.count ?? 0,
   };
 

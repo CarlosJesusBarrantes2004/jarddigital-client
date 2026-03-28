@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────
-// Users — Domain Types
-// ─────────────────────────────────────────────
-
 import type { RoleCode } from "@/features/auth/types";
 
 export type { RoleCode };
@@ -14,7 +10,6 @@ export interface Role {
   activo: boolean;
 }
 
-/** Workspace asignado a un usuario (permisos_acceso × modalidades_sede) */
 export interface UserWorkspace {
   id_modalidad_sede: number;
   id_sucursal: number;
@@ -29,14 +24,12 @@ export interface User {
   username: string;
   nombre_completo: string;
   email: string;
+  celular?: string | null;
   id_rol: number;
-  /** Detalle del rol — solo en el GET del backend */
   rol?: Role;
   sucursales: UserWorkspace[];
   activo: boolean;
 }
-
-// ── Payloads ──────────────────────────────────
 
 export interface CreateUserPayload {
   username: string;
@@ -44,6 +37,7 @@ export interface CreateUserPayload {
   email: string;
   password: string;
   id_rol: number;
+  celular?: string | null;
   ids_modalidades_sede?: number[];
   activo?: boolean;
 }
@@ -53,6 +47,7 @@ export interface UpdateUserPayload {
   email?: string;
   password?: string;
   id_rol?: number;
+  celular?: string | null;
   ids_modalidades_sede?: number[];
   activo?: boolean;
 }
@@ -64,16 +59,12 @@ export interface SupervisorAssignmentPayload {
   activo: boolean;
 }
 
-// ── Filtros ───────────────────────────────────
-
 export interface UserFilters {
   search?: string;
   id_rol?: number;
   id_modalidad_sede?: number;
   activo?: boolean;
 }
-
-// ── Opción de workspace para selects ─────────
 
 export interface WorkspaceOption {
   id: number;

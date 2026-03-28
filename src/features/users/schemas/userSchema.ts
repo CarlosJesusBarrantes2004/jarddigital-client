@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────
-// Users — Form Validation Schema
-// ─────────────────────────────────────────────
-
 import { z } from "zod";
 
 export const userFormSchema = z.object({
@@ -18,6 +14,14 @@ export const userFormSchema = z.object({
 
   email: z.string().email("Correo electrónico inválido"),
 
+  // Acepta vacío (usuarios existentes sin celular) o formato peruano válido.
+  // Si está vacío se envía null al backend para no pisar con string vacío.
+  celular: z
+    .string()
+    .refine(
+      (val) => val === "" || /^9\d{8}$/.test(val),
+      "Debe empezar con 9 y tener exactamente 9 dígitos",
+    ),
   password: z.string().optional(),
 
   id_rol: z
