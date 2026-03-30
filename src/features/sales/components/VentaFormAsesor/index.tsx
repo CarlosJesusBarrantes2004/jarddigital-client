@@ -332,16 +332,22 @@ export function VentaFormAsesor({
   const esEjecucion = ventaOrigen?.codigo_estado?.toUpperCase() === "EJECUCION";
   const esVentaNuevaPura = !ventaOrigen;
 
+  // ── ESTADO PENDIENTE: la venta existe pero NO tiene estado (código vacío/null)
+  // En este caso todos los campos excepto audios + grabador deben estar bloqueados
+  const esPendiente =
+    esEdicion &&
+    !ventaOrigen?.codigo_estado &&
+    !ventaOrigen?.solicitud_correccion;
+
   const tieneAudiosEnBD = (ventaOrigen?.audios?.length ?? 0) > 0;
   const soloAudios =
     esEdicion &&
     esEjecucion &&
     !ventaOrigen?.solicitud_correccion &&
     !tieneAudiosEnBD;
-  //const esCorreccionSinAudios =
-  //  esEdicion && !!ventaOrigen?.solicitud_correccion && !tieneAudiosEnBD;
   const todosBloqueado =
     esEdicion && !ventaOrigen?.solicitud_correccion && tieneAudiosEnBD;
+  // esPendienteSinAudios: pendiente y sin audios subidos (flujo solo-audios)
   const esPendienteSinAudios =
     esEdicion &&
     !ventaOrigen?.solicitud_correccion &&
@@ -355,37 +361,25 @@ export function VentaFormAsesor({
 
   const { data: tiposDoc = [] } = useTiposDocumento();
   const { data: productos = [] } = useProductos();
-  const idVentaActual = ventaOrigen?.id ?? null; // ID de la VENTA para el Pase VIP
+  const idVentaActual = ventaOrigen?.id ?? null;
   const { data: grabadores = [] } = useGrabadores(idVentaActual);
 
   const [filtroCampana, setFiltroCampana] = useState("");
   const [filtroSolucion, setFiltroSolucion] = useState("");
 
   // ── Estado de audios ─────────────────────────────────────────────────────
-  // audioUrls: URL activa en cada slot (null = vacío)
   const [audioUrls, setAudioUrls] = useState<(string | null)[]>([]);
-  // audioTokens: token de borrado de Cloudinary para el archivo recién subido
   const [audioTokens, setAudioTokens] = useState<(string | undefined)[]>([]);
-  // audioUploading / audioErrors: estado visual de la subida
   const [audioUploading, setAudioUploading] = useState<boolean[]>([]);
   const [audioErrors, setAudioErrors] = useState<(string | null)[]>([]);
-  // audioRechazados / audioMotivos: estado QA que viene de la BD (solo lectura)
   const [audioRechazados, setAudioRechazados] = useState<boolean[]>([]);
   const [audioMotivos, setAudioMotivos] = useState<(string | null)[]>([]);
 
-  /*
-   * FIX ANTI-DUPLICACIÓN:
-   * audioIdsOriginales guarda el ID de BD de cada audio cuando se carga la venta.
-   * Este array NUNCA se modifica al reemplazar un audio — solo al resetear el form.
-   *
-   * Por qué es necesario un array separado y no reutilizar audioIds:
-   * El handleAudioRemove anterior borraba audioIds[i] para "limpiar" el slot,
-   * de modo que cuando el asesor subía el audio nuevo, el slot quedaba sin ID y
-   * el backend hacía INSERT → duplicado.
-   *
-   * Con audioIdsOriginales: aunque el asesor quite y vuelva a subir el audio,
-   * el ID original sigue disponible y el payload final lo incluye → UPDATE.
-   */
+  // NUEVO: rastrea si algún slot tiene una grabación de micrófono pendiente de confirmar
+  const [audiosPendientesConfirmar, setAudiosPendientesConfirmar] = useState<
+    boolean[]
+  >([]);
+
   const [audioIdsOriginales, setAudioIdsOriginales] = useState<
     (number | undefined)[]
   >([]);
@@ -397,6 +391,9 @@ export function VentaFormAsesor({
   const isClosingRef = useRef(false);
 
   const tieneAlMenosUnAudio = audioUrls.some(Boolean);
+
+  // NUEVO: ¿hay alguna grabación de micrófono en modo "preview" sin confirmar?
+  const hayGrabacionSinConfirmar = audiosPendientesConfirmar.some(Boolean);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
@@ -454,7 +451,6 @@ export function VentaFormAsesor({
     if (!tieneAlMenosUnAudio) {
       form.setValue("id_grabador_audios", undefined);
       form.setValue("nombre_grabador_externo", "");
-      // Limpiamos los errores por si react-hook-form se quedó "enganchado"
       form.clearErrors(["id_grabador_audios", "nombre_grabador_externo"]);
     }
   }, [tieneAlMenosUnAudio, form]);
@@ -507,11 +503,11 @@ export function VentaFormAsesor({
         coordenadas_gps: v.coordenadas_gps ?? "",
         es_full_claro: v.es_full_claro,
         score_crediticio: v.score_crediticio ?? "",
-        id_grabador_audios: v.id_grabador_audios,
-        nombre_grabador_externo: nombreExterno,
+        id_grabador_audios: v.id_grabador_audios ?? undefined,
+        nombre_grabador_externo: nombreExterno || undefined,
         dep_inst_id: undefined,
         prov_inst_id: undefined,
-        id_distrito_instalacion: v.id_distrito_instalacion,
+        id_distrito_instalacion: v.id_distrito_instalacion ?? undefined,
         dep_nac_id: undefined,
         prov_nac_id: undefined,
         id_distrito_nacimiento: v.id_distrito_nacimiento ?? undefined,
@@ -545,7 +541,7 @@ export function VentaFormAsesor({
             // No heredamos nada del reingreso anterior
           } else {
             newUrls[i] = audioDB.url_audio;
-            newIds[i] = audioDB.id; // ID original de BD
+            newIds[i] = audioDB.id;
             newRechazados[i] = audioDB.conforme === false;
             newMotivos[i] = audioDB.motivo;
           }
@@ -553,13 +549,13 @@ export function VentaFormAsesor({
       });
 
       setAudioUrls(newUrls);
-      // FIX: guardamos los IDs en audioIdsOriginales — este array no se toca al reemplazar audios
       setAudioIdsOriginales(newIds);
       setAudioTokens(Array(etiquetasReales.length).fill(undefined));
       setAudioRechazados(newRechazados);
       setAudioMotivos(newMotivos);
       setAudioUploading(Array(etiquetasReales.length).fill(false));
       setAudioErrors(Array(etiquetasReales.length).fill(null));
+      setAudiosPendientesConfirmar(Array(etiquetasReales.length).fill(false));
       setTimeout(() => {
         isInitialMount.current = false;
       }, 500);
@@ -593,21 +589,52 @@ export function VentaFormAsesor({
             setAudioMotivos(Array(draftLength).fill(null));
             setAudioUploading(Array(draftLength).fill(false));
             setAudioErrors(Array(draftLength).fill(null));
+            setAudiosPendientesConfirmar(Array(draftLength).fill(false));
           } else {
             setAudioUrls(Array(draftLength).fill(null));
             setAudioTokens(Array(draftLength).fill(undefined));
             setAudioIdsOriginales(Array(draftLength).fill(undefined));
+            setAudiosPendientesConfirmar(Array(draftLength).fill(false));
           }
         } catch (e) {
           console.error("Error parseando borrador", e);
         }
       } else {
-        form.reset();
+        isClosingRef.current = false;
+        form.reset({
+          id_producto: undefined,
+          tecnologia: "",
+          id_tipo_documento: undefined,
+          cliente_numero_doc: "",
+          cliente_nombre: "",
+          cliente_telefono: "",
+          cliente_email: "",
+          cliente_fecha_nacimiento: "",
+          cliente_genero: "",
+          cliente_papa: "",
+          cliente_mama: "",
+          numero_instalacion: "",
+          cant_decos_adicionales: 0,
+          cant_repetidores_adicionales: 0,
+          representante_legal_dni: "",
+          representante_legal_nombre: "",
+          id_distrito_instalacion: undefined,
+          id_distrito_nacimiento: undefined,
+          referencias: "",
+          plano: "",
+          direccion_detalle: "",
+          coordenadas_gps: "",
+          es_full_claro: false,
+          score_crediticio: "",
+          id_grabador_audios: undefined,
+          nombre_grabador_externo: "",
+        });
         setFiltroCampana("");
         setFiltroSolucion("");
         setAudioUrls(Array(etiquetasAudio.length).fill(null));
         setAudioTokens(Array(etiquetasAudio.length).fill(undefined));
         setAudioIdsOriginales(Array(etiquetasAudio.length).fill(undefined));
+        setAudiosPendientesConfirmar(Array(etiquetasAudio.length).fill(false));
         prevLengthRef.current = etiquetasAudio.length;
       }
       setTimeout(() => {
@@ -624,12 +651,12 @@ export function VentaFormAsesor({
       setAudioTokens(Array(etiquetasAudio.length).fill(undefined));
       setAudioRechazados(Array(etiquetasAudio.length).fill(false));
       setAudioMotivos(Array(etiquetasAudio.length).fill(null));
+      setAudiosPendientesConfirmar(Array(etiquetasAudio.length).fill(false));
       prevLengthRef.current = etiquetasAudio.length;
     }
   }, [etiquetasAudio.length]);
 
   useEffect(() => {
-    // 👉 FIX: Evita guardar si isClosingRef.current es true
     if (
       open &&
       esVentaNuevaPura &&
@@ -675,11 +702,11 @@ export function VentaFormAsesor({
     setAudioUrls(Array(etiquetasAudio.length).fill(null));
     setAudioTokens(Array(etiquetasAudio.length).fill(undefined));
     setAudioIdsOriginales(Array(etiquetasAudio.length).fill(undefined));
+    setAudiosPendientesConfirmar(Array(etiquetasAudio.length).fill(false));
     setPaso(0);
     toast.success("Borrador limpiado correctamente");
   };
 
-  // 👉 FIX: Añadimos skipSave para no interferir con envíos exitosos
   const handleClose = (
     skipSave: boolean | React.MouseEvent | React.KeyboardEvent = false,
   ) => {
@@ -698,10 +725,7 @@ export function VentaFormAsesor({
           solucion: filtroSolucion,
         }),
       );
-      // Permitimos que el próximo open restaure el borrador
       hasLoadedDraftRef.current = false;
-      // NO hacemos form.reset() ni limpiamos audioUrls aquí:
-      // el borrador quedó en sessionStorage y se restaurará al reabrir.
       onClose();
       return;
     }
@@ -711,6 +735,7 @@ export function VentaFormAsesor({
     setPaso(0);
     setAudioUrls([]);
     setAudioIdsOriginales([]);
+    setAudiosPendientesConfirmar([]);
     setFiltroCampana("");
     setFiltroSolucion("");
     hasLoadedDraftRef.current = false;
@@ -740,13 +765,17 @@ export function VentaFormAsesor({
         n[i] = null;
         return n;
       });
+      // Al confirmar y subir, ya no está pendiente
+      setAudiosPendientesConfirmar((p) => {
+        const n = [...p];
+        n[i] = false;
+        return n;
+      });
     },
     [],
   );
 
   const handleAudioRemove = useCallback((i: number) => {
-    // Solo limpiamos la URL y el token del nuevo archivo
-    // audioIdsOriginales[i] permanece intacto para que al re-subir el ID siga presente
     setAudioUrls((p) => {
       const n = [...p];
       n[i] = null;
@@ -758,6 +787,11 @@ export function VentaFormAsesor({
       return n;
     });
     setAudioRechazados((p) => {
+      const n = [...p];
+      n[i] = false;
+      return n;
+    });
+    setAudiosPendientesConfirmar((p) => {
       const n = [...p];
       n[i] = false;
       return n;
@@ -790,6 +824,18 @@ export function VentaFormAsesor({
     });
   }, []);
 
+  // NUEVO: handler que recibe la notificación del AudioUploadField
+  const handleAudioPendienteConfirmar = useCallback(
+    (i: number, pendiente: boolean) => {
+      setAudiosPendientesConfirmar((p) => {
+        const n = [...p];
+        n[i] = pendiente;
+        return n;
+      });
+    },
+    [],
+  );
+
   const algunoSubiendo = audioUploading.some(Boolean);
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -807,8 +853,17 @@ export function VentaFormAsesor({
       return;
     }
 
+    // NUEVO: validar grabaciones de micrófono sin confirmar
+    if (hayGrabacionSinConfirmar) {
+      toast.error(
+        "Tienes grabaciones pendientes de confirmar. Haz clic en '✓ Usar esta grabación' en cada una antes de continuar.",
+      );
+      setPaso(2);
+      return;
+    }
+
     const values = form.getValues();
-    if (!soloAudios && !values.id_distrito_instalacion) {
+    if (!soloAudios && !esPendiente && !values.id_distrito_instalacion) {
       form.setError("id_distrito_instalacion", {
         message: "Selecciona un distrito",
       });
@@ -817,42 +872,46 @@ export function VentaFormAsesor({
       return;
     }
 
-    const isValid = await form.trigger();
-    if (!isValid) {
-      const errors = form.formState.errors;
-      const paso0Fields = [
-        "id_producto",
-        "tecnologia",
-        "id_tipo_documento",
-        "cliente_numero_doc",
-        "cliente_nombre",
-        "cliente_telefono",
-        "cliente_email",
-        "cliente_fecha_nacimiento",
-        "cliente_genero",
-        "cliente_papa",
-        "cliente_mama",
-        "numero_instalacion",
-        "representante_legal_dni",
-        "representante_legal_nombre",
-        "id_grabador_audios",
-        "nombre_grabador_externo",
-      ];
-      const paso1Fields = [
-        "id_distrito_instalacion",
-        "plano",
-        "direccion_detalle",
-      ];
+    // Para ventas en estado PENDIENTE (esPendienteSinAudios), solo validamos los campos de audio
+    // no los demás campos del formulario (que están bloqueados)
+    if (!soloAudios && !esPendiente) {
+      const isValid = await form.trigger();
+      if (!isValid) {
+        const errors = form.formState.errors;
+        const paso0Fields = [
+          "id_producto",
+          "tecnologia",
+          "id_tipo_documento",
+          "cliente_numero_doc",
+          "cliente_nombre",
+          "cliente_telefono",
+          "cliente_email",
+          "cliente_fecha_nacimiento",
+          "cliente_genero",
+          "cliente_papa",
+          "cliente_mama",
+          "numero_instalacion",
+          "representante_legal_dni",
+          "representante_legal_nombre",
+          "id_grabador_audios",
+          "nombre_grabador_externo",
+        ];
+        const paso1Fields = [
+          "id_distrito_instalacion",
+          "plano",
+          "direccion_detalle",
+        ];
 
-      let primerPasoConError = 0;
-      if (Object.keys(errors).some((k) => paso0Fields.includes(k)))
-        primerPasoConError = 0;
-      else if (Object.keys(errors).some((k) => paso1Fields.includes(k)))
-        primerPasoConError = 1;
+        let primerPasoConError = 0;
+        if (Object.keys(errors).some((k) => paso0Fields.includes(k)))
+          primerPasoConError = 0;
+        else if (Object.keys(errors).some((k) => paso1Fields.includes(k)))
+          primerPasoConError = 1;
 
-      setPaso(primerPasoConError);
-      toast.error("Por favor, revisa los campos en rojo antes de continuar.");
-      return;
+        setPaso(primerPasoConError);
+        toast.error("Por favor, revisa los campos en rojo antes de continuar.");
+        return;
+      }
     }
 
     const audiosPayload: AudioPayloadItem[] = etiquetasAudio
@@ -868,7 +927,6 @@ export function VentaFormAsesor({
         url_audio: a.url_audio as string,
       }));
 
-    // 1. Armamos el payload completo PRIMERO para evitar errores de inicialización
     const hayAudios = audiosPayload.length > 0;
     const distritoInstalacion = values.id_distrito_instalacion as number;
 
@@ -892,7 +950,7 @@ export function VentaFormAsesor({
       audios: audiosPayload,
     };
 
-    // 2. Flujo Exclusivo de Audios (Ventas en ejecución o pendientes exclusivas de audio)
+    // Flujo Exclusivo de Audios (Ventas en ejecución o pendientes sin audios)
     if (soloAudios || esPendienteSinAudios) {
       try {
         await editarVenta({
@@ -901,15 +959,14 @@ export function VentaFormAsesor({
           audios: audiosPayload,
         });
         toast.success("Audios subidos y enviados al Backoffice");
-        handleClose();
+        handleClose(true);
       } catch (err) {
         toast.error(extractApiError(err));
       }
       return;
     }
 
-    // 3. Flujo Normal (Creación, Reingreso o Correcciones generales)
-    // Aquí esCorreccionSinAudios entra sin problemas, con los audios vacíos si no subieron nada.
+    // Flujo Normal (Creación, Reingreso o Correcciones generales)
     try {
       if (esEdicion) {
         await editarVenta(payload);
@@ -924,9 +981,15 @@ export function VentaFormAsesor({
             ? "Venta reingresada correctamente"
             : "Venta creada correctamente",
         );
-        if (esVentaNuevaPura) sessionStorage.removeItem("jard_venta_draft");
+        // CORRECCIÓN: al guardar exitosamente la venta nueva, borramos el borrador
+        // y reseteamos la bandera para que la próxima apertura arranque limpia
+        if (esVentaNuevaPura) {
+          sessionStorage.removeItem("jard_venta_draft");
+          hasLoadedDraftRef.current = false;
+        }
       }
 
+      // skipSave=true: no volvemos a guardar el borrador al cerrar tras éxito
       handleClose(true);
     } catch (err) {
       toast.error(extractApiError(err));
@@ -968,6 +1031,17 @@ export function VentaFormAsesor({
   const provInstId = form.watch("prov_inst_id") ?? null;
   const depNacId = form.watch("dep_nac_id") ?? null;
   const provNacId = form.watch("prov_nac_id") ?? null;
+
+  // ── Flags de bloqueo de campos por sección ────────────────────────────────
+  // Paso 0 y 1 bloqueados cuando: soloAudios | todosBloqueado | esPendiente
+  const bloquearCamposFormulario = soloAudios || todosBloqueado || esPendiente;
+
+  // El grabador solo se puede asignar si hay al menos un audio subido
+  // En correcciones sin audios previos (con solicitud_correccion), el grabador NO es obligatorio
+  const esCorreccionConSolicitud =
+    esEdicion && !!ventaOrigen?.solicitud_correccion;
+  // Corrección con solicitud pero SIN audios existentes: audios y grabador son opcionales
+  const esCorreccionSinAudios = esCorreccionConSolicitud && !tieneAudiosEnBD;
 
   return (
     <>
@@ -1043,6 +1117,17 @@ export function VentaFormAsesor({
               </p>
             </div>
           )}
+          {/* NUEVO: banner para venta en estado PENDIENTE */}
+          {esPendiente && !soloAudios && !todosBloqueado && (
+            <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+              <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-500/90 leading-relaxed">
+                <strong>Venta pendiente.</strong> Los datos ya fueron
+                registrados. Solo puedes subir los audios y asignar el grabador
+                responsable.
+              </p>
+            </div>
+          )}
           {todosBloqueado && (
             <div className="mt-4 p-3 rounded-xl bg-muted border border-border flex items-start gap-3">
               <Lock
@@ -1052,14 +1137,6 @@ export function VentaFormAsesor({
               <p className="text-xs text-muted-foreground leading-relaxed">
                 <strong>Venta bloqueada.</strong> Ya fue enviada al Backoffice.
                 No puedes editar nada hasta que soliciten una corrección.
-              </p>
-            </div>
-          )}
-          {esPendienteSinAudios && (
-            <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-              <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-500/90 leading-relaxed">
-                <strong>Venta pendiente sin audios.</strong>
               </p>
             </div>
           )}
@@ -1141,119 +1218,72 @@ export function VentaFormAsesor({
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 0 && "hidden",
-                (soloAudios || todosBloqueado) &&
-                  "pointer-events-none opacity-60 grayscale-[20%]",
               )}
             >
-              <div>
-                <SectionTitle>Plan y Tecnología</SectionTitle>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <NativeSelect
-                    label="1. Seleccionar Campaña"
-                    disabled={soloAudios || todosBloqueado}
-                    value={filtroCampana}
-                    onChange={(v) => {
-                      setFiltroCampana(v);
-                      setFiltroSolucion("");
-                      form.resetField("id_producto");
-                    }}
-                    placeholder="Elegir campaña..."
-                  >
-                    {campanasDisponibles.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                  <NativeSelect
-                    label="2. Tipo de solución"
-                    disabled={!filtroCampana || soloAudios || todosBloqueado}
-                    value={filtroSolucion}
-                    onChange={(v) => {
-                      setFiltroSolucion(v);
-                      form.resetField("id_producto");
-                    }}
-                    placeholder="Elegir solución..."
-                  >
-                    {solucionesDisponibles.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Controller
-                    control={form.control}
-                    name="id_producto"
-                    render={({ field }) => (
-                      <NativeSelect
-                        label="3. Producto Final"
-                        required
-                        disabled={
-                          !filtroSolucion || soloAudios || todosBloqueado
-                        }
-                        value={field.value ?? ""}
-                        onChange={(v) =>
-                          field.onChange(v ? Number(v) : undefined)
-                        }
-                        placeholder="Seleccione el plan..."
-                        error={errorsObj.id_producto?.message}
-                      >
-                        {productosFiltrados.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombre_paquete}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="tecnologia"
-                    render={({ field }) => (
-                      <NativeSelect
-                        label="Tecnología"
-                        required
-                        disabled={soloAudios || todosBloqueado}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Seleccionar"
-                        error={errorsObj.tecnologia?.message}
-                      >
-                        {["FTTH", "HFC"].map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    )}
-                  />
-                </div>
-              </div>
-              <Divider />
-              <div>
-                <SectionTitle>Datos del Cliente</SectionTitle>
-                <div className="space-y-4">
+              {/* ── Sección bloqueada: Plan, Cliente, Equipos ── */}
+              <div
+                className={cn(
+                  "space-y-8",
+                  bloquearCamposFormulario &&
+                    "pointer-events-none opacity-60 grayscale-[20%]",
+                )}
+              >
+                <div>
+                  <SectionTitle>Plan y Tecnología</SectionTitle>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <NativeSelect
+                      label="1. Seleccionar Campaña"
+                      disabled={bloquearCamposFormulario}
+                      value={filtroCampana}
+                      onChange={(v) => {
+                        setFiltroCampana(v);
+                        setFiltroSolucion("");
+                        form.resetField("id_producto");
+                      }}
+                      placeholder="Elegir campaña..."
+                    >
+                      {campanasDisponibles.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <NativeSelect
+                      label="2. Tipo de solución"
+                      disabled={!filtroCampana || bloquearCamposFormulario}
+                      value={filtroSolucion}
+                      onChange={(v) => {
+                        setFiltroSolucion(v);
+                        form.resetField("id_producto");
+                      }}
+                      placeholder="Elegir solución..."
+                    >
+                      {solucionesDisponibles.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Controller
                       control={form.control}
-                      name="id_tipo_documento"
+                      name="id_producto"
                       render={({ field }) => (
                         <NativeSelect
-                          label="Tipo Documento"
+                          label="3. Producto Final"
                           required
-                          disabled={soloAudios || todosBloqueado}
+                          disabled={!filtroSolucion || bloquearCamposFormulario}
                           value={field.value ?? ""}
                           onChange={(v) =>
                             field.onChange(v ? Number(v) : undefined)
                           }
-                          placeholder="Seleccionar"
-                          error={errorsObj.id_tipo_documento?.message}
+                          placeholder="Seleccione el plan..."
+                          error={errorsObj.id_producto?.message}
                         >
-                          {tiposDoc.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.codigo}
+                          {productosFiltrados.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nombre_paquete}
                             </option>
                           ))}
                         </NativeSelect>
@@ -1261,227 +1291,290 @@ export function VentaFormAsesor({
                     />
                     <Controller
                       control={form.control}
-                      name="cliente_numero_doc"
-                      render={({ field }) => (
-                        <TextInput
-                          label="Número de documento"
-                          required
-                          disabled={soloAudios || todosBloqueado}
-                          placeholder={esRUC ? "20XXXXXXXXX" : "12345678"}
-                          {...field}
-                          error={errorsObj.cliente_numero_doc?.message}
-                        />
-                      )}
-                    />
-                  </div>
-                  <Controller
-                    control={form.control}
-                    name="cliente_nombre"
-                    render={({ field }) => (
-                      <TextInput
-                        label="Nombre completo / Razón Social"
-                        required
-                        disabled={soloAudios || todosBloqueado}
-                        placeholder="Ej: CARLOS"
-                        {...field}
-                        error={errorsObj.cliente_nombre?.message}
-                      />
-                    )}
-                  />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Controller
-                      control={form.control}
-                      name="cliente_telefono"
-                      render={({ field }) => (
-                        <TextInput
-                          label="Teléfono"
-                          required
-                          disabled={soloAudios || todosBloqueado}
-                          type="tel"
-                          placeholder="9XXXXXXXX"
-                          {...field}
-                          error={errorsObj.cliente_telefono?.message}
-                        />
-                      )}
-                    />
-                    <Controller
-                      control={form.control}
-                      name="cliente_email"
-                      render={({ field }) => (
-                        <TextInput
-                          label="Email"
-                          required
-                          disabled={soloAudios || todosBloqueado}
-                          type="email"
-                          placeholder="cliente@correo.com"
-                          {...field}
-                          error={errorsObj.cliente_email?.message}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Controller
-                      control={form.control}
-                      name="cliente_fecha_nacimiento"
-                      render={({ field }) => (
-                        <TextInput
-                          label="Fecha Nacimiento"
-                          required
-                          disabled={soloAudios || todosBloqueado}
-                          type="date"
-                          {...field}
-                          error={errorsObj.cliente_fecha_nacimiento?.message}
-                        />
-                      )}
-                    />
-                    <Controller
-                      control={form.control}
-                      name="cliente_genero"
+                      name="tecnologia"
                       render={({ field }) => (
                         <NativeSelect
-                          label="Género"
+                          label="Tecnología"
                           required
-                          disabled={soloAudios || todosBloqueado}
+                          disabled={bloquearCamposFormulario}
                           value={field.value ?? ""}
                           onChange={field.onChange}
-                          placeholder="Seleccionar género..."
-                          error={errorsObj.cliente_genero?.message}
+                          placeholder="Seleccionar"
+                          error={errorsObj.tecnologia?.message}
                         >
-                          <option value="MASCULINO">Masculino</option>
-                          <option value="FEMENINO">Femenino</option>
-                          <option value="OTRO">
-                            Otro / Prefiero no decirlo
-                          </option>
+                          {["FTTH", "HFC"].map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
                         </NativeSelect>
                       )}
                     />
                   </div>
-                  <Controller
-                    control={form.control}
-                    name="numero_instalacion"
-                    render={({ field }) => (
-                      <TextInput
-                        label="Número Instalación"
-                        required
-                        disabled={soloAudios || todosBloqueado}
-                        placeholder="9XXXXXXXX"
-                        {...field}
-                        error={errorsObj.numero_instalacion?.message}
+                </div>
+                <Divider />
+                <div>
+                  <SectionTitle>Datos del Cliente</SectionTitle>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Controller
+                        control={form.control}
+                        name="id_tipo_documento"
+                        render={({ field }) => (
+                          <NativeSelect
+                            label="Tipo Documento"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            value={field.value ?? ""}
+                            onChange={(v) =>
+                              field.onChange(v ? Number(v) : undefined)
+                            }
+                            placeholder="Seleccionar"
+                            error={errorsObj.id_tipo_documento?.message}
+                          >
+                            {tiposDoc.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.codigo}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        )}
                       />
-                    )}
-                  />
+                      <Controller
+                        control={form.control}
+                        name="cliente_numero_doc"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Número de documento"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            placeholder={esRUC ? "20XXXXXXXXX" : "12345678"}
+                            {...field}
+                            error={errorsObj.cliente_numero_doc?.message}
+                          />
+                        )}
+                      />
+                    </div>
+                    <Controller
+                      control={form.control}
+                      name="cliente_nombre"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Nombre completo / Razón Social"
+                          required
+                          disabled={bloquearCamposFormulario}
+                          placeholder="Ej: CARLOS"
+                          {...field}
+                          error={errorsObj.cliente_nombre?.message}
+                        />
+                      )}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Controller
+                        control={form.control}
+                        name="cliente_telefono"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Teléfono"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            type="tel"
+                            placeholder="9XXXXXXXX"
+                            {...field}
+                            error={errorsObj.cliente_telefono?.message}
+                          />
+                        )}
+                      />
+                      <Controller
+                        control={form.control}
+                        name="cliente_email"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Email"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            type="email"
+                            placeholder="cliente@correo.com"
+                            {...field}
+                            error={errorsObj.cliente_email?.message}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Controller
+                        control={form.control}
+                        name="cliente_fecha_nacimiento"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Fecha Nacimiento"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            type="date"
+                            {...field}
+                            error={errorsObj.cliente_fecha_nacimiento?.message}
+                          />
+                        )}
+                      />
+                      <Controller
+                        control={form.control}
+                        name="cliente_genero"
+                        render={({ field }) => (
+                          <NativeSelect
+                            label="Género"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                            placeholder="Seleccionar género..."
+                            error={errorsObj.cliente_genero?.message}
+                          >
+                            <option value="MASCULINO">Masculino</option>
+                            <option value="FEMENINO">Femenino</option>
+                            <option value="OTRO">
+                              Otro / Prefiero no decirlo
+                            </option>
+                          </NativeSelect>
+                        )}
+                      />
+                    </div>
+                    <Controller
+                      control={form.control}
+                      name="numero_instalacion"
+                      render={({ field }) => (
+                        <TextInput
+                          label="Número Instalación"
+                          required
+                          disabled={bloquearCamposFormulario}
+                          placeholder="9XXXXXXXX"
+                          {...field}
+                          error={errorsObj.numero_instalacion?.message}
+                        />
+                      )}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Controller
+                        control={form.control}
+                        name="cliente_papa"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Nombre del Padre"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            placeholder="Ej: CARLOS"
+                            {...field}
+                            error={errorsObj.cliente_papa?.message}
+                          />
+                        )}
+                      />
+                      <Controller
+                        control={form.control}
+                        name="cliente_mama"
+                        render={({ field }) => (
+                          <TextInput
+                            label="Nombre de la Madre"
+                            required
+                            disabled={bloquearCamposFormulario}
+                            placeholder="Ej: MARIA"
+                            {...field}
+                            error={errorsObj.cliente_mama?.message}
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+                {esRUC && (
+                  <>
+                    <Divider />
+                    <div>
+                      <SectionTitle className="text-purple-500">
+                        Representante Legal (RUC)
+                      </SectionTitle>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Controller
+                          control={form.control}
+                          name="representante_legal_dni"
+                          render={({ field }) => (
+                            <TextInput
+                              label="DNI Representante"
+                              required
+                              disabled={bloquearCamposFormulario}
+                              placeholder="12345678"
+                              {...field}
+                              value={field.value ?? ""}
+                              error={errorsObj.representante_legal_dni?.message}
+                            />
+                          )}
+                        />
+                        <Controller
+                          control={form.control}
+                          name="representante_legal_nombre"
+                          render={({ field }) => (
+                            <TextInput
+                              label="Nombre Representante"
+                              required
+                              disabled={bloquearCamposFormulario}
+                              placeholder="NOMBRES APELLIDOS"
+                              {...field}
+                              value={field.value ?? ""}
+                              error={
+                                errorsObj.representante_legal_nombre?.message
+                              }
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+                <Divider />
+                <div>
+                  <SectionTitle>Equipos</SectionTitle>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Controller
                       control={form.control}
-                      name="cliente_papa"
+                      name="cant_decos_adicionales"
                       render={({ field }) => (
                         <TextInput
-                          label="Nombre del Padre"
-                          required
-                          disabled={soloAudios || todosBloqueado}
-                          placeholder="Ej: CARLOS"
+                          label="Decos asignados"
+                          type="number"
+                          min="0"
+                          disabled={bloquearCamposFormulario}
                           {...field}
-                          error={errorsObj.cliente_papa?.message}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value))
+                          }
+                          value={field.value ?? 0}
                         />
                       )}
                     />
                     <Controller
                       control={form.control}
-                      name="cliente_mama"
+                      name="cant_repetidores_adicionales"
                       render={({ field }) => (
                         <TextInput
-                          label="Nombre de la Madre"
-                          required
-                          disabled={soloAudios || todosBloqueado}
-                          placeholder="Ej: MARIA"
+                          label="Repetidores asignados"
+                          type="number"
+                          min="0"
+                          disabled={bloquearCamposFormulario}
                           {...field}
-                          error={errorsObj.cliente_mama?.message}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value))
+                          }
+                          value={field.value ?? 0}
                         />
                       )}
                     />
                   </div>
                 </div>
               </div>
-              {esRUC && (
-                <>
-                  <Divider />
-                  <div>
-                    <SectionTitle className="text-purple-500">
-                      Representante Legal (RUC)
-                    </SectionTitle>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Controller
-                        control={form.control}
-                        name="representante_legal_dni"
-                        render={({ field }) => (
-                          <TextInput
-                            label="DNI Representante"
-                            required
-                            disabled={soloAudios || todosBloqueado}
-                            placeholder="12345678"
-                            {...field}
-                            value={field.value ?? ""}
-                            error={errorsObj.representante_legal_dni?.message}
-                          />
-                        )}
-                      />
-                      <Controller
-                        control={form.control}
-                        name="representante_legal_nombre"
-                        render={({ field }) => (
-                          <TextInput
-                            label="Nombre Representante"
-                            required
-                            disabled={soloAudios || todosBloqueado}
-                            placeholder="NOMBRES APELLIDOS"
-                            {...field}
-                            value={field.value ?? ""}
-                            error={
-                              errorsObj.representante_legal_nombre?.message
-                            }
-                          />
-                        )}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
+              {/* fin sección bloqueada */}
+
+              {/* ── Grabador: FUERA del bloqueo para que sea accesible en estado pendiente ── */}
               <Divider />
               <div>
-                <SectionTitle>Equipos & Grabador</SectionTitle>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <Controller
-                    control={form.control}
-                    name="cant_decos_adicionales"
-                    render={({ field }) => (
-                      <TextInput
-                        label="Decos asignados"
-                        type="number"
-                        min="0"
-                        disabled={soloAudios || todosBloqueado}
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                        value={field.value ?? 0}
-                      />
-                    )}
-                  />
-                  <Controller
-                    control={form.control}
-                    name="cant_repetidores_adicionales"
-                    render={({ field }) => (
-                      <TextInput
-                        label="Repetidores asignados"
-                        type="number"
-                        min="0"
-                        disabled={soloAudios || todosBloqueado}
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                        value={field.value ?? 0}
-                      />
-                    )}
-                  />
-                </div>
+                <SectionTitle>Grabador Responsable</SectionTitle>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Controller
                     control={form.control}
@@ -1490,7 +1583,8 @@ export function VentaFormAsesor({
                       <NativeSelect
                         label="Grabador Asignado"
                         disabled={
-                          soloAudios || todosBloqueado || !tieneAlMenosUnAudio
+                          todosBloqueado ||
+                          (!tieneAlMenosUnAudio && !esCorreccionSinAudios)
                         }
                         value={field.value ?? ""}
                         onChange={(v) =>
@@ -1507,14 +1601,42 @@ export function VentaFormAsesor({
                       </NativeSelect>
                     )}
                   />
-                  {!tieneAlMenosUnAudio && !soloAudios && !todosBloqueado && (
+                  {!tieneAlMenosUnAudio &&
+                    !soloAudios &&
+                    !todosBloqueado &&
+                    !esPendiente &&
+                    !esCorreccionSinAudios && (
+                      <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1 italic">
+                        <AlertTriangle
+                          size={12}
+                          className="shrink-0 mt-0.5 text-amber-500"
+                        />
+                        <span>
+                          Sube al menos un audio para poder asignar un grabador.
+                        </span>
+                      </p>
+                    )}
+                  {esPendiente && !tieneAlMenosUnAudio && (
                     <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1 italic">
                       <AlertTriangle
                         size={12}
                         className="shrink-0 mt-0.5 text-amber-500"
                       />
                       <span>
-                        Sube al menos un audio para poder asignar un grabador.
+                        Sube los audios en la pestaña "Audios" para habilitar el
+                        grabador.
+                      </span>
+                    </p>
+                  )}
+                  {esCorreccionSinAudios && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1 italic">
+                      <AlertTriangle
+                        size={12}
+                        className="shrink-0 mt-0.5 text-blue-500"
+                      />
+                      <span>
+                        Esta corrección no requiere audios. El grabador es
+                        opcional.
                       </span>
                     </p>
                   )}
@@ -1526,7 +1648,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Nombre del Grabador"
                           required
-                          disabled={soloAudios || todosBloqueado}
+                          disabled={todosBloqueado}
                           placeholder="Ej: CARLOS"
                           {...field}
                           value={field.value ?? ""}
@@ -1544,7 +1666,8 @@ export function VentaFormAsesor({
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 1 && "hidden",
-                (soloAudios || todosBloqueado) &&
+                // CAMBIADO: usamos bloquearCamposFormulario
+                bloquearCamposFormulario &&
                   "pointer-events-none opacity-60 grayscale-[20%]",
               )}
             >
@@ -1557,7 +1680,7 @@ export function VentaFormAsesor({
                     <UbigeoCascada
                       label=""
                       required
-                      disabled={soloAudios || todosBloqueado}
+                      disabled={bloquearCamposFormulario}
                       depId={depInstId}
                       provId={provInstId}
                       distId={field.value ?? null}
@@ -1581,7 +1704,7 @@ export function VentaFormAsesor({
                       <TextInput
                         label="Dirección Detallada"
                         required
-                        disabled={soloAudios || todosBloqueado}
+                        disabled={bloquearCamposFormulario}
                         placeholder="Ej: AV BALTA ..."
                         {...field}
                         error={errorsObj.direccion_detalle?.message}
@@ -1596,7 +1719,7 @@ export function VentaFormAsesor({
                         <TextInput
                           label="Nro Plano"
                           required
-                          disabled={soloAudios || todosBloqueado}
+                          disabled={bloquearCamposFormulario}
                           placeholder="PL-XXXXX"
                           {...field}
                           error={errorsObj.plano?.message}
@@ -1609,7 +1732,7 @@ export function VentaFormAsesor({
                       render={({ field }) => (
                         <TextInput
                           label="Referencias"
-                          disabled={soloAudios || todosBloqueado}
+                          disabled={bloquearCamposFormulario}
                           placeholder="Cerca al parque..."
                           {...field}
                           value={field.value ?? ""}
@@ -1623,7 +1746,7 @@ export function VentaFormAsesor({
                     render={({ field }) => (
                       <TextInput
                         label="Coordenadas GPS"
-                        disabled={soloAudios || todosBloqueado}
+                        disabled={bloquearCamposFormulario}
                         placeholder="-12.0464, -77.0428"
                         {...field}
                         value={field.value ?? ""}
@@ -1641,7 +1764,7 @@ export function VentaFormAsesor({
                   render={({ field }) => (
                     <UbigeoCascada
                       label=""
-                      disabled={soloAudios || todosBloqueado}
+                      disabled={bloquearCamposFormulario}
                       depId={depNacId}
                       provId={provNacId}
                       distId={field.value ?? null}
@@ -1679,7 +1802,7 @@ export function VentaFormAsesor({
                     render={({ field }) => (
                       <TextInput
                         label="Score Crediticio"
-                        disabled={soloAudios || todosBloqueado}
+                        disabled={bloquearCamposFormulario}
                         placeholder="Ej: A / B / C"
                         {...field}
                         value={field.value ?? ""}
@@ -1719,6 +1842,19 @@ export function VentaFormAsesor({
                     ? "Al reingresar debes subir audios nuevos desde cero."
                     : "Sube los archivos de audio (cualquier formato)."}
                 </p>
+                {/* NUEVO: Aviso si hay grabaciones pendientes de confirmar */}
+                {hayGrabacionSinConfirmar && (
+                  <div className="mt-2 flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                    <AlertTriangle
+                      size={13}
+                      className="text-amber-500 shrink-0"
+                    />
+                    <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                      Tienes grabaciones pendientes de confirmar. Haz clic en "✓
+                      Usar esta grabación" antes de guardar.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1741,6 +1877,10 @@ export function VentaFormAsesor({
                     onRemove={() => handleAudioRemove(i)}
                     onUploadStart={() => handleAudioStart(i)}
                     onUploadError={(err) => handleAudioError(i, err)}
+                    // NUEVO: notificación de grabación pendiente
+                    onPendienteConfirmar={(pendiente) =>
+                      handleAudioPendienteConfirmar(i, pendiente)
+                    }
                   />
                 ))}
               </div>
@@ -1796,7 +1936,12 @@ export function VentaFormAsesor({
             <Button
               type="button"
               onClick={handleCustomSubmit}
-              disabled={isPending || algunoSubiendo || todosBloqueado}
+              disabled={
+                isPending ||
+                algunoSubiendo ||
+                todosBloqueado ||
+                hayGrabacionSinConfirmar
+              }
               className="h-11 rounded-xl px-6 gap-2 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/20 disabled:opacity-50"
             >
               {isPending && <Loader2 size={16} className="animate-spin" />}

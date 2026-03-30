@@ -341,6 +341,8 @@ export interface VentaFiltros {
   id_estado_audios?: number | string;
   id_producto?: number | string;
   id_origen_venta?: number | string;
+  id_sucursal?: number | string;
+  id_modalidad?: number | string;
   tecnologia?: string;
   es_full_claro?: boolean;
   solicitud_correccion?: boolean;

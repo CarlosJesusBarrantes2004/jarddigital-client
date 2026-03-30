@@ -177,12 +177,16 @@ export const salesService = {
   exportarExcel: async (
     fechaInicio?: string,
     fechaFin?: string,
-    estadoSot?: string, // FIX #6: "ATENDIDO" | "EJECUCION" | "RECHAZADO" | undefined
+    estadoSot?: string,
+    idSucursal?: number | string,
+    idModalidad?: number | string,
   ): Promise<void> => {
     const params = new URLSearchParams();
     if (fechaInicio) params.append("fecha_inicio", fechaInicio);
     if (fechaFin) params.append("fecha_fin", fechaFin);
-    if (estadoSot) params.append("estado_sot", estadoSot); // ← NUEVO
+    if (estadoSot) params.append("estado_sot", estadoSot);
+    if (idSucursal) params.append("id_sucursal", String(idSucursal));
+    if (idModalidad) params.append("id_modalidad", String(idModalidad));
 
     const response = await api.get(
       `/sales/ventas/exportar_excel/?${params.toString()}`,

@@ -15,7 +15,7 @@ export const SalesPage = () => {
 
   if (rol === "ASESOR") return <AsesorPage></AsesorPage>;
 
-  // El DUEÑO puede ver todo pero NO gestionar ventas
-  const soloLectura = rol === "DUENO";
+  // El DUEÑO y SUPERVISOR pueden ver todo pero NO gestionar ventas
+  const soloLectura = rol === "DUENO" || rol === "SUPERVISOR";
   return <BackofficePage soloLectura={soloLectura} />;
 };

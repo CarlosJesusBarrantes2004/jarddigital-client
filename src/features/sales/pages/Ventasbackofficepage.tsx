@@ -12,6 +12,8 @@ import {
   ChevronDown,
   FileSpreadsheet,
   Mic,
+  Building2,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,7 @@ import { buildColumnsBackoffice } from "../components/VentasTable/columnsBackoff
 import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 import { PaginationControls } from "../components/PaginationControls";
 import { VentaDetalleModal } from "../components/VentaDetalleModal";
+import { useBranches } from "@/features/core/hooks/useBranches";
 
 const PAGE_SIZE = 5;
 
@@ -98,7 +101,13 @@ const OPCIONES_EXCEL: { key: EstadoExcel; label: string; desc: string }[] = [
   },
 ];
 
-function ExcelPanel({ onClose }: { onClose: () => void }) {
+function ExcelPanel({
+  onClose,
+  filtros,
+}: {
+  onClose: () => void;
+  filtros: VentaFiltros;
+}) {
   const [estadoExcel, setEstadoExcel] = useState<EstadoExcel>("todas");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -117,9 +126,11 @@ function ExcelPanel({ onClose }: { onClose: () => void }) {
     setExportando(true);
     try {
       await salesService.exportarExcel(
-        fechaDesde || undefined,
-        fechaHasta || undefined,
+        fechaDesde || filtros.fecha_inicio || undefined,
+        fechaHasta || filtros.fecha_fin || undefined,
         estadoExcel === "todas" ? undefined : estadoExcel,
+        filtros.id_sucursal,
+        filtros.id_modalidad,
       );
       toast.success("Excel generado correctamente");
       onClose();
@@ -261,6 +272,8 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [filtroEstadoAudio, setFiltroEstadoAudio] = useState<number | "">("");
+  const [filtroSucursal, setFiltroSucursal] = useState<number | "">("");
+  const [filtroModalidad, setFiltroModalidad] = useState<number | "">("");
   const [ordenFecha, setOrdenFecha] = useState<"asc" | "desc" | null>("desc");
 
   const handleToggleOrdenFecha = () => {
@@ -279,6 +292,8 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
       ...(filtroEstadoAudio !== ""
         ? { id_estado_audios: filtroEstadoAudio }
         : {}),
+      ...(filtroSucursal !== "" ? { id_sucursal: filtroSucursal } : {}),
+      ...(filtroModalidad !== "" ? { id_modalidad: filtroModalidad } : {}),
       ...(ordenFecha
         ? { ordering: ordenFecha === "asc" ? "fecha_venta" : "-fecha_venta" }
         : {}),
@@ -329,6 +344,10 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
     setFechaHasta,
     filtroEstadoAudio,
     setFiltroEstadoAudio,
+    filtroSucursal,
+    setFiltroSucursal,
+    filtroModalidad,
+    setFiltroModalidad,
     ordenFecha,
     handleToggleOrdenFecha,
     filtros,
@@ -356,10 +375,19 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
     setFechaHasta,
     filtroEstadoAudio,
     setFiltroEstadoAudio,
+    filtroSucursal,
+    setFiltroSucursal,
+    filtroModalidad,
+    setFiltroModalidad,
     ordenFecha,
     handleToggleOrdenFecha,
     filtros,
   } = useFiltrosBackoffice(estadosSOTData);
+
+  const { branches, modalities } = useBranches();
+  const opcionesModalidad = filtroSucursal
+    ? branches.find((b) => b.id === filtroSucursal)?.modalidades || []
+    : modalities;
 
   // ── Paginación ──────────────────────────────────────────────
   const [page, setPage] = useState(1);
@@ -433,7 +461,9 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
             />
           </Button>
 
-          {excelOpen && <ExcelPanel onClose={() => setExcelOpen(false)} />}
+          {excelOpen && (
+            <ExcelPanel onClose={() => setExcelOpen(false)} filtros={filtros} />
+          )}
         </div>
       </div>
 
@@ -497,6 +527,74 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           )}
 
           <div className="relative flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background min-w-[160px]">
+            <Building2 size={12} className="text-muted-foreground shrink-0" />
+            <select
+              value={filtroSucursal}
+              onChange={(e) => {
+                setFiltroSucursal(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                );
+                setFiltroModalidad("");
+              }}
+              className="w-full text-sm text-foreground bg-transparent outline-none cursor-pointer appearance-none pr-5"
+            >
+              <option value="">Todas las sucursales</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={12}
+              className="absolute right-3 text-muted-foreground pointer-events-none"
+            />
+            {filtroSucursal !== "" && (
+              <button
+                onClick={() => {
+                  setFiltroSucursal("");
+                  setFiltroModalidad("");
+                }}
+                className="absolute right-7 text-muted-foreground hover:text-foreground"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+
+          <div className="relative flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background min-w-[150px]">
+            <MapPin size={12} className="text-muted-foreground shrink-0" />
+            <select
+              value={filtroModalidad}
+              onChange={(e) =>
+                setFiltroModalidad(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                )
+              }
+              className="w-full text-sm text-foreground bg-transparent outline-none cursor-pointer appearance-none pr-5"
+            >
+              <option value="">Todas las modalidades</option>
+              {opcionesModalidad.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={12}
+              className="absolute right-3 text-muted-foreground pointer-events-none"
+            />
+            {filtroModalidad !== "" && (
+              <button
+                onClick={() => setFiltroModalidad("")}
+                className="absolute right-7 text-muted-foreground hover:text-foreground"
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+
+          <div className="relative flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-background min-w-[150px]">
             <Mic size={12} className="text-muted-foreground shrink-0" />
             <select
               value={filtroEstadoAudio}

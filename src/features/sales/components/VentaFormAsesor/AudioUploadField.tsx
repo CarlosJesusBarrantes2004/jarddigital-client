@@ -31,6 +31,8 @@ interface AudioUploadFieldProps {
   onRemove: () => void;
   onUploadStart: () => void;
   onUploadError: (err: string) => void;
+  // NUEVO: notifica al padre si hay una grabación pendiente de confirmar
+  onPendienteConfirmar?: (pendiente: boolean) => void;
   disabled?: boolean;
   isRechazado?: boolean;
   motivoRechazo?: string | null;
@@ -163,6 +165,7 @@ export function AudioUploadField({
   onRemove,
   onUploadStart,
   onUploadError,
+  onPendienteConfirmar,
   disabled,
   isRechazado,
   motivoRechazo,
@@ -176,6 +179,14 @@ export function AudioUploadField({
   const previewAudioElRef = useRef<HTMLAudioElement | null>(null);
 
   const recorder = useAudioRecorder();
+
+  // Notificar al padre cuando el estado de "pendiente de confirmar" cambia
+  useEffect(() => {
+    // Hay grabación pendiente si: el grabador está en modo preview (isPreviewing)
+    // y todavía no se subió (no hay url final aún)
+    const pendiente = recorder.isPreviewing && !url;
+    onPendienteConfirmar?.(pendiente);
+  }, [recorder.isPreviewing, url, onPendienteConfirmar]);
 
   // Convierte el blob grabado en File y lo sube a Cloudinary
   const handleUploadRecording = useCallback(async () => {
@@ -193,6 +204,7 @@ export function AudioUploadField({
       recorder.discardRecording();
       setShowRecorder(false);
       onUploaded(result.url, result.deleteToken);
+      // Al confirmar y subir, ya no hay pendiente — el useEffect lo detecta automáticamente
     } catch (err) {
       onUploadError(
         err instanceof Error ? err.message : "Error al subir la grabación",
@@ -202,8 +214,6 @@ export function AudioUploadField({
 
   const handleFile = useCallback(
     async (file: File) => {
-      // ── Sin restricción de formato: cualquier archivo es aceptado ──
-      // Solo limitamos el tamaño máximo (50MB para cubrir audios largos)
       if (file.size > 50 * 1024 * 1024)
         return onUploadError("El archivo no debe superar 50MB");
 
@@ -285,6 +295,7 @@ export function AudioUploadField({
     }
     setPreviewPlaying(false);
     recorder.discardRecording();
+    // Al descartar, ya no hay pendiente — el useEffect lo detecta
   };
 
   const hasUrl = !!url;
@@ -313,8 +324,8 @@ export function AudioUploadField({
           </p>
           {valorCliente && (
             <p
-              className="text-[10px] font-mono text-primary/70 leading-tight mt-0.5 truncate"
-              title={valorCliente}
+              className="text-[12px] font-sans font-medium text-foreground/70 leading-snug mt-0.5 break-words whitespace-normal"
+              style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
             >
               {valorCliente}
             </p>
@@ -383,6 +394,13 @@ export function AudioUploadField({
 
           {recorder.isPreviewing && recorder.recordedUrl && (
             <div className="flex flex-col gap-2">
+              {/* AVISO PROMINENTE: indica que debe confirmar */}
+              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                <AlertCircle size={12} className="text-amber-500 shrink-0" />
+                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                  Debes confirmar la grabación para que quede registrada
+                </p>
+              </div>
               <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
                 Vista previa — {recorder.formatTime(recorder.recordingSeconds)}
               </p>
@@ -456,11 +474,6 @@ export function AudioUploadField({
                   : "border-border bg-card",
         )}
       >
-        {/*
-         * Sin atributo "accept" para permitir absolutamente cualquier formato.
-         * El navegador no filtrará nada — el usuario puede subir mp3, m4a,
-         * opus, ogg, wav, amr, aac, wma, flac, mp4, 3gp, etc.
-         */}
         <input
           ref={inputRef}
           type="file"

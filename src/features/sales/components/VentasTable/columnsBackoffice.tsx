@@ -509,23 +509,25 @@ export function buildColumnsBackoffice(
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => handleWhatsApp(v, esRUC)}
-              className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
-                v.celular_asesor
-                  ? "border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 hover:border-[#25D366]/60"
-                  : "border-border bg-background text-muted-foreground/40 cursor-not-allowed",
-              )}
-              title={
-                v.celular_asesor
-                  ? `Enviar guión por WhatsApp al asesor (${v.celular_asesor})`
-                  : "El asesor no tiene celular registrado"
-              }
-            >
-              <WhatsAppIcon size={14} />
-            </button>
+            {onGestionar !== null && (
+              <button
+                type="button"
+                onClick={() => handleWhatsApp(v, esRUC)}
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
+                  v.celular_asesor
+                    ? "border-[#25D366]/40 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 hover:border-[#25D366]/60"
+                    : "border-border bg-background text-muted-foreground/40 cursor-not-allowed",
+                )}
+                title={
+                  v.celular_asesor
+                    ? `Enviar guión por WhatsApp al asesor (${v.celular_asesor})`
+                    : "El asesor no tiene celular registrado"
+                }
+              >
+                <WhatsAppIcon size={14} />
+              </button>
+            )}
 
             {onGestionar === null ? (
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">
