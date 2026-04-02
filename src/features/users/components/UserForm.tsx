@@ -45,6 +45,12 @@ const ROLE_BADGE: Record<
     bgClass: "bg-blue-500/10 hover:bg-blue-500/20",
     borderClass: "border-blue-500/30",
   },
+  COORDINADOR: {
+    label: "Coordinador",
+    colorClass: "text-violet-500",
+    bgClass: "bg-violet-500/10 hover:bg-violet-500/20",
+    borderClass: "border-violet-500/30",
+  },
   RRHH: {
     label: "RRHH",
     colorClass: "text-orange-500",

@@ -6,23 +6,22 @@ import type { Workspace } from "../types";
 
 export const SelectWorkspacePage = () => {
   const navigate = useNavigate();
-  
+
   // 1. Extraemos activeWorkspace para usarlo como candado
   const { user, activeWorkspace, selectWorkspace, logout } = useAuth();
-  
+
   const workspaces: Workspace[] = user?.sucursales ?? [];
 
   useEffect(() => {
-    if (user?.rol?.codigo === "BACKOFFICE") {
-      // 2. CANDADO CRÍTICO: Solo seteamos la sede si NO hay una ya activa
+    const rolCodigo = user?.rol?.codigo;
+
+    if (rolCodigo === "BACKOFFICE" || rolCodigo === "COORDINADOR") {
       if (workspaces.length > 0 && !activeWorkspace) {
         selectWorkspace(workspaces[0]);
       }
-      // 3. Usamos replace: true para no ensuciar el historial de navegación
       navigate("/dashboard", { replace: true });
     }
-  // 4. Deshabilitamos la regla de dependencias exhaustivas aquí para evitar el loop
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeWorkspace, navigate]);
 
   const handleSelect = (workspace: Workspace) => {
@@ -36,7 +35,9 @@ export const SelectWorkspacePage = () => {
   };
 
   // Evitamos el parpadeo visual mientras se redirige al Backoffice
-  if (user?.rol?.codigo === "BACKOFFICE") return null;
+  if (user?.rol?.codigo === "BACKOFFICE" || user?.rol?.codigo === "COORDINADOR")
+    return null;
+
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-background font-sans p-8 overflow-hidden transition-colors duration-300">
       {/* Fondo Atmosférico Celeste */}

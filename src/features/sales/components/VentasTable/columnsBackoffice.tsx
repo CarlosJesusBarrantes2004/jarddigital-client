@@ -15,6 +15,7 @@ import {
   Phone,
   Hash,
   Clock,
+  Pencil,
 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT, EstadoAudio } from "../../types/sales.types";
@@ -180,6 +181,7 @@ export function buildColumnsBackoffice(
   ordenFecha?: "asc" | "desc" | null,
   onToggleOrdenFecha?: () => void,
   onVerDetalle?: (v: Venta) => void,
+  onEditar?: ((v: Venta) => void) | null,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -506,6 +508,17 @@ export function buildColumnsBackoffice(
                 title="Ver detalles de la venta"
               >
                 <Eye size={14} />
+              </button>
+            )}
+
+            {onEditar && (
+              <button
+                type="button"
+                onClick={() => onEditar(v)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/50 transition-all"
+                title="Editar venta"
+              >
+                <Pencil size={14} />
               </button>
             )}
 

@@ -45,7 +45,14 @@ const SECTIONS: RouteSection[] = [
       {
         label: "Dashboard",
         href: "/dashboard",
-        roles: ["DUENO", "SUPERVISOR", "RRHH", "BACKOFFICE", "ASESOR"],
+        roles: [
+          "DUENO",
+          "SUPERVISOR",
+          "COORDINADOR",
+          "RRHH",
+          "BACKOFFICE",
+          "ASESOR",
+        ],
       },
     ],
   },
@@ -58,7 +65,7 @@ const SECTIONS: RouteSection[] = [
       {
         label: "Gestión de Ventas",
         href: "/sales",
-        roles: ["BACKOFFICE", "SUPERVISOR", "DUENO"],
+        roles: ["BACKOFFICE", "SUPERVISOR", "COORDINADOR", "DUENO"],
       },
     ],
   },
@@ -230,12 +237,13 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
   const [open, setOpen] = useState(false);
 
   const workspaces: Workspace[] = user?.sucursales ?? [];
-  const isBackoffice = user?.rol?.codigo === "BACKOFFICE";
+  const esVistaGlobal =
+    user?.rol?.codigo === "BACKOFFICE" || user?.rol?.codigo === "COORDINADOR";
 
   if (workspaces.length === 0) return null;
 
   // ---> NUEVA LÓGICA: BLOQUEO VISUAL PARA BACKOFFICE <---
-  if (isBackoffice) {
+  if (esVistaGlobal) {
     return (
       <div
         className="w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground opacity-80 cursor-default"

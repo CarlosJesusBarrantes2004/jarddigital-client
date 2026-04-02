@@ -30,6 +30,13 @@ export const LoginPage = () => {
       setUser(userData);
 
       const workspaces = userData.sucursales ?? [];
+      const rolCodigo = userData.rol?.codigo;
+
+      if (rolCodigo === "BACKOFFICE" || rolCodigo === "COORDINADOR") {
+        if (workspaces.length > 0) selectWorkspace(workspaces[0]);
+        navigate("/dashboard");
+        return;
+      }
 
       if (workspaces.length === 0) {
         navigate("/dashboard");

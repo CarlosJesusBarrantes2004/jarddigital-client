@@ -66,26 +66,15 @@ export function useVenta(id: number, options?: { enabled?: boolean }) {
   });
 }
 
-// ==========================================
-// ESTADÍSTICAS ASESOR — CORREGIDO
-// ==========================================
-//
-// Estrategia: hacemos una query por cada categoría enviando page=1&page_size=1.
-// El backend devuelve { count: N, results: [...1 item] }.
-// Solo nos importa el `count` — ignoramos los resultados.
-// Así evitamos traer todos los registros solo para contarlos.
-//
-// Para ejecución/atendidas/rechazadas necesitamos el ID del EstadoSOT.
-// Lo resolvemos con useEstadosSOT() que ya está en caché (staleTime: Infinity).
-
-export function useEstadisticasAsesor(): {
+export function useEstadisticasAsesor(filtrosFecha?: {
+  fecha_inicio?: string;
+  fecha_fin?: string;
+}): {
   stats: EstadisticasAsesor;
   isLoading: boolean;
 } {
-  // Catálogo de estados (viene de caché en la mayoría de casos)
   const { data: estadosSOT = [] } = useEstadosSOT();
 
-  // Resolvemos los IDs de los estados que necesitamos
   const idEjecucion = estadosSOT.find(
     (s) => s.codigo.toUpperCase() === "EJECUCION",
   )?.id;
@@ -96,27 +85,37 @@ export function useEstadisticasAsesor(): {
     (s) => s.codigo.toUpperCase() === "RECHAZADO",
   )?.id;
 
-  // ── Total ────────────────────────────────────────────────────────────────────
+  // Base de fechas que se propaga a todas las queries
+  const fechaBase: VentaFiltros = {
+    ...(filtrosFecha?.fecha_inicio
+      ? { fecha_inicio: filtrosFecha.fecha_inicio }
+      : {}),
+    ...(filtrosFecha?.fecha_fin ? { fecha_fin: filtrosFecha.fecha_fin } : {}),
+  };
+
   const { data: dataTotal, isLoading: l0 } = useQuery({
     queryKey: salesKeys.list({
       _stat: "total",
+      ...fechaBase,
       page: 1,
       page_size: 1,
     } as VentaFiltros),
-    queryFn: () => salesService.getVentas({ page: 1, page_size: 1 }),
+    queryFn: () =>
+      salesService.getVentas({ ...fechaBase, page: 1, page_size: 1 }),
     staleTime: 1000 * 30,
   });
 
-  // ── Pendientes (estado nulo) ──────────────────────────────────────────────────
   const { data: dataPendientes, isLoading: l1 } = useQuery({
     queryKey: salesKeys.list({
       _stat: "pendientes",
+      ...fechaBase,
       id_estado_sot__isnull: true,
       page: 1,
       page_size: 1,
     } as VentaFiltros),
     queryFn: () =>
       salesService.getVentas({
+        ...fechaBase,
         id_estado_sot__isnull: true,
         page: 1,
         page_size: 1,
@@ -124,16 +123,17 @@ export function useEstadisticasAsesor(): {
     staleTime: 1000 * 30,
   });
 
-  // ── En ejecución ─────────────────────────────────────────────────────────────
   const { data: dataEjecucion, isLoading: l2 } = useQuery({
     queryKey: salesKeys.list({
       _stat: "ejecucion",
+      ...fechaBase,
       id_estado_sot: idEjecucion,
       page: 1,
       page_size: 1,
     } as VentaFiltros),
     queryFn: () =>
       salesService.getVentas({
+        ...fechaBase,
         id_estado_sot: idEjecucion,
         page: 1,
         page_size: 1,
@@ -142,16 +142,17 @@ export function useEstadisticasAsesor(): {
     staleTime: 1000 * 30,
   });
 
-  // ── Atendidas ────────────────────────────────────────────────────────────────
   const { data: dataAtendidas, isLoading: l3 } = useQuery({
     queryKey: salesKeys.list({
       _stat: "atendidas",
+      ...fechaBase,
       id_estado_sot: idAtendido,
       page: 1,
       page_size: 1,
     } as VentaFiltros),
     queryFn: () =>
       salesService.getVentas({
+        ...fechaBase,
         id_estado_sot: idAtendido,
         page: 1,
         page_size: 1,
@@ -160,16 +161,17 @@ export function useEstadisticasAsesor(): {
     staleTime: 1000 * 30,
   });
 
-  // ── Rechazadas ───────────────────────────────────────────────────────────────
   const { data: dataRechazadas, isLoading: l4 } = useQuery({
     queryKey: salesKeys.list({
       _stat: "rechazadas",
+      ...fechaBase,
       id_estado_sot: idRechazado,
       page: 1,
       page_size: 1,
     } as VentaFiltros),
     queryFn: () =>
       salesService.getVentas({
+        ...fechaBase,
         id_estado_sot: idRechazado,
         page: 1,
         page_size: 1,
@@ -178,16 +180,17 @@ export function useEstadisticasAsesor(): {
     staleTime: 1000 * 30,
   });
 
-  // ── En corrección ────────────────────────────────────────────────────────────
   const { data: dataCorreccion, isLoading: l5 } = useQuery({
     queryKey: salesKeys.list({
       _stat: "correccion",
+      ...fechaBase,
       solicitud_correccion: true,
       page: 1,
       page_size: 1,
     } as VentaFiltros),
     queryFn: () =>
       salesService.getVentas({
+        ...fechaBase,
         solicitud_correccion: true,
         page: 1,
         page_size: 1,

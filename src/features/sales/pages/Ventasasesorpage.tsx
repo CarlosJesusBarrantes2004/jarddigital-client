@@ -284,7 +284,10 @@ export function AsesorPage() {
   const ventas = data?.results ?? [];
 
   // Stats: usan filtros sin page para obtener counts reales
-  const { stats } = useEstadisticasAsesor();
+  const { stats } = useEstadisticasAsesor({
+    fecha_inicio: fechaDesde,
+    fecha_fin: fechaHasta,
+  });
 
   const [formOpen, setFormOpen] = useState(false);
   const [ventaSeleccionada, setVentaSeleccionada] = useState<Venta | null>(

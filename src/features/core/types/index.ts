@@ -16,6 +16,7 @@ export interface Branch {
 export type RoleCode =
   | "DUENO"
   | "SUPERVISOR"
+  | "COORDINADOR"
   | "RRHH"
   | "BACKOFFICE"
   | "ASESOR";

@@ -28,6 +28,8 @@ import { VentaFormBackoffice } from "../components/VentaFormBackoffice";
 import { PaginationControls } from "../components/PaginationControls";
 import { VentaDetalleModal } from "../components/VentaDetalleModal";
 import { useBranches } from "@/features/core/hooks/useBranches";
+import { VentaFormAsesor } from "../components/VentaFormAsesor";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 const PAGE_SIZE = 5;
 
@@ -329,6 +331,8 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
     fechaDesde,
     fechaHasta,
     filtroEstadoAudio,
+    filtroSucursal,
+    filtroModalidad,
     ordenFecha,
     estadosSOT,
   ]);
@@ -363,6 +367,14 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   const { data: estadosAudio = [] } = useEstadosAudio();
 
   const [ventaDetalle, setVentaDetalle] = useState<Venta | null>(null);
+
+  const { user } = useAuth();
+  const rol = user?.rol?.codigo?.toUpperCase() ?? "";
+  const puedeEditar = rol === "SUPERVISOR" || rol === "COORDINADOR";
+
+  const [ventaParaEditar, setVentaParaEditar] = useState<Venta | null>(null);
+  const handleEditar = (v: Venta) => setVentaParaEditar(v);
+  const handleCerrarEditar = () => setVentaParaEditar(null);
 
   const {
     tab,
@@ -423,9 +435,10 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
         ordenFecha,
         handleToggleOrdenFecha,
         setVentaDetalle,
+        puedeEditar ? handleEditar : null,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [estadosSOTData, estadosAudio, soloLectura, ordenFecha],
+    [estadosSOTData, estadosAudio, soloLectura, ordenFecha, puedeEditar],
   );
 
   const tieneFechas = !!fechaDesde || !!fechaHasta;
@@ -708,6 +721,14 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           open={!!ventaDetalle}
           onClose={() => setVentaDetalle(null)}
           venta={ventaDetalle}
+        />
+      )}
+
+      {ventaParaEditar && (
+        <VentaFormAsesor
+          open={!!ventaParaEditar}
+          onClose={handleCerrarEditar}
+          ventaOrigen={ventaParaEditar}
         />
       )}
     </div>
