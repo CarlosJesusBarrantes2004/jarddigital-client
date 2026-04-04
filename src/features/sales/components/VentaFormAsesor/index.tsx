@@ -326,11 +326,47 @@ export function VentaFormAsesor({
   });
   const [nombresNac, setNombresNac] = useState({ dep: "", prov: "", dist: "" });
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema) as any,
+    mode: "onSubmit",
+    defaultValues: {
+      cant_decos_adicionales: 0,
+      cant_repetidores_adicionales: 0,
+      es_full_claro: false,
+      audio_urls: [],
+      dep_inst_id: undefined,
+      prov_inst_id: undefined,
+      id_distrito_instalacion: undefined,
+      dep_nac_id: undefined,
+      prov_nac_id: undefined,
+      id_distrito_nacimiento: undefined,
+      cliente_genero: "",
+    },
+  });
+
   const esRechazada = ventaOrigen?.codigo_estado?.toUpperCase() === "RECHAZADO";
   const esReingreso = !!ventaOrigen && esRechazada;
   const esEdicion = !!ventaOrigen && !esRechazada;
   const esEjecucion = ventaOrigen?.codigo_estado?.toUpperCase() === "EJECUCION";
   const esVentaNuevaPura = !ventaOrigen;
+
+  const dniActual = form.watch("cliente_numero_doc");
+
+  const dniOrigenReingreso = esReingreso
+    ? ventaOrigen!.cliente_numero_doc
+    : null;
+
+  const grabadorOrigenId = esReingreso
+    ? (ventaOrigen!.id_grabador_audios ?? undefined)
+    : undefined;
+
+  // true = el asesor NO cambió el DNI → grabador bloqueado al del origen
+  const reingresoMismoDNI =
+    esReingreso && !!dniOrigenReingreso && dniActual === dniOrigenReingreso;
+
+  // true = DNI cambió → grabador habilitado pero sin el grabador antiguo
+  const reingreSoDNIDistinto =
+    esReingreso && !!dniActual && dniActual !== dniOrigenReingreso;
 
   // ── ESTADO PENDIENTE: la venta existe pero NO tiene estado (código vacío/null)
   // En este caso todos los campos excepto audios + grabador deben estar bloqueados
@@ -394,24 +430,6 @@ export function VentaFormAsesor({
 
   // NUEVO: ¿hay alguna grabación de micrófono en modo "preview" sin confirmar?
   const hayGrabacionSinConfirmar = audiosPendientesConfirmar.some(Boolean);
-
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema) as any,
-    mode: "onSubmit",
-    defaultValues: {
-      cant_decos_adicionales: 0,
-      cant_repetidores_adicionales: 0,
-      es_full_claro: false,
-      audio_urls: [],
-      dep_inst_id: undefined,
-      prov_inst_id: undefined,
-      id_distrito_instalacion: undefined,
-      dep_nac_id: undefined,
-      prov_nac_id: undefined,
-      id_distrito_nacimiento: undefined,
-      cliente_genero: "",
-    },
-  });
 
   const watchedValues = form.watch();
   const tipoDocId = form.watch("id_tipo_documento");
@@ -1579,27 +1597,70 @@ export function VentaFormAsesor({
                   <Controller
                     control={form.control}
                     name="id_grabador_audios"
-                    render={({ field }) => (
-                      <NativeSelect
-                        label="Grabador Asignado"
-                        disabled={
-                          todosBloqueado ||
-                          (!tieneAlMenosUnAudio && !esCorreccionSinAudios)
-                        }
-                        value={field.value ?? ""}
-                        onChange={(v) =>
-                          field.onChange(v ? Number(v) : undefined)
-                        }
-                        placeholder="Seleccione el responsable"
-                        error={errorsObj.id_grabador_audios?.message}
-                      >
-                        {grabadores.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.nombre_completo}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    )}
+                    render={({ field }) => {
+                      if (reingresoMismoDNI) {
+                        return (
+                          <div>
+                            <FieldLabel>Grabador asignado</FieldLabel>
+                            <div className="relative">
+                              <select
+                                disabled
+                                value={grabadorOrigenId ?? ""}
+                                className="w-full h-11 pl-3.5 pr-10 rounded-xl bg-muted opacity-60 border border-border text-sm font-sans outline-none appearance-none cursor-not-allowed"
+                              >
+                                {grabadores.map((g) => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.nombre_completo}
+                                  </option>
+                                ))}
+                              </select>
+                              <Lock
+                                size={14}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                              />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1 italic">
+                              <Lock
+                                size={12}
+                                className="shrink-0 mt-0.5 text-amber-500"
+                              />
+                              <span>
+                                El DNI no cambió: debes usar el mismo grabador
+                                de la venta original.
+                              </span>
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      // Escenario B: reingreso con DNI distinto → habilitado, sin el grabador antiguo
+                      const grabadoresDisponibles =
+                        reingreSoDNIDistinto && grabadorOrigenId
+                          ? grabadores.filter((g) => g.id !== grabadorOrigenId)
+                          : grabadores;
+
+                      return (
+                        <NativeSelect
+                          label="Grabador asignado"
+                          disabled={
+                            todosBloqueado ||
+                            (!tieneAlMenosUnAudio && !esCorreccionSinAudios)
+                          }
+                          value={field.value ?? ""}
+                          onChange={(v) =>
+                            field.onChange(v ? Number(v) : undefined)
+                          }
+                          placeholder="Seleccione el responsable"
+                          error={errorsObj.id_grabador_audios?.message}
+                        >
+                          {grabadoresDisponibles.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.nombre_completo}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      );
+                    }}
                   />
                   {!tieneAlMenosUnAudio &&
                     !soloAudios &&
