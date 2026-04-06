@@ -30,13 +30,6 @@ export const LoginPage = () => {
       setUser(userData);
 
       const workspaces = userData.sucursales ?? [];
-      const rolCodigo = userData.rol?.codigo;
-
-      if (rolCodigo === "BACKOFFICE" || rolCodigo === "COORDINADOR") {
-        if (workspaces.length > 0) selectWorkspace(workspaces[0]);
-        navigate("/dashboard");
-        return;
-      }
 
       if (workspaces.length === 0) {
         navigate("/dashboard");
@@ -71,13 +64,12 @@ export const LoginPage = () => {
       {/* Tarjeta Glassmorphism */}
       <div className="relative z-10 w-full max-w-[420px] mx-6 bg-background/60 dark:bg-card/40 border border-border/50 backdrop-blur-xl rounded-[20px] p-10 md:p-12 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
         {/* Logo */}
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-[38px] h-[38px] bg-gradient-to-br from-primary to-blue-500 rounded-xl flex items-center justify-center font-serif font-bold text-[1.1rem] text-primary-foreground shadow-md">
-            J
-          </div>
-          <span className="font-serif text-xl font-bold text-foreground tracking-tight">
-            Jard Digital
-          </span>
+        <div className="flex justify-center mb-8">
+          <img
+            src="/logo-login.png"
+            alt="Jard Digital"
+            className="h-[70px] object-contain drop-shadow-md"
+          />
         </div>
 
         {/* Titular */}
