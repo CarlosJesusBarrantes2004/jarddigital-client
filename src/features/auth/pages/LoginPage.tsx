@@ -160,9 +160,9 @@ export const LoginPage = () => {
           </button>
         </form>
 
-        <div className="absolute bottom-6 right-8 font-mono text-[10px] text-muted-foreground/50 tracking-[0.1em] uppercase">
+        {/*<div className="absolute bottom-6 right-8 font-mono text-[10px] text-muted-foreground/50 tracking-[0.1em] uppercase">
           v2.0 · JARD
-        </div>
+        </div>*/}
       </div>
     </div>
   );
