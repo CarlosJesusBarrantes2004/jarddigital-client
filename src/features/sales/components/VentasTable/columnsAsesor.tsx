@@ -298,7 +298,7 @@ export function buildColumnsAsesor(
           (v.solicitud_correccion ||
             esPendiente ||
             (esEjecucion && !tieneAudios));
-        const puedeEliminar = esPendiente;
+        const puedeEliminar = v.id_estado_sot === null;
         const yaReingresada = !!(v as Venta & { ya_reingresada?: boolean })
           .ya_reingresada;
 
