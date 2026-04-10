@@ -466,6 +466,17 @@ export function VentaFormAsesor({
   }, [productos, filtroCampana, filtroSolucion]);
 
   useEffect(() => {
+    if (reingresoMismoDNI && grabadorOrigenId !== undefined) {
+      form.setValue("id_grabador_audios", grabadorOrigenId);
+    } else if (reingreSoDNIDistinto && grabadorOrigenId !== undefined) {
+      const valorActual = form.getValues("id_grabador_audios");
+      if (valorActual === grabadorOrigenId) {
+        form.setValue("id_grabador_audios", undefined);
+      }
+    }
+  }, [reingresoMismoDNI, reingreSoDNIDistinto, grabadorOrigenId, form]);
+
+  useEffect(() => {
     if (!tieneAlMenosUnAudio) {
       form.setValue("id_grabador_audios", undefined);
       form.setValue("nombre_grabador_externo", "");
