@@ -196,24 +196,52 @@ export const useUsers = () => {
   ): Promise<boolean> => {
     try {
       await userService.update(id, payload);
+
       if (isSupervisor) {
         const today = new Date().toISOString().split("T")[0];
+
+        // Caso B: obtener asignaciones activas actuales y cerrar las que ya no están seleccionadas
+        const asignacionesActivas =
+          await userService.getActiveSupervisorAssignments(id);
+
+        for (const asignacion of asignacionesActivas) {
+          const sigueAsignada = selectedWorkspaces.includes(
+            asignacion.id_modalidad_sede,
+          );
+          if (!sigueAsignada) {
+            // Esta sede fue quitada — la damos de baja
+            try {
+              await userService.deactivateSupervisorAssignment(asignacion.id);
+            } catch (e) {
+              console.error("Error cerrando asignación removida:", e);
+            }
+          }
+        }
+
+        // Crear nuevas asignaciones solo para sedes que no tienen una activa ya
+        const wsConAsignacionActiva = asignacionesActivas
+          .filter((a) => selectedWorkspaces.includes(a.id_modalidad_sede))
+          .map((a) => a.id_modalidad_sede);
+
         for (const wsId of selectedWorkspaces) {
-          try {
-            await userService.assignSupervisor({
-              id_supervisor: id,
-              id_modalidad_sede: wsId,
-              fecha_inicio: today,
-              activo: true,
-            });
-          } catch (e) {
-            console.log(e);
+          if (!wsConAsignacionActiva.includes(wsId)) {
+            try {
+              await userService.assignSupervisor({
+                id_supervisor: id,
+                id_modalidad_sede: wsId,
+                fecha_inicio: today,
+                activo: true,
+              });
+            } catch (e) {
+              console.error("Error asignando sede:", e);
+            }
           }
         }
       }
+
       toast.success("Colaborador actualizado");
       fetchUsers();
-      fetchInactiveUsers(); // FIX #7
+      fetchInactiveUsers();
       return true;
     } catch {
       toast.error("Error al actualizar el colaborador");
@@ -223,10 +251,20 @@ export const useUsers = () => {
 
   const deactivateUser = async (id: number): Promise<void> => {
     try {
+      // Caso A: si tiene asignaciones activas como supervisor, las cerramos primero
+      const asignaciones = await userService.getActiveSupervisorAssignments(id);
+      for (const asignacion of asignaciones) {
+        try {
+          await userService.deactivateSupervisorAssignment(asignacion.id);
+        } catch (e) {
+          console.error("Error cerrando asignación:", e);
+        }
+      }
+
       await userService.deactivate(id);
       toast.success("Colaborador desactivado");
       fetchUsers();
-      fetchInactiveUsers(); // FIX #7: mueve al inactivo inmediatamente
+      fetchInactiveUsers();
     } catch {
       toast.error("Error al desactivar el colaborador");
     }
@@ -241,12 +279,12 @@ export const useUsers = () => {
 
   return {
     users,
-    inactiveUsers, // FIX #7
+    inactiveUsers,
     roles,
     workspaceOptions,
     stats,
     isLoading,
-    isLoadingInactive, // FIX #7
+    isLoadingInactive,
     filters,
     setFilters,
     createUser,
@@ -254,7 +292,7 @@ export const useUsers = () => {
     deactivateUser,
     checkActiveSupervisorAssignment,
     deactivateSupervisorAssignment,
-    reactivateUser, // FIX #7
+    reactivateUser,
     refetch: () => {
       fetchUsers();
       fetchInactiveUsers();

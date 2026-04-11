@@ -104,6 +104,17 @@ export const userService = {
     });
   },
 
+  getActiveSupervisorAssignments: async (
+    supervisorId: number,
+  ): Promise<{ id: number; id_modalidad_sede: number }[]> => {
+    const params = new URLSearchParams({
+      id_supervisor: String(supervisorId),
+      activo: "true",
+    });
+    const { data } = await api.get(`/users/asignaciones-supervisor/?${params}`);
+    return data;
+  },
+
   getActiveSupervisorAssignment: async (
     wsId: number,
     excludeUserId?: number,
