@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Check, Loader2, Lock } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  Loader2,
+  Lock,
+  ShieldAlert,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { userService } from "../services/userService";
@@ -17,6 +24,14 @@ import type { User as AuthUser } from "@/features/auth/types";
 import { Switch } from "@/components/ui/switch";
 import { SESSION_KEY_WORKSPACE } from "@/features/auth/context/AuthProvider";
 
+// Tipo que representa una asignación activa conflictiva
+interface ConflictingAssignment {
+  wsId: number;
+  assignmentId: number;
+  nombreSupervisor: string;
+  resolved: boolean; // true cuando el usuario ya la desactivó
+}
+
 interface UserFormProps {
   user?: User;
   roles: Role[];
@@ -27,6 +42,16 @@ interface UserFormProps {
     selectedWsIds: number[],
   ) => Promise<boolean>;
   onCancel: () => void;
+  // Ahora devuelve la asignación completa o null
+  checkActiveSupervisorAssignment?: (
+    wsId: number,
+    excludeUserId?: number,
+  ) => Promise<{
+    id: number;
+    id_supervisor: number;
+    nombre_supervisor: string;
+  } | null>;
+  deactivateSupervisorAssignment?: (assignmentId: number) => Promise<void>;
 }
 
 const ROLE_BADGE: Record<
@@ -77,6 +102,8 @@ export const UserForm = ({
   currentUser,
   onSave,
   onCancel,
+  checkActiveSupervisorAssignment,
+  deactivateSupervisorAssignment,
 }: UserFormProps) => {
   const isEditing = !!user;
 
@@ -86,6 +113,13 @@ export const UserForm = ({
   const [loadingWs, setLoadingWs] = useState(true);
   const [selectedWsIds, setSelectedWsIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Conflictos: lista de asignaciones activas que colisionan con las sedes seleccionadas
+  const [conflicts, setConflicts] = useState<ConflictingAssignment[]>([]);
+  const [resolvingId, setResolvingId] = useState<number | null>(null); // assignmentId en proceso
+
+  const [showRemoveSupervisorWarning, setShowRemoveSupervisorWarning] =
+    useState(false);
 
   const {
     register,
@@ -99,7 +133,6 @@ export const UserForm = ({
       nombre_completo: user?.nombre_completo ?? "",
       username: user?.username ?? "",
       email: user?.email ?? "",
-      // null y undefined del backend se normalizan a "" para que el input no sea "uncontrolled"
       celular: user?.celular ?? "",
       password: "",
       id_rol: user?.id_rol ?? 0,
@@ -108,13 +141,94 @@ export const UserForm = ({
   });
 
   const watchedRolId = watch("id_rol");
+  const watchedActivo = watch("activo");
   const selectedRole = roles.find((r) => r.id === watchedRolId);
   const roleCode = selectedRole?.codigo ?? "";
-
   const isAdvisor = roleCode === "ASESOR";
   const isSupervisor = roleCode === "SUPERVISOR";
   const isOwner = roleCode === "DUENO";
   const needsWorkspace = !isOwner && watchedRolId !== 0;
+
+  const originalRoleCode = useMemo(() => {
+    if (!user || !roles.length) return "";
+    return roles.find((r) => r.id === user.id_rol)?.codigo ?? "";
+  }, [user, roles]);
+
+  const wasSupervior = originalRoleCode === "SUPERVISOR";
+
+  // Detectar si le quitan rol supervisor o lo desactivan
+  useEffect(() => {
+    if (!isEditing || !wasSupervior) {
+      setShowRemoveSupervisorWarning(false);
+      return;
+    }
+    setShowRemoveSupervisorWarning(!isSupervisor || watchedActivo === false);
+  }, [isEditing, wasSupervior, isSupervisor, watchedActivo]);
+
+  // Verificar conflictos al cambiar sedes seleccionadas (solo si es supervisor)
+  useEffect(() => {
+    if (
+      !isSupervisor ||
+      !checkActiveSupervisorAssignment ||
+      selectedWsIds.length === 0
+    ) {
+      setConflicts([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const nuevosConflictos: ConflictingAssignment[] = [];
+      for (const wsId of selectedWsIds) {
+        const assignment = await checkActiveSupervisorAssignment(
+          wsId,
+          user?.id,
+        );
+        if (assignment) {
+          // Preservar estado "resolved" si ya existía
+          const previo = conflicts.find((c) => c.wsId === wsId);
+          nuevosConflictos.push({
+            wsId,
+            assignmentId: assignment.id,
+            nombreSupervisor: assignment.nombre_supervisor,
+            resolved:
+              previo?.assignmentId === assignment.id ? previo.resolved : false,
+          });
+        }
+      }
+      if (!cancelled) setConflicts(nuevosConflictos);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSupervisor, selectedWsIds, checkActiveSupervisorAssignment, user?.id]);
+
+  // ¿Quedan conflictos sin resolver?
+  const unresolvedConflicts = conflicts.filter((c) => !c.resolved);
+  const hasBlockingConflicts = unresolvedConflicts.length > 0;
+
+  // Desactivar asignación anterior (el "muro histórico")
+  const handleResolveConflict = async (conflict: ConflictingAssignment) => {
+    if (!deactivateSupervisorAssignment) return;
+    setResolvingId(conflict.assignmentId);
+    try {
+      await deactivateSupervisorAssignment(conflict.assignmentId);
+      setConflicts((prev) =>
+        prev.map((c) =>
+          c.assignmentId === conflict.assignmentId
+            ? { ...c, resolved: true }
+            : c,
+        ),
+      );
+    } catch {
+      // Podrías mostrar un toast de error aquí si tienes acceso a él
+      console.error("Error al desactivar asignación anterior");
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const isRestrictedUser =
     currentUser?.rol?.codigo === "SUPERVISOR" ||
@@ -132,9 +246,7 @@ export const UserForm = ({
   const activeWsId = activeSessionSede?.id_modalidad_sede;
 
   const workspaceOptions = useMemo(() => {
-    if (currentUser?.rol?.codigo === "DUENO") {
-      return rawWorkspaceOptions;
-    }
+    if (currentUser?.rol?.codigo === "DUENO") return rawWorkspaceOptions;
     const sedesPermitidasIds =
       currentUser?.sucursales?.map((s) => s.id_modalidad_sede) || [];
     return rawWorkspaceOptions.filter((ws) =>
@@ -152,9 +264,7 @@ export const UserForm = ({
         } else {
           if (roles.length > 0 && watchedRolId === 0)
             setValue("id_rol", roles[0].id);
-          if (isRestrictedUser && activeWsId) {
-            setSelectedWsIds([activeWsId]);
-          }
+          if (isRestrictedUser && activeWsId) setSelectedWsIds([activeWsId]);
         }
       })
       .catch(console.error)
@@ -162,13 +272,11 @@ export const UserForm = ({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isOwner) {
-      setSelectedWsIds([]);
-    } else if (isRestrictedUser && activeWsId && !isEditing) {
+    if (isOwner) setSelectedWsIds([]);
+    else if (isRestrictedUser && activeWsId && !isEditing)
       setSelectedWsIds([activeWsId]);
-    } else if (isAdvisor && selectedWsIds.length > 1) {
+    else if (isAdvisor && selectedWsIds.length > 1)
       setSelectedWsIds([selectedWsIds[0]]);
-    }
   }, [isOwner, isAdvisor, isRestrictedUser, activeWsId, isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleWorkspace = (wsId: number) => {
@@ -181,11 +289,10 @@ export const UserForm = ({
   };
 
   const onSubmit = async (values: UserFormValues) => {
+    if (hasBlockingConflicts) return; // Seguridad extra
     if (needsWorkspace && selectedWsIds.length === 0) return;
 
     setIsSubmitting(true);
-
-    // Celular vacío → null para que el backend no guarde un string vacío
     const celularFinal = values.celular?.trim() || null;
 
     const payload: CreateUserPayload | UpdateUserPayload = isEditing
@@ -214,19 +321,37 @@ export const UserForm = ({
     if (!ok) setIsSubmitting(false);
   };
 
+  const getNombreSede = (wsId: number) =>
+    workspaceOptions.find((ws) => ws.id === wsId)?.etiqueta ?? `Sede #${wsId}`;
+
   return (
     <form
       className="flex flex-col gap-6 pb-4 font-sans"
       onSubmit={handleSubmit(onSubmit)}
       noValidate
     >
+      {/* Banner: cambio de rol supervisor */}
+      {showRemoveSupervisorWarning && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 animate-in fade-in slide-in-from-top-2 duration-300">
+          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+              Atención: cambio de rol supervisor
+            </p>
+            <p className="text-[12px] text-amber-600/80 dark:text-amber-400/80 mt-1 leading-relaxed">
+              Al guardar, todas las asignaciones activas de este supervisor
+              serán <strong>cerradas automáticamente</strong> con fecha de hoy.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Datos de cuenta ── */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground mb-4">
           Datos de cuenta
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Nombre completo */}
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               Nombre completo
@@ -249,7 +374,6 @@ export const UserForm = ({
             )}
           </div>
 
-          {/* Usuario */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               Nombre de usuario
@@ -270,7 +394,6 @@ export const UserForm = ({
             )}
           </div>
 
-          {/* Email */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               Email
@@ -291,7 +414,6 @@ export const UserForm = ({
             )}
           </div>
 
-          {/* Celular */}
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
               Celular
@@ -322,7 +444,6 @@ export const UserForm = ({
             )}
           </div>
 
-          {/* Contraseña */}
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
               {isEditing ? "Nueva contraseña (opcional)" : "Contraseña inicial"}
@@ -424,6 +545,12 @@ export const UserForm = ({
               {workspaceOptions.map((ws) => {
                 const isSelected = selectedWsIds.includes(ws.id);
                 const isLocked = isRestrictedUser && !isEditing;
+                const conflict = isSupervisor
+                  ? conflicts.find((c) => c.wsId === ws.id)
+                  : undefined;
+                const hasUnresolvedConflict = !!conflict && !conflict.resolved;
+                const hasResolvedConflict = !!conflict && conflict.resolved;
+
                 return (
                   <div
                     key={ws.id}
@@ -432,9 +559,13 @@ export const UserForm = ({
                     }}
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-xl border transition-all duration-200",
-                      isSelected
-                        ? "bg-primary/10 border-primary/30"
-                        : "bg-background border-border",
+                      hasUnresolvedConflict
+                        ? "bg-amber-500/5 border-amber-500/30"
+                        : hasResolvedConflict
+                          ? "bg-emerald-500/5 border-emerald-500/30"
+                          : isSelected
+                            ? "bg-primary/10 border-primary/30"
+                            : "bg-background border-border",
                       isLocked
                         ? "cursor-not-allowed opacity-60"
                         : "cursor-pointer hover:bg-muted hover:border-primary/20",
@@ -443,24 +574,57 @@ export const UserForm = ({
                     <div
                       className={cn(
                         "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors",
-                        isSelected
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-muted-foreground/30",
+                        hasUnresolvedConflict
+                          ? "bg-amber-500/20 border-amber-500"
+                          : hasResolvedConflict
+                            ? "bg-emerald-500/20 border-emerald-500"
+                            : isSelected
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-muted-foreground/30",
                       )}
                     >
-                      {isSelected && <Check size={12} strokeWidth={3} />}
+                      {hasUnresolvedConflict ? (
+                        <AlertTriangle size={11} className="text-amber-500" />
+                      ) : hasResolvedConflict ? (
+                        <Check
+                          size={12}
+                          strokeWidth={3}
+                          className="text-emerald-600"
+                        />
+                      ) : isSelected ? (
+                        <Check size={12} strokeWidth={3} />
+                      ) : null}
                     </div>
-                    <div className="flex-1 flex justify-between items-center">
-                      <span
-                        className={cn(
-                          "block text-[13px] font-medium transition-colors",
-                          isSelected ? "text-primary" : "text-foreground",
+
+                    <div className="flex-1 flex justify-between items-center min-w-0">
+                      <div className="min-w-0">
+                        <span
+                          className={cn(
+                            "block text-[13px] font-medium transition-colors truncate",
+                            hasUnresolvedConflict
+                              ? "text-amber-600 dark:text-amber-400"
+                              : hasResolvedConflict
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : isSelected
+                                  ? "text-primary"
+                                  : "text-foreground",
+                          )}
+                        >
+                          {ws.etiqueta}
+                        </span>
+                        {hasUnresolvedConflict && conflict && (
+                          <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-mono">
+                            Supervisor activo: {conflict.nombreSupervisor}
+                          </span>
                         )}
-                      >
-                        {ws.etiqueta}
-                      </span>
+                        {hasResolvedConflict && (
+                          <span className="text-[10px] text-emerald-600/80 font-mono">
+                            Supervisor anterior dado de baja ✓
+                          </span>
+                        )}
+                      </div>
                       {isLocked && isSelected && (
-                        <Lock size={12} className="text-primary/50" />
+                        <Lock size={12} className="text-primary/50 shrink-0" />
                       )}
                     </div>
                   </div>
@@ -473,10 +637,84 @@ export const UserForm = ({
               )}
             </div>
           )}
+
           {selectedWsIds.length === 0 && workspaceOptions.length > 0 && (
             <p className="text-[11px] text-destructive flex items-center gap-1 mt-2">
               <AlertCircle size={11} /> Selecciona al menos una sede
             </p>
+          )}
+
+          {/* Panel de resolución de conflictos */}
+          {isSupervisor && conflicts.length > 0 && (
+            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-500/20">
+                <ShieldAlert size={14} className="text-amber-500 shrink-0" />
+                <p className="text-[12px] font-semibold text-amber-600 dark:text-amber-400">
+                  {unresolvedConflicts.length > 0
+                    ? `${unresolvedConflicts.length === 1 ? "Hay un supervisor activo" : `Hay ${unresolvedConflicts.length} supervisores activos"}`} — acción requerida`
+                    : "Conflictos resueltos — puedes guardar"}
+                </p>
+              </div>
+
+              <div className="divide-y divide-amber-500/10">
+                {conflicts.map((conflict) => (
+                  <div
+                    key={conflict.assignmentId}
+                    className={cn(
+                      "flex items-center justify-between gap-3 px-4 py-3 transition-colors",
+                      conflict.resolved ? "opacity-60" : "",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium text-foreground truncate">
+                        {getNombreSede(conflict.wsId)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Supervisor actual:{" "}
+                        <span className="font-medium">
+                          {conflict.nombreSupervisor}
+                        </span>
+                      </p>
+                    </div>
+
+                    {conflict.resolved ? (
+                      <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-2.5 py-1">
+                        <Check size={11} strokeWidth={3} /> Dado de baja
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={resolvingId === conflict.assignmentId}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleResolveConflict(conflict);
+                        }}
+                        className={cn(
+                          "shrink-0 h-8 px-3 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap",
+                          resolvingId === conflict.assignmentId
+                            ? "opacity-50 cursor-not-allowed border-border text-muted-foreground"
+                            : "bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500 hover:text-white hover:border-amber-500",
+                        )}
+                      >
+                        {resolvingId === conflict.assignmentId ? (
+                          <Loader2 size={11} className="animate-spin" />
+                        ) : null}
+                        Dar de baja y continuar
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {unresolvedConflicts.length > 0 && (
+                <div className="px-4 py-2.5 bg-amber-500/5 border-t border-amber-500/20">
+                  <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
+                    Da de baja al supervisor actual para poder registrar el
+                    nuevo. Esto cierra su asignación con fecha de hoy.
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -488,16 +726,16 @@ export const UserForm = ({
         </p>
         <div className="flex items-center gap-3">
           <Switch
-            checked={watch("activo")}
+            checked={watchedActivo}
             onCheckedChange={(val) => setValue("activo", val)}
           />
           <span
             className={cn(
               "text-sm transition-colors",
-              watch("activo") ? "text-foreground" : "text-muted-foreground",
+              watchedActivo ? "text-foreground" : "text-muted-foreground",
             )}
           >
-            {watch("activo") ? "Usuario activo" : "Usuario inactivo"}
+            {watchedActivo ? "Usuario activo" : "Usuario inactivo"}
           </span>
         </div>
       </div>
@@ -507,7 +745,9 @@ export const UserForm = ({
         <button
           type="submit"
           disabled={
-            isSubmitting || (needsWorkspace && selectedWsIds.length === 0)
+            isSubmitting ||
+            (needsWorkspace && selectedWsIds.length === 0) ||
+            hasBlockingConflicts // bloqueado solo si hay conflictos SIN resolver
           }
           className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -515,6 +755,8 @@ export const UserForm = ({
             <>
               <Loader2 size={16} className="animate-spin" /> Guardando...
             </>
+          ) : hasBlockingConflicts ? (
+            "Resuelve los conflictos primero"
           ) : isEditing ? (
             "Guardar cambios"
           ) : (

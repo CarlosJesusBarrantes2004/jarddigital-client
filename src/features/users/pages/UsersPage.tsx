@@ -70,6 +70,8 @@ export const UsersPage = () => {
     updateUser,
     deactivateUser,
     reactivateUser, // ← nuevo — ver hook
+    checkActiveSupervisorAssignment,
+    deactivateSupervisorAssignment,
   } = useUsers();
 
   const isDueno = currentUser?.rol?.codigo === "DUENO";
@@ -408,6 +410,8 @@ export const UsersPage = () => {
               currentUser={currentUser}
               onSave={handleSave}
               onCancel={() => setSheetOpen(false)}
+              checkActiveSupervisorAssignment={checkActiveSupervisorAssignment}
+              deactivateSupervisorAssignment={deactivateSupervisorAssignment}
             />
           </div>
         </SheetContent>

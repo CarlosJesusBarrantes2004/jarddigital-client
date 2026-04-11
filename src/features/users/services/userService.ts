@@ -87,6 +87,43 @@ export const userService = {
     await api.delete(`/users/empleados/${id}/`);
   },
 
+  deactivateSupervisorAssignment: async (
+    assignmentId: number,
+  ): Promise<void> => {
+    const today = new Date().toISOString().split("T")[0];
+
+    // Primero obtenemos la asignación para tener fecha_inicio
+    const { data: assignment } = await api.get(
+      `/users/asignaciones-supervisor/${assignmentId}/`,
+    );
+
+    await api.patch(`/users/asignaciones-supervisor/${assignmentId}/`, {
+      activo: false,
+      fecha_fin: today,
+      fecha_inicio: assignment.fecha_inicio, // evita el TypeError en el validador
+    });
+  },
+
+  getActiveSupervisorAssignment: async (
+    wsId: number,
+    excludeUserId?: number,
+  ): Promise<{
+    id: number;
+    id_supervisor: number;
+    nombre_supervisor: string;
+  } | null> => {
+    const params = new URLSearchParams({
+      id_modalidad_sede: String(wsId),
+      activo: "true",
+    });
+    const { data } = await api.get(`/users/asignaciones-supervisor/?${params}`);
+    const found = data.find(
+      (a: { id_supervisor: number; id: number; nombre_supervisor: string }) =>
+        a.id_supervisor !== excludeUserId,
+    );
+    return found ?? null;
+  },
+
   /**
    * FIX #1: Reactivar un colaborador usando el endpoint de detalle normal con PATCH { activo: true }.
    * El backend SoftDeleteModelViewSet lo maneja nativamente — no existe /reactivar/.

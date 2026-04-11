@@ -109,6 +109,34 @@ export const useUsers = () => {
     }
   }, [filters, currentUser?.rol?.codigo, activeWorkspace]);
 
+  const checkActiveSupervisorAssignment = useCallback(
+    async (
+      wsId: number,
+      excludeUserId?: number,
+    ): Promise<{
+      id: number;
+      id_supervisor: number;
+      nombre_supervisor: string;
+    } | null> => {
+      try {
+        return await userService.getActiveSupervisorAssignment(
+          wsId,
+          excludeUserId,
+        );
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  const deactivateSupervisorAssignment = useCallback(
+    async (assignmentId: number): Promise<void> => {
+      await userService.deactivateSupervisorAssignment(assignmentId);
+    },
+    [],
+  );
+
   // ── Effects ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchRoles();
@@ -224,6 +252,8 @@ export const useUsers = () => {
     createUser,
     updateUser,
     deactivateUser,
+    checkActiveSupervisorAssignment,
+    deactivateSupervisorAssignment,
     reactivateUser, // FIX #7
     refetch: () => {
       fetchUsers();
