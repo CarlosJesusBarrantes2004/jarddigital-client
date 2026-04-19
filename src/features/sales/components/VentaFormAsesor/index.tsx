@@ -891,6 +891,10 @@ export function VentaFormAsesor({
       return;
     }
 
+    if (reingresoMismoDNI && grabadorOrigenId !== undefined) {
+      form.setValue("id_grabador_audios", grabadorOrigenId);
+    }
+
     const values = form.getValues();
     if (!soloAudios && !esPendiente && !values.id_distrito_instalacion) {
       form.setError("id_distrito_instalacion", {
@@ -1616,7 +1620,14 @@ export function VentaFormAsesor({
                             <div className="relative">
                               <select
                                 disabled
-                                value={grabadorOrigenId ?? ""}
+                                value={field.value ?? grabadorOrigenId ?? ""}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value
+                                      ? Number(e.target.value)
+                                      : undefined,
+                                  )
+                                }
                                 className="w-full h-11 pl-3.5 pr-10 rounded-xl bg-muted opacity-60 border border-border text-sm font-sans outline-none appearance-none cursor-not-allowed"
                               >
                                 {grabadores.map((g) => (
