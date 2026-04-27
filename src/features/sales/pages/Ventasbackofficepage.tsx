@@ -14,12 +14,19 @@ import {
   Mic,
   Building2,
   MapPin,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-import { useVentas, useEstadosSOT, useEstadosAudio } from "../hooks/useSales";
+import {
+  useVentas,
+  useEstadosSOT,
+  useEstadosAudio,
+  useDeleteVentaAsesor,
+} from "../hooks/useSales";
 import { salesService } from "../services/sales.service";
 import type { Venta, VentaFiltros, EstadoSOT } from "../types/sales.types";
 import { DataTable } from "../components/VentasTable";
@@ -372,6 +379,29 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   const rol = user?.rol?.codigo?.toUpperCase() ?? "";
   const puedeEditar = rol === "SUPERVISOR" || rol === "COORDINADOR";
 
+  const esDueno = rol === "DUENO" || rol === "DUEÑO";
+
+  const [ventaParaEliminar, setVentaParaEliminar] = useState<Venta | null>(
+    null,
+  );
+  const { mutateAsync: eliminarVenta, isPending: eliminando } =
+    useDeleteVentaAsesor();
+
+  const handleEliminar = (v: Venta) => setVentaParaEliminar(v);
+
+  const confirmarEliminar = async () => {
+    if (!ventaParaEliminar) return;
+    try {
+      await eliminarVenta(ventaParaEliminar.id);
+      toast.success(
+        `Venta de ${ventaParaEliminar.cliente_nombre} eliminada correctamente`,
+      );
+      setVentaParaEliminar(null);
+    } catch {
+      toast.error("No se pudo eliminar la venta. Inténtalo de nuevo.");
+    }
+  };
+
   const [ventaParaEditar, setVentaParaEditar] = useState<Venta | null>(null);
   const handleEditar = (v: Venta) => setVentaParaEditar(v);
   const handleCerrarEditar = () => setVentaParaEditar(null);
@@ -436,9 +466,17 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
         handleToggleOrdenFecha,
         setVentaDetalle,
         puedeEditar ? handleEditar : null,
+        esDueno ? handleEliminar : null,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [estadosSOTData, estadosAudio, soloLectura, ordenFecha, puedeEditar],
+    [
+      estadosSOTData,
+      estadosAudio,
+      soloLectura,
+      ordenFecha,
+      puedeEditar,
+      esDueno,
+    ],
   );
 
   const tieneFechas = !!fechaDesde || !!fechaHasta;
@@ -730,6 +768,57 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
           onClose={handleCerrarEditar}
           ventaOrigen={ventaParaEditar}
         />
+      )}
+
+      {ventaParaEliminar && (
+        <>
+          <div
+            className="fixed inset-0 z-[2000] bg-black/40 animate-in fade-in"
+            onClick={() => setVentaParaEliminar(null)}
+          />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[2001] w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle size={24} className="text-destructive" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground text-lg">
+                  ¿Eliminar esta venta?
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Esta acción <strong>no se puede deshacer</strong>. Se
+                  eliminará permanentemente la venta de{" "}
+                  <span className="font-medium text-foreground">
+                    {ventaParaEliminar.cliente_nombre}
+                  </span>
+                  .
+                </p>
+              </div>
+              <div className="flex gap-3 w-full">
+                <Button
+                  variant="outline"
+                  className="flex-1 rounded-xl"
+                  onClick={() => setVentaParaEliminar(null)}
+                  disabled={eliminando}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 rounded-xl bg-destructive hover:bg-destructive/90 text-white gap-2"
+                  onClick={confirmarEliminar}
+                  disabled={eliminando}
+                >
+                  {eliminando ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                  {eliminando ? "Eliminando…" : "Sí, eliminar"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

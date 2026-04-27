@@ -16,6 +16,7 @@ import {
   Hash,
   Clock,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT, EstadoAudio } from "../../types/sales.types";
@@ -182,6 +183,7 @@ export function buildColumnsBackoffice(
   onToggleOrdenFecha?: () => void,
   onVerDetalle?: (v: Venta) => void,
   onEditar?: ((v: Venta) => void) | null,
+  onEliminar?: ((v: Venta) => void) | null,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -519,6 +521,17 @@ export function buildColumnsBackoffice(
                 title="Editar venta"
               >
                 <Pencil size={14} />
+              </button>
+            )}
+
+            {onEliminar && (
+              <button
+                type="button"
+                onClick={() => onEliminar(v)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:border-destructive/50 transition-all"
+                title="Eliminar venta definitivamente"
+              >
+                <Trash2 size={14} />
               </button>
             )}
 
