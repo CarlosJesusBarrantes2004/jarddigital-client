@@ -67,6 +67,16 @@ const SECTIONS: RouteSection[] = [
         href: "/sales",
         roles: ["BACKOFFICE", "SUPERVISOR", "COORDINADOR", "DUENO"],
       },
+      {
+        label: "Mi Seguimiento",
+        href: "/tracking",
+        roles: ["ASESOR"],
+      },
+      {
+        label: "Seguimiento",
+        href: "/tracking",
+        roles: ["BACKOFFICE", "SUPERVISOR", "COORDINADOR", "DUENO", "RRHH"],
+      },
     ],
   },
   {
