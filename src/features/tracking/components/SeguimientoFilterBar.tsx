@@ -1,0 +1,262 @@
+// ============================================================
+// SeguimientoFilters.tsx
+// Filter bar for the tracking table - supports both roles
+// ============================================================
+
+import { useState } from "react";
+import { Search, Filter, X, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { MESES_ES } from "../utils";
+import type {
+  SeguimientoFilters,
+  EstadoSeguimientoType,
+  GeneroCliente,
+} from "../types";
+
+interface FilterBarProps {
+  filters: SeguimientoFilters;
+  onChange: (filters: SeguimientoFilters) => void;
+  role: "encargado" | "asesor";
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "h-7 px-3 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap",
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-transparent text-muted-foreground border-border hover:border-primary/40 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Select({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { label: string; value: string }[];
+  placeholder: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-8 pl-2.5 pr-7 rounded-lg border border-border bg-background text-[12px] text-foreground appearance-none focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={12}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+      />
+    </div>
+  );
+}
+
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1];
+
+export function SeguimientoFilterBar({
+  filters,
+  onChange,
+  role,
+}: FilterBarProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const activeCount = Object.entries(filters).filter(
+    ([k, v]) => k !== "search" && v !== undefined && v !== "" && v !== null,
+  ).length;
+
+  const update = (partial: Partial<SeguimientoFilters>) =>
+    onChange({ ...filters, ...partial });
+
+  const clear = () => onChange({});
+
+  return (
+    <div className="space-y-3">
+      {/* Row 1: Search + toggle */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-[360px]">
+          <Search
+            size={13}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          />
+          <input
+            value={filters.search ?? ""}
+            onChange={(e) => update({ search: e.target.value || undefined })}
+            placeholder="Buscar por código, nombre, código de pago..."
+            className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          />
+          {filters.search && (
+            <button
+              type="button"
+              onClick={() => update({ search: undefined })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className={cn(
+            "flex items-center gap-2 h-8 px-3 rounded-lg border text-[12px] font-medium transition-all",
+            showAdvanced || activeCount > 0
+              ? "border-primary/40 bg-primary/5 text-primary"
+              : "border-border text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Filter size={12} />
+          Filtros
+          {activeCount > 0 && (
+            <span className="bg-primary text-primary-foreground text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+              {activeCount}
+            </span>
+          )}
+        </button>
+
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={clear}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Row 2: Quick chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterChip
+          label="Alto Valor"
+          active={filters.es_alto_valor === true}
+          onClick={() =>
+            update({
+              es_alto_valor: filters.es_alto_valor === true ? undefined : true,
+            })
+          }
+        />
+        <FilterChip
+          label="Primer Mes Pagado"
+          active={filters.primer_mes_pagado === true}
+          onClick={() =>
+            update({
+              primer_mes_pagado:
+                filters.primer_mes_pagado === true ? undefined : true,
+            })
+          }
+        />
+        <FilterChip
+          label="Sin primer pago"
+          active={filters.primer_mes_pagado === false}
+          onClick={() =>
+            update({
+              primer_mes_pagado:
+                filters.primer_mes_pagado === false ? undefined : false,
+            })
+          }
+        />
+        <FilterChip
+          label="Con descuento"
+          active={filters.descuento_realizado === true}
+          onClick={() =>
+            update({
+              descuento_realizado:
+                filters.descuento_realizado === true ? undefined : true,
+            })
+          }
+        />
+
+        {/* Estado chips */}
+        {(
+          ["PENALIZADO", "SUSPENDIDO", "DESACTIVADO"] as EstadoSeguimientoType[]
+        ).map((e) => (
+          <FilterChip
+            key={e}
+            label={e.charAt(0) + e.slice(1).toLowerCase()}
+            active={filters.estado === e}
+            onClick={() =>
+              update({ estado: filters.estado === e ? undefined : e })
+            }
+          />
+        ))}
+
+        {/* Género chips — only for encargado */}
+        {role === "encargado" && (
+          <>
+            <FilterChip
+              label="Masculino"
+              active={filters.genero === "M"}
+              onClick={() =>
+                update({ genero: filters.genero === "M" ? undefined : "M" })
+              }
+            />
+            <FilterChip
+              label="Femenino"
+              active={filters.genero === "F"}
+              onClick={() =>
+                update({ genero: filters.genero === "F" ? undefined : "F" })
+              }
+            />
+          </>
+        )}
+      </div>
+
+      {/* Advanced filters panel */}
+      {showAdvanced && (
+        <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-border/50">
+          <Select
+            value={String(filters.mes_instalacion ?? "")}
+            onChange={(v) =>
+              update({ mes_instalacion: v ? Number(v) : undefined })
+            }
+            placeholder="Mes de instalación"
+            options={MESES_ES.map((m, i) => ({
+              label: m,
+              value: String(i + 1),
+            }))}
+            className="w-44"
+          />
+          <Select
+            value={String(filters.anio_instalacion ?? "")}
+            onChange={(v) =>
+              update({ anio_instalacion: v ? Number(v) : undefined })
+            }
+            placeholder="Año"
+            options={ANIOS.map((a) => ({ label: String(a), value: String(a) }))}
+            className="w-28"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
