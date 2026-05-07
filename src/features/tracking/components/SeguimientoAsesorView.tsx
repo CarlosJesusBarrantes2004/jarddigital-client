@@ -205,7 +205,13 @@ function MesGroup({
 }
 
 export function SeguimientoAsesorView() {
-  const [filters, setFilters] = useState<SeguimientoFilters>({});
+  const [filters, setFilters] = useState<SeguimientoFilters>(() => {
+    const now = new Date();
+    return {
+      mes_instalacion: now.getMonth() + 1,
+      anio_instalacion: now.getFullYear(),
+    };
+  });
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [showPrimerPago, setShowPrimerPago] = useState<boolean | undefined>(

@@ -1,12 +1,8 @@
-// ============================================================
-// SeguimientoFilters.tsx
-// Filter bar for the tracking table - supports both roles
-// ============================================================
-
 import { useState } from "react";
-import { Search, Filter, X, ChevronDown } from "lucide-react";
+import { Search, Filter, X, ChevronDown, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MESES_ES } from "../utils";
+import { exportarExcelPendientes } from "../api";
 import type {
   SeguimientoFilters,
   EstadoSeguimientoType,
@@ -88,6 +84,7 @@ export function SeguimientoFilterBar({
   role,
 }: FilterBarProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const activeCount = Object.entries(filters).filter(
     ([k, v]) => k !== "search" && v !== undefined && v !== "" && v !== null,
@@ -98,9 +95,20 @@ export function SeguimientoFilterBar({
 
   const clear = () => onChange({});
 
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      await exportarExcelPendientes();
+    } catch (error) {
+      console.error("Error al exportar Excel", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
-      {/* Row 1: Search + toggle */}
+      {/* Row 1: Search + toggles + Export */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-[360px]">
           <Search
@@ -152,6 +160,18 @@ export function SeguimientoFilterBar({
             <X size={12} /> Limpiar
           </button>
         )}
+
+        {role === "encargado" && (
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={isExporting}
+            className="ml-auto flex items-center gap-1.5 h-8 px-3 rounded-lg bg-emerald-600 text-white text-[12px] font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+          >
+            <Download size={13} />
+            {isExporting ? "Generando..." : "Exportar Pendientes"}
+          </button>
+        )}
       </div>
 
       {/* Row 2: Quick chips */}
@@ -195,8 +215,18 @@ export function SeguimientoFilterBar({
             })
           }
         />
+        {/* NUEVO: Filtro Sin Descuento */}
+        <FilterChip
+          label="Sin descuento"
+          active={filters.descuento_realizado === false}
+          onClick={() =>
+            update({
+              descuento_realizado:
+                filters.descuento_realizado === false ? undefined : false,
+            })
+          }
+        />
 
-        {/* Estado chips */}
         {(
           ["PENALIZADO", "SUSPENDIDO", "DESACTIVADO"] as EstadoSeguimientoType[]
         ).map((e) => (
@@ -210,7 +240,6 @@ export function SeguimientoFilterBar({
           />
         ))}
 
-        {/* Género chips — only for encargado */}
         {role === "encargado" && (
           <>
             <FilterChip
@@ -233,28 +262,80 @@ export function SeguimientoFilterBar({
 
       {/* Advanced filters panel */}
       {showAdvanced && (
-        <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-border/50">
-          <Select
-            value={String(filters.mes_instalacion ?? "")}
-            onChange={(v) =>
-              update({ mes_instalacion: v ? Number(v) : undefined })
-            }
-            placeholder="Mes de instalación"
-            options={MESES_ES.map((m, i) => ({
-              label: m,
-              value: String(i + 1),
-            }))}
-            className="w-44"
-          />
-          <Select
-            value={String(filters.anio_instalacion ?? "")}
-            onChange={(v) =>
-              update({ anio_instalacion: v ? Number(v) : undefined })
-            }
-            placeholder="Año"
-            options={ANIOS.map((a) => ({ label: String(a), value: String(a) }))}
-            className="w-28"
-          />
+        <div className="flex items-center gap-4 flex-wrap pt-3 border-t border-border/50">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
+              Instalación:
+            </span>
+            <Select
+              value={String(filters.mes_instalacion ?? "")}
+              onChange={(v) =>
+                update({ mes_instalacion: v ? Number(v) : undefined })
+              }
+              placeholder="Mes"
+              options={MESES_ES.map((m, i) => ({
+                label: m,
+                value: String(i + 1),
+              }))}
+              className="w-32"
+            />
+            <Select
+              value={String(filters.anio_instalacion ?? "")}
+              onChange={(v) =>
+                update({ anio_instalacion: v ? Number(v) : undefined })
+              }
+              placeholder="Año"
+              options={ANIOS.map((a) => ({
+                label: String(a),
+                value: String(a),
+              }))}
+              className="w-24"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
+              Pago Desde/Hasta:
+            </span>
+            <input
+              type="date"
+              value={filters.fecha_pago_desde ?? ""}
+              onChange={(e) =>
+                update({ fecha_pago_desde: e.target.value || undefined })
+              }
+              className="h-8 px-2 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+            <input
+              type="date"
+              value={filters.fecha_pago_hasta ?? ""}
+              onChange={(e) =>
+                update({ fecha_pago_hasta: e.target.value || undefined })
+              }
+              className="h-8 px-2 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
+              Seguim. Desde/Hasta:
+            </span>
+            <input
+              type="date"
+              value={filters.fecha_seguimiento_desde ?? ""}
+              onChange={(e) =>
+                update({ fecha_seguimiento_desde: e.target.value || undefined })
+              }
+              className="h-8 px-2 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+            <input
+              type="date"
+              value={filters.fecha_seguimiento_hasta ?? ""}
+              onChange={(e) =>
+                update({ fecha_seguimiento_hasta: e.target.value || undefined })
+              }
+              className="h-8 px-2 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+          </div>
         </div>
       )}
     </div>

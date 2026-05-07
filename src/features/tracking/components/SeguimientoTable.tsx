@@ -5,19 +5,16 @@ import {
   XCircle,
   ChevronUp,
   ChevronDown,
-  AlertTriangle,
   Minus,
   CreditCard,
   Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
-import { formatDate, nombreMes } from "../utils";
+import { formatDate } from "../utils";
 import { SeguimientoFilterBar } from "./SeguimientoFilterBar";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
 import type { Seguimiento, SeguimientoFilters } from "../types";
-
-// ─── Badge components ─────────────────────────────────────────
 
 function PagoBadge({ paid }: { paid: boolean }) {
   return paid ? (
@@ -46,8 +43,6 @@ function EstadoTag({ estado }: { estado: string | null | undefined }) {
   );
 }
 
-// ─── Row ─────────────────────────────────────────────────────
-
 function SeguimientoRow({
   seg,
   onView,
@@ -59,11 +54,8 @@ function SeguimientoRow({
     seg.meses_evaluados?.slice().sort((a, b) => a.mes_numero - b.mes_numero) ??
     [];
 
-  console.log(seg);
-
   return (
     <tr className="group border-b border-border/40 hover:bg-muted/30 transition-colors">
-      {/* Cliente */}
       <td className="px-3 py-3 min-w-[180px]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary shrink-0">
@@ -78,6 +70,7 @@ function SeguimientoRow({
                 <Star
                   size={10}
                   className="text-amber-500 shrink-0 fill-amber-500"
+                  title="Alto Valor"
                 />
               )}
             </div>
@@ -88,7 +81,6 @@ function SeguimientoRow({
         </div>
       </td>
 
-      {/* Género */}
       <td className="px-3 py-3 text-center">
         <span
           className={cn(
@@ -102,21 +94,32 @@ function SeguimientoRow({
         </span>
       </td>
 
-      {/* F. Instalación */}
+      {/* NUEVO: Asesor */}
+      <td className="px-3 py-3">
+        <span className="text-[11px] font-medium text-foreground truncate block max-w-[120px]">
+          {seg.venta.id_asesor?.nombre_completo ?? "—"}
+        </span>
+      </td>
+
+      {/* NUEVO: Producto */}
+      <td className="px-3 py-3">
+        <span className="text-[11px] text-muted-foreground truncate block max-w-[120px]">
+          {seg.venta.id_producto?.nombre ?? "—"}
+        </span>
+      </td>
+
       <td className="px-3 py-3 text-center">
         <span className="text-[12px] text-muted-foreground font-mono">
           {formatDate(seg.venta.fecha_real_inst)}
         </span>
       </td>
 
-      {/* Ciclo */}
       <td className="px-3 py-3 text-center">
         <span className="text-[12px] text-foreground font-mono">
           {formatDate(seg.ciclo_facturacion)}
         </span>
       </td>
 
-      {/* Código pago */}
       <td className="px-3 py-3">
         {seg.codigo_pago ? (
           <div className="flex items-center gap-1.5">
@@ -130,7 +133,6 @@ function SeguimientoRow({
         )}
       </td>
 
-      {/* 6 months columns */}
       {Array.from({ length: 6 }, (_, i) => {
         const mes = meses.find((m) => m.mes_numero === i + 1);
         return (
@@ -158,12 +160,10 @@ function SeguimientoRow({
         );
       })}
 
-      {/* Estado */}
       <td className="px-3 py-3 text-center">
         <EstadoTag estado={seg.estado} />
       </td>
 
-      {/* Descuento */}
       <td className="px-3 py-3 text-center">
         {seg.descuento_realizado ? (
           <CheckCircle2 size={13} className="text-emerald-500 mx-auto" />
@@ -172,7 +172,6 @@ function SeguimientoRow({
         )}
       </td>
 
-      {/* Actions */}
       <td className="px-3 py-3">
         <button
           type="button"
@@ -186,10 +185,16 @@ function SeguimientoRow({
   );
 }
 
-// ─── Main Table ───────────────────────────────────────────────
-
 export function SeguimientoTable() {
-  const [filters, setFilters] = useState<SeguimientoFilters>({});
+  // Inicializamos los filtros con el mes y año actual
+  const [filters, setFilters] = useState<SeguimientoFilters>(() => {
+    const now = new Date();
+    return {
+      mes_instalacion: now.getMonth() + 1,
+      anio_instalacion: now.getFullYear(),
+    };
+  });
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [ordering, setOrdering] = useState<string>(
     "-id_venta__fecha_real_inst",
@@ -236,7 +241,6 @@ export function SeguimientoTable() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Filters */}
       <div className="p-4 border-b border-border bg-background/60 backdrop-blur-sm shrink-0">
         <SeguimientoFilterBar
           filters={filters}
@@ -245,10 +249,8 @@ export function SeguimientoTable() {
         />
       </div>
 
-      {/* Count */}
       <div className="px-4 py-2.5 flex items-center gap-2 shrink-0">
         <span className="text-[12px] text-muted-foreground">
-          {/* 2. MODIFICAMOS AQUÍ: Usamos totalCount */}
           {isLoading ? "Cargando..." : `${totalCount} seguimientos`}
         </span>
         {totalCount > 0 && (
@@ -258,13 +260,14 @@ export function SeguimientoTable() {
         )}
       </div>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full">
-        <table className="w-full border-collapse min-w-[1100px]">
+        <table className="w-full border-collapse min-w-[1300px]">
           <thead className="sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <tr className="border-b border-border">
               <ThCol label="Cliente" field="id_venta__cliente_nombre" />
               <ThCol label="G." className="text-center" />
+              <ThCol label="Asesor" field="id_venta__id_asesor__nombre" />
+              <ThCol label="Producto" />
               <ThCol
                 label="F. Inst."
                 field="id_venta__fecha_real_inst"
@@ -293,7 +296,7 @@ export function SeguimientoTable() {
             {isLoading ? (
               Array.from({ length: 8 }, (_, i) => (
                 <tr key={i} className="border-b border-border/30">
-                  {Array.from({ length: 14 }, (_, j) => (
+                  {Array.from({ length: 16 }, (_, j) => (
                     <td key={j} className="px-3 py-3">
                       <div className="h-4 bg-muted rounded animate-pulse" />
                     </td>
@@ -303,7 +306,7 @@ export function SeguimientoTable() {
             ) : seguimientos.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={16}
                   className="px-3 py-16 text-center text-muted-foreground text-[13px]"
                 >
                   No se encontraron seguimientos con los filtros actuales.
@@ -322,7 +325,6 @@ export function SeguimientoTable() {
         </table>
       </div>
 
-      {/* Drawer */}
       {selectedId !== null && (
         <SeguimientoDrawer
           seguimientoId={selectedId}

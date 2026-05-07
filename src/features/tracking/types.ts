@@ -67,6 +67,10 @@ export interface SeguimientoFilters {
   genero?: GeneroCliente;
   search?: string;
   ordering?: string;
+  fecha_pago_desde?: string;
+  fecha_pago_hasta?: string;
+  fecha_seguimiento_desde?: string;
+  fecha_seguimiento_hasta?: string;
 }
 
 // ─── Update payloads ─────────────────────────────────────────

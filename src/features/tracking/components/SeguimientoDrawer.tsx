@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -82,11 +83,13 @@ function MesCard({
   mes,
   seguimientoId,
   isBlocked,
+  isPenalizado, // NUEVA prop para bloquear todo
   isLast,
 }: {
   mes: SeguimientoMensual;
   seguimientoId: number;
   isBlocked: boolean;
+  isPenalizado: boolean;
   isLast: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -99,12 +102,13 @@ function MesCard({
   });
 
   const updateMes = useUpdateSeguimientoMensual();
-  const updateSeg = useUpdateSeguimiento();
-
   const isPaid = mes.pago_cliente_realizado;
 
+  // Si está penalizado, deshabilitamos todo intento de edición
+  const canEdit = !isBlocked && !isPenalizado;
+
   const handleTogglePago = () => {
-    if (isBlocked && !isPaid) return; // can't pay if prev month unpaid
+    if (isPenalizado || (isBlocked && !isPaid)) return;
     updateMes.mutate({
       id: mes.id,
       seguimientoId,
@@ -132,26 +136,23 @@ function MesCard({
         "relative rounded-xl border transition-all duration-200",
         isPaid
           ? "border-emerald-500/40 bg-emerald-500/5"
-          : isBlocked
+          : isBlocked || isPenalizado
             ? "border-border/30 bg-muted/20 opacity-60"
             : "border-border bg-card",
       )}
     >
-      {/* Connector line */}
       {!isLast && (
         <div className="absolute left-[23px] top-full h-3 w-px bg-border/50 z-10" />
       )}
 
       <div className="p-4">
-        {/* Header row */}
         <div className="flex items-center gap-3 mb-3">
-          {/* Month badge */}
           <div
             className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 border-2",
               isPaid
                 ? "border-emerald-500 bg-emerald-500 text-white"
-                : isBlocked
+                : isBlocked || isPenalizado
                   ? "border-border/40 bg-muted text-muted-foreground"
                   : "border-primary/40 bg-primary/10 text-primary",
             )}
@@ -164,17 +165,35 @@ function MesCard({
               <span className="text-[13px] font-semibold text-foreground">
                 Mes {mes.mes_numero}
               </span>
+
+              {/* Etiqueta CONFORME / INCONFORME */}
               {mes.conformidad && (
-                <span
-                  className={cn(
-                    "text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
-                    mes.conformidad === "CONFORME"
-                      ? "bg-blue-500/15 text-blue-600"
-                      : "bg-orange-500/15 text-orange-600",
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
+                      mes.conformidad === "CONFORME"
+                        ? "bg-blue-500/15 text-blue-600"
+                        : "bg-orange-500/15 text-orange-600",
+                    )}
+                  >
+                    {mes.conformidad}
+                  </span>
+
+                  {/* Tooltip Cuadro flotante para Inconforme */}
+                  {mes.conformidad === "INCONFORME" && mes.observacion && (
+                    <div className="group relative flex items-center justify-center">
+                      <AlertCircle
+                        size={13}
+                        className="text-orange-500 cursor-help hover:text-orange-600 transition-colors"
+                      />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 bg-popover/95 backdrop-blur text-popover-foreground text-[11px] font-medium leading-relaxed rounded-lg shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        {mes.observacion}
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-b border-r border-border rotate-45" />
+                      </div>
+                    </div>
                   )}
-                >
-                  {mes.conformidad}
-                </span>
+                </div>
               )}
             </div>
             <div className="flex gap-4 mt-0.5">
@@ -189,9 +208,8 @@ function MesCard({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
-            {!isBlocked && (
+            {canEdit && (
               <button
                 type="button"
                 onClick={() => setEditing(!editing)}
@@ -203,17 +221,19 @@ function MesCard({
             <button
               type="button"
               onClick={handleTogglePago}
-              disabled={isBlocked && !isPaid}
+              disabled={isPenalizado || (isBlocked && !isPaid)}
               title={
-                isBlocked && !isPaid
-                  ? "El mes anterior aún no ha sido pagado"
-                  : undefined
+                isPenalizado
+                  ? "Venta Penalizada"
+                  : isBlocked && !isPaid
+                    ? "El mes anterior aún no ha sido pagado"
+                    : undefined
               }
               className={cn(
                 "flex items-center gap-1.5 px-3 h-7 rounded-lg text-[11px] font-semibold transition-all",
                 isPaid
                   ? "bg-emerald-500/20 text-emerald-600 hover:bg-emerald-500/30"
-                  : isBlocked
+                  : isPenalizado || isBlocked
                     ? "bg-muted text-muted-foreground cursor-not-allowed"
                     : "bg-primary/10 text-primary hover:bg-primary/20",
               )}
@@ -224,7 +244,6 @@ function MesCard({
           </div>
         </div>
 
-        {/* Editing panel */}
         {editing && (
           <div className="mt-3 pt-3 border-t border-border/50 space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -325,23 +344,6 @@ function MesCard({
             </div>
           </div>
         )}
-
-        {/* Observation preview */}
-        {!editing && mes.observacion && (
-          <button
-            type="button"
-            onClick={() => setShowObs(!showObs)}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-2"
-          >
-            {showObs ? <EyeOff size={11} /> : <Eye size={11} />}
-            {showObs ? "Ocultar" : "Ver"} observación
-          </button>
-        )}
-        {showObs && mes.observacion && (
-          <p className="mt-2 text-[12px] text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
-            {mes.observacion}
-          </p>
-        )}
       </div>
     </div>
   );
@@ -360,6 +362,7 @@ export function SeguimientoDrawer({
 }: SeguimientoDrawerProps) {
   const { data: seg, isLoading } = useSeguimiento(seguimientoId);
   const updateSeg = useUpdateSeguimiento();
+
   const [editingHeader, setEditingHeader] = useState(false);
   const [headerForm, setHeaderForm] = useState<{
     codigo_pago: string;
@@ -372,8 +375,6 @@ export function SeguimientoDrawer({
     estado: "",
     descuento_realizado: false,
   });
-
-  console.log(seg);
 
   const openHeaderEdit = () => {
     if (!seg) return;
@@ -410,6 +411,8 @@ export function SeguimientoDrawer({
     const prev = meses.find((m) => m.mes_numero === mesNum - 1);
     return !prev?.pago_cliente_realizado;
   };
+
+  const isPenalizado = seg?.estado === "PENALIZADO";
 
   return (
     <>
@@ -636,6 +639,7 @@ export function SeguimientoDrawer({
                         mes={mes}
                         seguimientoId={seg.id}
                         isBlocked={isBlocked(mes.mes_numero)}
+                        isPenalizado={isPenalizado}
                         isLast={idx === meses.length - 1}
                       />
                     ))}
