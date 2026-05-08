@@ -3,11 +3,7 @@ import { Search, Filter, X, ChevronDown, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MESES_ES } from "../utils";
 import { exportarExcelPendientes } from "../api";
-import type {
-  SeguimientoFilters,
-  EstadoSeguimientoType,
-  GeneroCliente,
-} from "../types";
+import type { SeguimientoFilters, EstadoSeguimientoType } from "../types";
 
 interface FilterBarProps {
   filters: SeguimientoFilters;
@@ -118,7 +114,7 @@ export function SeguimientoFilterBar({
           <input
             value={filters.search ?? ""}
             onChange={(e) => update({ search: e.target.value || undefined })}
-            placeholder="Buscar por código, nombre, código de pago..."
+            placeholder="Buscar por código, nombre, pago..."
             className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
           {filters.search && (
@@ -176,6 +172,26 @@ export function SeguimientoFilterBar({
 
       {/* Row 2: Quick chips */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* CORRECCIÓN QA: Filtros de Género movidos al principio */}
+        {role === "encargado" && (
+          <>
+            <FilterChip
+              label="Masculino"
+              active={filters.genero === "M"}
+              onClick={() =>
+                update({ genero: filters.genero === "M" ? undefined : "M" })
+              }
+            />
+            <FilterChip
+              label="Femenino"
+              active={filters.genero === "F"}
+              onClick={() =>
+                update({ genero: filters.genero === "F" ? undefined : "F" })
+              }
+            />
+          </>
+        )}
+
         <FilterChip
           label="Alto Valor"
           active={filters.es_alto_valor === true}
@@ -215,7 +231,6 @@ export function SeguimientoFilterBar({
             })
           }
         />
-        {/* NUEVO: Filtro Sin Descuento */}
         <FilterChip
           label="Sin descuento"
           active={filters.descuento_realizado === false}
@@ -239,25 +254,6 @@ export function SeguimientoFilterBar({
             }
           />
         ))}
-
-        {role === "encargado" && (
-          <>
-            <FilterChip
-              label="Masculino"
-              active={filters.genero === "M"}
-              onClick={() =>
-                update({ genero: filters.genero === "M" ? undefined : "M" })
-              }
-            />
-            <FilterChip
-              label="Femenino"
-              active={filters.genero === "F"}
-              onClick={() =>
-                update({ genero: filters.genero === "F" ? undefined : "F" })
-              }
-            />
-          </>
-        )}
       </div>
 
       {/* Advanced filters panel */}

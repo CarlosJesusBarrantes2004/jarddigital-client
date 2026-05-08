@@ -24,6 +24,7 @@ export interface VentaParaSeguimiento {
   cliente_nombre: string;
   cliente_apellido?: string;
   cliente_dni?: string;
+  cliente_telefono?: string; // <-- AÑADIDO PARA EL REPORTE DE QA
   cliente_direccion?: string;
   cliente_fecha_nacimiento?: string;
   cliente_lugar_nacimiento?: string;

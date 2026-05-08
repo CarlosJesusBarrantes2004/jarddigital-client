@@ -470,6 +470,10 @@ export function SeguimientoDrawer({
                     value={seg.venta.direccion_detalle}
                   />
                   <DataRow
+                    label="Teléfono"
+                    value={seg.venta.cliente_telefono}
+                  />
+                  <DataRow
                     label="F. Nacimiento"
                     value={formatDate(seg.venta.cliente_fecha_nacimiento)}
                   />

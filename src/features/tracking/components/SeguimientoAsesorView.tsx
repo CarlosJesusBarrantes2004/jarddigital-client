@@ -9,6 +9,7 @@ import {
   Calendar,
   Star,
   Minus,
+  Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
@@ -33,6 +34,9 @@ function mesLabel(key: string) {
   return `${MESES_ES[parseInt(m) - 1]} ${y}`;
 }
 
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1];
+
 function AsesorSeguimientoCard({
   seg,
   onView,
@@ -45,12 +49,10 @@ function AsesorSeguimientoCard({
 
   return (
     <div className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/30 transition-colors border-b border-border/30 last:border-0 group">
-      {/* Avatar */}
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary shrink-0">
         {seg.venta.cliente_nombre?.substring(0, 2).toUpperCase()}
       </div>
 
-      {/* Client info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-semibold text-foreground truncate">
@@ -63,19 +65,29 @@ function AsesorSeguimientoCard({
             />
           )}
         </div>
+
         <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-[10px] font-mono text-muted-foreground">
+          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5">
             {seg.venta.codigo_sot}
+            {/* CORRECCIÓN QA: Celular añadido a la vista del Asesor */}
+            {seg.venta.cliente_telefono && (
+              <>
+                <span className="text-border">•</span>
+                <span className="flex items-center gap-0.5">
+                  <Phone size={9} />
+                  {seg.venta.cliente_telefono}
+                </span>
+              </>
+            )}
           </span>
           {seg.venta.id_producto?.nombre && (
-            <span className="text-[10px] text-muted-foreground/70">
+            <span className="text-[10px] text-muted-foreground/70 hidden sm:block">
               {seg.venta.id_producto.nombre}
             </span>
           )}
         </div>
       </div>
 
-      {/* Fecha instalación */}
       <div className="text-center hidden sm:block">
         <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
           Instalado
@@ -85,7 +97,6 @@ function AsesorSeguimientoCard({
         </div>
       </div>
 
-      {/* Código pago */}
       <div className="text-center w-28 hidden md:block">
         <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-0.5">
           Cód. Pago
@@ -100,7 +111,6 @@ function AsesorSeguimientoCard({
         )}
       </div>
 
-      {/* Primer mes pagado */}
       <div className="flex flex-col items-center gap-0.5 w-24 shrink-0">
         <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
           Mes 1
@@ -129,7 +139,6 @@ function AsesorSeguimientoCard({
         )}
       </div>
 
-      {/* View button */}
       <button
         type="button"
         onClick={onView}
@@ -159,7 +168,6 @@ function MesGroup({
 
   return (
     <div className="border border-border rounded-xl overflow-hidden mb-3">
-      {/* Group header */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -172,7 +180,6 @@ function MesGroup({
         <span className="text-[11px] font-mono text-muted-foreground">
           {segs.length} ventas · {pagados}/{segs.length} pagados
         </span>
-        {/* Progress bar */}
         <div className="w-24 h-1.5 rounded-full bg-border overflow-hidden hidden sm:block">
           <div
             className="h-full rounded-full bg-emerald-500 transition-all"
@@ -188,7 +195,6 @@ function MesGroup({
         )}
       </button>
 
-      {/* Rows */}
       {open && (
         <div className="divide-y-0">
           {segs.map((seg) => (
@@ -224,7 +230,6 @@ export function SeguimientoAsesorView() {
     primer_mes_pagado: showPrimerPago,
   });
 
-  // Aseguramos que la lectura sea compatible si data es un Array directo o un objeto con .results
   const seguimientos = Array.isArray(data) ? data : (data?.results ?? []);
   const totalCount = Array.isArray(data) ? data.length : (data?.count ?? 0);
 
@@ -232,10 +237,9 @@ export function SeguimientoAsesorView() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
       <div className="p-4 border-b border-border bg-background/60 backdrop-blur-sm shrink-0 space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-[320px]">
+          <div className="relative flex-1 max-w-[280px]">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -244,7 +248,48 @@ export function SeguimientoAsesorView() {
             />
           </div>
 
-          {/* Primer mes filter */}
+          {/* CORRECCIÓN QA: Controles de Mes y Año para navegar por el historial del asesor */}
+          <div className="flex items-center gap-2 mr-2">
+            <select
+              value={filters.mes_instalacion ?? ""}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  mes_instalacion: e.target.value
+                    ? Number(e.target.value)
+                    : undefined,
+                })
+              }
+              className="h-8 pl-2 pr-6 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
+            >
+              <option value="">Todo (Mes)</option>
+              {MESES_ES.map((m, i) => (
+                <option key={i} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filters.anio_instalacion ?? ""}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  anio_instalacion: e.target.value
+                    ? Number(e.target.value)
+                    : undefined,
+                })
+              }
+              className="h-8 pl-2 pr-6 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
+            >
+              <option value="">Todo (Año)</option>
+              {ANIOS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground font-mono">
               Mes 1:
@@ -272,7 +317,6 @@ export function SeguimientoAsesorView() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-auto p-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full">
         {isLoading ? (
           <div className="space-y-3">
@@ -284,8 +328,14 @@ export function SeguimientoAsesorView() {
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <div className="flex items-center justify-center h-40 text-muted-foreground text-[13px]">
-            No hay ventas en seguimiento.
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-[13px] gap-2">
+            <span>No hay ventas en seguimiento para este mes.</span>
+            <button
+              onClick={() => setFilters({})}
+              className="text-primary hover:underline font-semibold"
+            >
+              Ver todo el historial
+            </button>
           </div>
         ) : (
           groups.map(([key, segs]) => (

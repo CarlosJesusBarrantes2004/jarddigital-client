@@ -8,6 +8,7 @@ import {
   Minus,
   CreditCard,
   Star,
+  Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
@@ -74,8 +75,18 @@ function SeguimientoRow({
                 />
               )}
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground">
+            {/* CORRECCIÓN QA: Celular añadido */}
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5 mt-0.5">
               {seg.venta.codigo_sot}
+              {seg.venta.cliente_telefono && (
+                <>
+                  <span className="text-border">•</span>
+                  <span className="flex items-center gap-0.5">
+                    <Phone size={9} />
+                    {seg.venta.cliente_telefono}
+                  </span>
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -94,17 +105,21 @@ function SeguimientoRow({
         </span>
       </td>
 
-      {/* NUEVO: Asesor */}
+      {/* CORRECCIÓN QA: Extracción segura para asegurar que Asesor se muestre */}
       <td className="px-3 py-3">
         <span className="text-[11px] font-medium text-foreground truncate block max-w-[120px]">
-          {seg.venta.id_asesor?.nombre_completo ?? "—"}
+          {seg.venta.id_asesor?.nombre_completo ??
+            (seg.venta as any).asesor_nombre ??
+            "—"}
         </span>
       </td>
 
-      {/* NUEVO: Producto */}
+      {/* CORRECCIÓN QA: Extracción segura para asegurar que Producto se muestre */}
       <td className="px-3 py-3">
         <span className="text-[11px] text-muted-foreground truncate block max-w-[120px]">
-          {seg.venta.id_producto?.nombre ?? "—"}
+          {seg.venta.id_producto?.nombre ??
+            (seg.venta as any).producto_nombre ??
+            "—"}
         </span>
       </td>
 
@@ -136,21 +151,31 @@ function SeguimientoRow({
       {Array.from({ length: 6 }, (_, i) => {
         const mes = meses.find((m) => m.mes_numero === i + 1);
         return (
-          <td key={i} className="px-2 py-3 text-center">
+          <td key={i} className="px-2 py-3 text-center relative">
             {mes ? (
               <div className="flex flex-col items-center gap-1">
                 <PagoBadge paid={mes.pago_cliente_realizado} />
+
+                {/* CORRECCIÓN QA: Tooltip Flotante para el Inconforme */}
                 {mes.conformidad && (
-                  <span
-                    className={cn(
-                      "text-[9px] font-mono font-bold",
-                      mes.conformidad === "CONFORME"
-                        ? "text-blue-500"
-                        : "text-orange-500",
+                  <div className="group relative flex justify-center">
+                    <span
+                      className={cn(
+                        "text-[9px] font-mono font-bold cursor-help",
+                        mes.conformidad === "CONFORME"
+                          ? "text-blue-500"
+                          : "text-orange-500",
+                      )}
+                    >
+                      {mes.conformidad.substring(0, 3)}
+                    </span>
+                    {mes.conformidad === "INCONFORME" && mes.observacion && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-popover/95 backdrop-blur text-popover-foreground text-[10px] font-medium leading-relaxed rounded-lg shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none text-left">
+                        {mes.observacion}
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-b border-r border-border rotate-45" />
+                      </div>
                     )}
-                  >
-                    {mes.conformidad.substring(0, 3)}
-                  </span>
+                  </div>
                 )}
               </div>
             ) : (
@@ -186,7 +211,6 @@ function SeguimientoRow({
 }
 
 export function SeguimientoTable() {
-  // Inicializamos los filtros con el mes y año actual
   const [filters, setFilters] = useState<SeguimientoFilters>(() => {
     const now = new Date();
     return {
