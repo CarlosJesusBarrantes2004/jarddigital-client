@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
-import { formatDate } from "../utils";
+// CORRECCIÓN QA: Importamos los extractores
+import { formatDate, getNombreAsesor, getNombreProducto } from "../utils";
 import { SeguimientoFilterBar } from "./SeguimientoFilterBar";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
 import type { Seguimiento, SeguimientoFilters } from "../types";
@@ -75,7 +76,6 @@ function SeguimientoRow({
                 />
               )}
             </div>
-            {/* CORRECCIÓN QA: Celular añadido */}
             <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5 mt-0.5">
               {seg.venta.codigo_sot}
               {seg.venta.cliente_telefono && (
@@ -105,21 +105,23 @@ function SeguimientoRow({
         </span>
       </td>
 
-      {/* CORRECCIÓN QA: Extracción segura para asegurar que Asesor se muestre */}
+      {/* CORRECCIÓN QA: Uso del extractor de Asesor */}
       <td className="px-3 py-3">
-        <span className="text-[11px] font-medium text-foreground truncate block max-w-[120px]">
-          {seg.venta.id_asesor?.nombre_completo ??
-            (seg.venta as any).asesor_nombre ??
-            "—"}
+        <span
+          className="text-[11px] font-medium text-foreground truncate block max-w-[120px]"
+          title={getNombreAsesor(seg.venta)}
+        >
+          {getNombreAsesor(seg.venta)}
         </span>
       </td>
 
-      {/* CORRECCIÓN QA: Extracción segura para asegurar que Producto se muestre */}
+      {/* CORRECCIÓN QA: Uso del extractor de Producto */}
       <td className="px-3 py-3">
-        <span className="text-[11px] text-muted-foreground truncate block max-w-[120px]">
-          {seg.venta.id_producto?.nombre ??
-            (seg.venta as any).producto_nombre ??
-            "—"}
+        <span
+          className="text-[11px] text-muted-foreground truncate block max-w-[120px]"
+          title={getNombreProducto(seg.venta)}
+        >
+          {getNombreProducto(seg.venta)}
         </span>
       </td>
 
@@ -156,7 +158,6 @@ function SeguimientoRow({
               <div className="flex flex-col items-center gap-1">
                 <PagoBadge paid={mes.pago_cliente_realizado} />
 
-                {/* CORRECCIÓN QA: Tooltip Flotante para el Inconforme */}
                 {mes.conformidad && (
                   <div className="group relative flex justify-center">
                     <span

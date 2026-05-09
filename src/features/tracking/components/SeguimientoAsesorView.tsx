@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
-import { formatDate, MESES_ES } from "../utils";
+// CORRECCIÓN QA: Extractor importado
+import { formatDate, MESES_ES, getNombreProducto } from "../utils";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
 import type { Seguimiento, SeguimientoFilters } from "../types";
 
@@ -47,6 +48,8 @@ function AsesorSeguimientoCard({
   const mes1 = seg.meses_evaluados?.find((m) => m.mes_numero === 1);
   const primerMesPagado = mes1?.pago_cliente_realizado ?? false;
 
+  const nombreProd = getNombreProducto(seg.venta);
+
   return (
     <div className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/30 transition-colors border-b border-border/30 last:border-0 group">
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary shrink-0">
@@ -69,7 +72,6 @@ function AsesorSeguimientoCard({
         <div className="flex items-center gap-3 mt-0.5">
           <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5">
             {seg.venta.codigo_sot}
-            {/* CORRECCIÓN QA: Celular añadido a la vista del Asesor */}
             {seg.venta.cliente_telefono && (
               <>
                 <span className="text-border">•</span>
@@ -80,9 +82,9 @@ function AsesorSeguimientoCard({
               </>
             )}
           </span>
-          {seg.venta.id_producto?.nombre && (
-            <span className="text-[10px] text-muted-foreground/70 hidden sm:block">
-              {seg.venta.id_producto.nombre}
+          {nombreProd !== "—" && (
+            <span className="text-[10px] text-muted-foreground/70 hidden sm:block truncate max-w-[150px]">
+              {nombreProd}
             </span>
           )}
         </div>
@@ -248,7 +250,6 @@ export function SeguimientoAsesorView() {
             />
           </div>
 
-          {/* CORRECCIÓN QA: Controles de Mes y Año para navegar por el historial del asesor */}
           <div className="flex items-center gap-2 mr-2">
             <select
               value={filters.mes_instalacion ?? ""}

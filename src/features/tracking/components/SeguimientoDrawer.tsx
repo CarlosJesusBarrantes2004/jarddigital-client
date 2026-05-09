@@ -25,7 +25,7 @@ import {
   useUpdateSeguimiento,
   useUpdateSeguimientoMensual,
 } from "../api";
-import { formatDate } from "../utils";
+import { formatDate, getNombreAsesor, getNombreProducto } from "../utils";
 import type {
   Seguimiento,
   SeguimientoMensual,
@@ -436,7 +436,7 @@ export function SeguimientoDrawer({
             </h2>
             {seg && (
               <p className="text-[11px] font-mono text-muted-foreground">
-                {seg.venta.codigo_sot} · {seg.venta.id_asesor?.nombre_completo}
+                {seg.venta.codigo_sot} · {getNombreAsesor(seg.venta)}
               </p>
             )}
           </div>
@@ -487,7 +487,7 @@ export function SeguimientoDrawer({
                   <DataRow label="Género" value={seg.venta.cliente_genero} />
                   <DataRow
                     label="Producto"
-                    value={`${seg.venta.producto_campana} ${seg.venta.producto_paquete} ${seg.venta.producto_solucion}`}
+                    value={getNombreProducto(seg.venta)}
                   />
                   <DataRow
                     label="F. Instalación"

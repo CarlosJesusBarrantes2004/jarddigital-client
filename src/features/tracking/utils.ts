@@ -44,22 +44,18 @@ export function calcularDiaCiclo(diaInstalacion: number): number {
   return TABLA_OPERATIVA[diaInstalacion] ?? diaInstalacion;
 }
 
-/** Add days to a Date, returning a new Date */
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
 }
 
-/** Add months with EOM rule (mirrors relativedelta behaviour) */
 function addMonthsEOM(base: Date, months: number): Date {
   const result = new Date(base);
   const targetMonth = result.getMonth() + months;
   result.setMonth(targetMonth);
-  // If the day overflowed (e.g. Jan 31 + 1 month → Feb 28/29)
-  // JS automatically rolls over, but we want EOM, not rollover to March
   if (result.getMonth() !== (((base.getMonth() + months) % 12) + 12) % 12) {
-    result.setDate(0); // last day of the intended month
+    result.setDate(0);
   }
   return result;
 }
@@ -75,10 +71,6 @@ export interface FechasProyectadas {
   meses_detalle: MesProyectado[];
 }
 
-/**
- * Genera el ciclo de facturación y los 6 meses proyectados
- * a partir de la fecha real de instalación ("Día 0").
- */
 export function generarFechasProyectadas(
   fechaInstalacion: Date,
 ): FechasProyectadas {
@@ -89,7 +81,6 @@ export function generarFechasProyectadas(
 
   const meses: MesProyectado[] = [];
 
-  // Mes 1
   const fechaSegM1 = addDays(ciclo, 10);
   const fechaValM1 = addDays(ciclo, 20);
   meses.push({
@@ -98,7 +89,6 @@ export function generarFechasProyectadas(
     fecha_validacion_pago: fechaValM1,
   });
 
-  // Meses 2–6
   for (let i = 2; i <= 6; i++) {
     const nuevaFechaVal = addMonthsEOM(fechaValM1, i - 1);
     const fechaValAnterior = meses[i - 2].fecha_validacion_pago;
@@ -113,19 +103,44 @@ export function generarFechasProyectadas(
   return { ciclo_facturacion: ciclo, meses_detalle: meses };
 }
 
-/** Format ISO date string to DD/MM/YYYY */
+/**
+ * CORRECCIÓN QA: Format ISO date string to DD/MM/YYYY and handles amigable Time (AM/PM)
+ */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
+
+  // Si incluye "T", es un DateTime. Extraemos la hora de forma amigable
+  if (iso.includes("T")) {
+    const dateObj = new Date(iso);
+    if (!isNaN(dateObj.getTime())) {
+      const dd = String(dateObj.getDate()).padStart(2, "0");
+      const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const yyyy = dateObj.getFullYear();
+
+      let hours = dateObj.getHours();
+      const minutes = String(dateObj.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12; // el 0 debe ser 12
+
+      const strTime = `${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
+      return `${dd}/${mm}/${yyyy} ${strTime}`;
+    }
+  }
+
+  // Fallback seguro si es solo un campo Date clásico (YYYY-MM-DD)
+  const parts = iso.split("T")[0].split("-");
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return iso;
 }
 
-/** Format Date object to YYYY-MM-DD for API */
 export function toISODate(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
-/** Human-readable month name */
 export const MESES_ES = [
   "Enero",
   "Febrero",
@@ -143,4 +158,39 @@ export const MESES_ES = [
 
 export function nombreMes(num: number): string {
   return MESES_ES[num - 1] ?? `Mes ${num}`;
+}
+
+/**
+ * CORRECCIÓN QA: Extractor ultra robusto para el nombre del Asesor.
+ * Cubre casos de objetos anidados o aplanados enviados por DRF.
+ */
+export function getNombreAsesor(venta: any): string {
+  if (!venta) return "—";
+  return (
+    venta.id_asesor?.nombre_completo ||
+    venta.asesor_nombre_completo ||
+    venta.asesor_nombre ||
+    venta.nombre_asesor ||
+    (typeof venta.id_asesor === "string" ? venta.id_asesor : "—")
+  );
+}
+
+/**
+ * CORRECCIÓN QA: Extractor ultra robusto para el Producto.
+ * Cubre concatenaciones separadas, campos anidados o llaves aplanadas.
+ */
+export function getNombreProducto(venta: any): string {
+  if (!venta) return "—";
+  if (venta.id_producto?.nombre) return venta.id_producto.nombre;
+  if (venta.id_producto?.nombre_paquete)
+    return venta.id_producto.nombre_paquete;
+
+  const compuesto =
+    `${venta.producto_campana ?? ""} ${venta.producto_paquete ?? ""} ${venta.producto_solucion ?? ""}`.trim();
+  if (compuesto) return compuesto;
+
+  return (
+    venta.producto_nombre ||
+    (typeof venta.id_producto === "string" ? venta.id_producto : "—")
+  );
 }
