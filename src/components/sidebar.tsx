@@ -17,12 +17,9 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useAuth } from "@/features/auth/context/useAuth";
-import { useTheme } from "@/components/ThemeProvider"; // Ajusta la ruta a tu ThemeProvider
+import { useTheme } from "@/components/ThemeProvider";
 import type { RoleCode, Workspace } from "@/features/auth/types";
 
-// ─────────────────────────────────────────────
-// Rutas (Mismo código que tenías)
-// ─────────────────────────────────────────────
 interface RouteItem {
   label: string;
   href: string;
@@ -52,6 +49,7 @@ const SECTIONS: RouteSection[] = [
           "RRHH",
           "BACKOFFICE",
           "ASESOR",
+          "SEGUIMIENTO", // Agregado para que no se quede sin dashboard
         ],
       },
     ],
@@ -75,7 +73,8 @@ const SECTIONS: RouteSection[] = [
       {
         label: "Seguimiento",
         href: "/tracking",
-        roles: ["BACKOFFICE", "SUPERVISOR", "COORDINADOR", "DUENO", "RRHH"],
+        // RESTRICCIÓN APLICADA: Solo SEGUIMIENTO y DUENO
+        roles: ["SEGUIMIENTO", "DUENO"],
       },
     ],
   },
@@ -247,17 +246,20 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
   const [open, setOpen] = useState(false);
 
   const workspaces: Workspace[] = user?.sucursales ?? [];
+
+  // Agregamos SEGUIMIENTO aquí por si debe comportarse como Backoffice en la vista global
   const esVistaGlobal =
-    user?.rol?.codigo === "BACKOFFICE" || user?.rol?.codigo === "COORDINADOR";
+    user?.rol?.codigo === "BACKOFFICE" ||
+    user?.rol?.codigo === "COORDINADOR" ||
+    user?.rol?.codigo === "SEGUIMIENTO";
 
   if (workspaces.length === 0) return null;
 
-  // ---> NUEVA LÓGICA: BLOQUEO VISUAL PARA BACKOFFICE <---
   if (esVistaGlobal) {
     return (
       <div
         className="w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground opacity-80 cursor-default"
-        title="Vista Global Backoffice"
+        title="Vista Global"
       >
         <Building2 size={14} className="shrink-0" />
         {expanded && (
@@ -352,11 +354,6 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
   );
 };
 
-// ─────────────────────────────────────────────
-// Sidebar principal
-// Recibe props para controlar su estado desde el Layout
-// ─────────────────────────────────────────────
-
 interface SidebarProps {
   expanded: boolean;
   setExpanded: (val: boolean) => void;
@@ -374,7 +371,6 @@ export const Sidebar = ({
   const { theme, setTheme } = useTheme();
   const roleCode = (user?.rol?.codigo ?? "ASESOR") as RoleCode;
 
-  // Lógica para alternar temas (Claro -> Oscuro -> Sistema)
   const cycleTheme = () => {
     if (theme === "light") setTheme("dark");
     else if (theme === "dark") setTheme("system");
@@ -395,7 +391,6 @@ export const Sidebar = ({
 
   return (
     <>
-      {/* ── Overlay Mobile ── */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-background/80 z-40 backdrop-blur-sm lg:hidden transition-opacity duration-300"
@@ -403,7 +398,6 @@ export const Sidebar = ({
         />
       )}
 
-      {/* ── Sidebar ── */}
       <aside
         className={cn(
           "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border z-50 flex flex-col font-sans transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none",
@@ -411,7 +405,6 @@ export const Sidebar = ({
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* 1. Header FIJO */}
         <div className="h-[64px] flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
           <div
             className={cn(
@@ -437,9 +430,7 @@ export const Sidebar = ({
           </button>
         </div>
 
-        {/* 2. CONTENEDOR SCROLLEABLE (Usuario + Nav + Bottom) */}
         <div className="flex-1 overflow-y-auto flex flex-col [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50">
-          {/* User info */}
           {user && (
             <div
               className={cn(
@@ -463,7 +454,6 @@ export const Sidebar = ({
             </div>
           )}
 
-          {/* Nav */}
           <nav className="flex-1 p-3 flex flex-col gap-1">
             {SECTIONS.map((section) => (
               <NavSection
@@ -476,11 +466,9 @@ export const Sidebar = ({
             ))}
           </nav>
 
-          {/* Bottom (usamos mt-auto para empujarlo al fondo si la pantalla es alta) */}
           <div className="mt-auto border-t border-sidebar-border p-3 flex flex-col gap-2 shrink-0">
             <WorkspaceSwitcher expanded={expanded} />
 
-            {/* Botón Theme */}
             <button
               type="button"
               className="group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap"
@@ -490,7 +478,6 @@ export const Sidebar = ({
               {expanded && <span>{getThemeLabel()}</span>}
             </button>
 
-            {/* Logout */}
             <button
               type="button"
               className="group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap"

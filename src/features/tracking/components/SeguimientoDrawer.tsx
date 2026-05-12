@@ -354,11 +354,13 @@ function MesCard({
 interface SeguimientoDrawerProps {
   seguimientoId: number | null;
   onClose: () => void;
+  isAsesor?: boolean;
 }
 
 export function SeguimientoDrawer({
   seguimientoId,
   onClose,
+  isAsesor = false,
 }: SeguimientoDrawerProps) {
   const { data: seg, isLoading } = useSeguimiento(seguimientoId);
   const updateSeg = useUpdateSeguimiento();
@@ -417,7 +419,7 @@ export function SeguimientoDrawer({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0  z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-40" onClick={onClose} />
 
       {/* Drawer */}
       <div className="fixed right-0 top-0 h-screen w-full max-w-[640px] bg-background border-l border-border z-50 flex flex-col shadow-2xl animate-in slide-in-from-right-4 duration-300">
@@ -619,37 +621,39 @@ export function SeguimientoDrawer({
               </section>
 
               {/* ── Monthly tracking ── */}
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <Calendar size={14} className="text-primary" />
-                  <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-foreground">
-                    Seguimientos Mensuales
-                  </h3>
-                  <span className="text-[10px] font-mono text-muted-foreground ml-auto">
-                    {meses.filter((m) => m.pago_cliente_realizado).length} /{" "}
-                    {meses.length} pagados
-                  </span>
-                </div>
+              {!isAsesor && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Calendar size={14} className="text-primary" />
+                    <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-foreground">
+                      Seguimientos Mensuales
+                    </h3>
+                    <span className="text-[10px] font-mono text-muted-foreground ml-auto">
+                      {meses.filter((m) => m.pago_cliente_realizado).length} /{" "}
+                      {meses.length} pagados
+                    </span>
+                  </div>
 
-                {meses.length === 0 ? (
-                  <div className="flex items-center gap-2 text-muted-foreground text-[13px] py-6 justify-center">
-                    <Clock size={16} /> Sin registros mensuales
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {meses.map((mes, idx) => (
-                      <MesCard
-                        key={mes.id}
-                        mes={mes}
-                        seguimientoId={seg.id}
-                        isBlocked={isBlocked(mes.mes_numero)}
-                        isPenalizado={isPenalizado}
-                        isLast={idx === meses.length - 1}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
+                  {meses.length === 0 ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-[13px] py-6 justify-center">
+                      <Clock size={16} /> Sin registros mensuales
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {meses.map((mes, idx) => (
+                        <MesCard
+                          key={mes.id}
+                          mes={mes}
+                          seguimientoId={seg.id}
+                          isBlocked={isBlocked(mes.mes_numero)}
+                          isPenalizado={isPenalizado}
+                          isLast={idx === meses.length - 1}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
           )}
         </div>

@@ -354,6 +354,7 @@ export function SeguimientoAsesorView() {
         <SeguimientoDrawer
           seguimientoId={selectedId}
           onClose={() => setSelectedId(null)}
+          isAsesor={true}
         />
       )}
     </div>

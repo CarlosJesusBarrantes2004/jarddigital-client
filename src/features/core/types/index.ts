@@ -19,7 +19,8 @@ export type RoleCode =
   | "COORDINADOR"
   | "RRHH"
   | "BACKOFFICE"
-  | "ASESOR";
+  | "ASESOR"
+  | "SEGUIMIENTO";
 
 export interface Role {
   id: number;

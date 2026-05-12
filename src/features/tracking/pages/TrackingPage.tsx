@@ -3,12 +3,14 @@ import { SeguimientoTable } from "../components/SeguimientoTable";
 import { SeguimientoAsesorView } from "../components/SeguimientoAsesorView";
 
 const ASESOR_ROLES = ["ASESOR"];
+const TABLE_ROLES = ["SEGUIMIENTO", "DUENO"];
 
 export function TrackingPage() {
   const { user } = useAuth();
   const roleCode = user?.rol?.codigo ?? "";
 
   const isAsesor = ASESOR_ROLES.includes(roleCode);
+  const canViewTable = TABLE_ROLES.includes(roleCode);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -28,7 +30,21 @@ export function TrackingPage() {
 
       {/* Dynamic view */}
       <div className="flex-1 overflow-hidden">
-        {isAsesor ? <SeguimientoAsesorView /> : <SeguimientoTable />}
+        {isAsesor ? (
+          <SeguimientoAsesorView />
+        ) : canViewTable ? (
+          <SeguimientoTable></SeguimientoTable>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-2">
+            <h2 className="text-[16px] font-bold text-foreground">
+              Acceso Restringido
+            </h2>
+            <p className="text-[13px] text-muted-foreground">
+              No tienes los permisos necesarios para visualizar la tabla global
+              de seguimientos.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
