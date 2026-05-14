@@ -87,9 +87,9 @@ export function SeguimientoFilterBar({
   ).length;
 
   const update = (partial: Partial<SeguimientoFilters>) =>
-    onChange({ ...filters, ...partial });
+    onChange({ ...filters, ...partial, page: 1 });
 
-  const clear = () => onChange({});
+  const clear = () => onChange({ page: 1 });
 
   const handleExport = async () => {
     try {

@@ -216,6 +216,7 @@ export function SeguimientoTable() {
     return {
       mes_instalacion: now.getMonth() + 1,
       anio_instalacion: now.getFullYear(),
+      page: 1,
     };
   });
 
@@ -228,6 +229,10 @@ export function SeguimientoTable() {
 
   const seguimientos = Array.isArray(data) ? data : (data?.results ?? []);
   const totalCount = Array.isArray(data) ? data.length : (data?.count ?? 0);
+
+  const hasNext = !Array.isArray(data) && !!data?.next;
+  const hasPrev = !Array.isArray(data) && !!data?.previous;
+  const currentPage = filters.page ?? 1;
 
   const toggleOrder = (field: string) => {
     setOrdering((prev) => (prev === field ? `-${field}` : field));
@@ -347,6 +352,30 @@ export function SeguimientoTable() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-background shrink-0">
+        <span className="text-[12px] font-medium text-muted-foreground">
+          Página {currentPage}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              setFilters({ ...filters, page: Math.max(1, currentPage - 1) })
+            }
+            disabled={!hasPrev || isLoading}
+            className="h-8 px-3 rounded-lg border border-border text-[12px] font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+          >
+            Anterior
+          </button>
+          <button
+            onClick={() => setFilters({ ...filters, page: currentPage + 1 })}
+            disabled={!hasNext || isLoading}
+            className="h-8 px-3 rounded-lg border border-border text-[12px] font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
 
       {selectedId !== null && (

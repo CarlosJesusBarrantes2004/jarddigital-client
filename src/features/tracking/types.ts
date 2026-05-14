@@ -80,6 +80,7 @@ export interface SeguimientoFilters {
   fecha_pago_hasta?: string;
   fecha_seguimiento_desde?: string;
   fecha_seguimiento_hasta?: string;
+  page?: number;
 }
 
 // ─── Update payloads ─────────────────────────────────────────

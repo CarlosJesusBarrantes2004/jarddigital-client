@@ -218,6 +218,7 @@ export function SeguimientoAsesorView() {
     return {
       mes_instalacion: now.getMonth() + 1,
       anio_instalacion: now.getFullYear(),
+      page: 1,
     };
   });
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -235,7 +236,37 @@ export function SeguimientoAsesorView() {
   const seguimientos = Array.isArray(data) ? data : (data?.results ?? []);
   const totalCount = Array.isArray(data) ? data.length : (data?.count ?? 0);
 
+  const hasNext = !Array.isArray(data) && !!data?.next;
+  const hasPrev = !Array.isArray(data) && !!data?.previous;
+  const currentPage = filters.page ?? 1;
+
   const groups = groupByMesInstalacion(seguimientos);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setFilters((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleMesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters({
+      ...filters,
+      mes_instalacion: e.target.value ? Number(e.target.value) : undefined,
+      page: 1,
+    });
+  };
+
+  const handleAnioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters({
+      ...filters,
+      anio_instalacion: e.target.value ? Number(e.target.value) : undefined,
+      page: 1,
+    });
+  };
+
+  const handlePrimerPagoToggle = (v: boolean | undefined) => {
+    setShowPrimerPago(v);
+    setFilters((prev) => ({ ...prev, page: 1 }));
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -244,7 +275,7 @@ export function SeguimientoAsesorView() {
           <div className="relative flex-1 max-w-[280px]">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={handleSearchChange}
               placeholder="Buscar por nombre o código..."
               className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
@@ -253,14 +284,7 @@ export function SeguimientoAsesorView() {
           <div className="flex items-center gap-2 mr-2">
             <select
               value={filters.mes_instalacion ?? ""}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  mes_instalacion: e.target.value
-                    ? Number(e.target.value)
-                    : undefined,
-                })
-              }
+              onChange={handleMesChange}
               className="h-8 pl-2 pr-6 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
             >
               <option value="">Todo (Mes)</option>
@@ -272,14 +296,7 @@ export function SeguimientoAsesorView() {
             </select>
             <select
               value={filters.anio_instalacion ?? ""}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  anio_instalacion: e.target.value
-                    ? Number(e.target.value)
-                    : undefined,
-                })
-              }
+              onChange={handleAnioChange}
               className="h-8 pl-2 pr-6 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
             >
               <option value="">Todo (Año)</option>
@@ -299,7 +316,7 @@ export function SeguimientoAsesorView() {
               <button
                 key={String(v)}
                 type="button"
-                onClick={() => setShowPrimerPago(v)}
+                onClick={() => handlePrimerPagoToggle(v)}
                 className={cn(
                   "h-7 px-3 rounded-full text-[11px] font-semibold border transition-all",
                   showPrimerPago === v
@@ -313,7 +330,7 @@ export function SeguimientoAsesorView() {
           </div>
 
           <span className="text-[12px] text-muted-foreground ml-auto">
-            {isLoading ? "Cargando..." : `${totalCount} ventas`}
+            {isLoading ? "Cargando..." : `${totalCount} ventas en total`}
           </span>
         </div>
       </div>
@@ -348,6 +365,30 @@ export function SeguimientoAsesorView() {
             />
           ))
         )}
+      </div>
+
+      <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-background shrink-0">
+        <span className="text-[12px] font-medium text-muted-foreground">
+          Página {currentPage}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              setFilters({ ...filters, page: Math.max(1, currentPage - 1) })
+            }
+            disabled={!hasPrev || isLoading}
+            className="h-8 px-3 rounded-lg border border-border text-[12px] font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+          >
+            Anterior
+          </button>
+          <button
+            onClick={() => setFilters({ ...filters, page: currentPage + 1 })}
+            disabled={!hasNext || isLoading}
+            className="h-8 px-3 rounded-lg border border-border text-[12px] font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
 
       {selectedId !== null && (
