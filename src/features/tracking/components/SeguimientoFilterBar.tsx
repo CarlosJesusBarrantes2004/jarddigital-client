@@ -94,7 +94,7 @@ export function SeguimientoFilterBar({
   const handleExport = async () => {
     try {
       setIsExporting(true);
-      await exportarExcelPendientes();
+      await exportarExcelPendientes(filters);
     } catch (error) {
       console.error("Error al exportar Excel", error);
     } finally {

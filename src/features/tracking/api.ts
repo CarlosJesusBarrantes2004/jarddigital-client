@@ -106,10 +106,10 @@ export function useUpdateSeguimientoMensual() {
 /**
  * NUEVO: Mutación para descargar el Excel de Pendientes Mes 1
  */
-export async function exportarExcelPendientes() {
+export async function exportarExcelPendientes(filters?: Record<string, any>) {
   const response = await api.get(
     "/tracking/seguimientos/exportar_pendientes_mes_1/",
-    { responseType: "blob" },
+    { params: filters, responseType: "blob" },
   );
   const url = window.URL.createObjectURL(new Blob([response.data]));
   const link = document.createElement("a");
