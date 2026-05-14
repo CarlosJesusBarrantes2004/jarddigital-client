@@ -491,160 +491,166 @@ export function SeguimientoDrawer({
               </section>
 
               {/* ── Seguimiento Header ── */}
-              <section>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <CreditCard size={14} className="text-primary" />
-                    <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-foreground">
-                      Datos de Seguimiento
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={editingHeader ? saveHeader : openHeaderEdit}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:opacity-80 transition-opacity"
-                  >
-                    {editingHeader ? <Save size={12} /> : <Edit3 size={12} />}
-                    {editingHeader ? "Guardar" : "Editar"}
-                  </button>
-                </div>
-
-                {editingHeader ? (
-                  <div className="bg-muted/30 rounded-xl p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1">
-                          Código de Pago
-                        </label>
-                        <input
-                          value={headerForm.codigo_pago}
-                          onChange={(e) =>
-                            setHeaderForm((f) => ({
-                              ...f,
-                              codigo_pago: e.target.value,
-                            }))
-                          }
-                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          placeholder="Ej. COD-00123"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1">
-                          Ciclo Facturación
-                        </label>
-                        <input
-                          type="date"
-                          value={headerForm.ciclo_facturacion}
-                          onChange={(e) =>
-                            setHeaderForm((f) => ({
-                              ...f,
-                              ciclo_facturacion: e.target.value,
-                            }))
-                          }
-                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1">
-                          Estado
-                        </label>
-                        <select
-                          value={headerForm.estado}
-                          onChange={(e) =>
-                            setHeaderForm((f) => ({
-                              ...f,
-                              estado: e.target.value as
-                                | EstadoSeguimientoType
-                                | "",
-                            }))
-                          }
-                          className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        >
-                          <option value="">Sin estado</option>
-                          <option value="PENALIZADO">Penalizado</option>
-                          <option value="SUSPENDIDO">Suspendido</option>
-                          <option value="DESACTIVADO">Desactivado</option>
-                        </select>
-                      </div>
-                      <div className="flex items-end pb-1">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={headerForm.descuento_realizado}
-                            onChange={(e) =>
-                              setHeaderForm((f) => ({
-                                ...f,
-                                descuento_realizado: e.target.checked,
-                              }))
-                            }
-                            className="rounded border-border accent-primary"
-                          />
-                          <span className="text-[12px] text-foreground">
-                            Descuento Realizado
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setEditingHeader(false)}
-                        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-muted/30 rounded-xl p-4 space-y-0">
-                    <DataRow label="Código Pago" value={seg.codigo_pago} />
-                    <DataRow
-                      label="Ciclo Facturación"
-                      value={formatDate(seg.ciclo_facturacion)}
-                    />
-                    <DataRow
-                      label="Descuento"
-                      value={seg.descuento_realizado ? "✓ Realizado" : "No"}
-                    />
-                  </div>
-                )}
-              </section>
 
               {/* ── Monthly tracking ── */}
               {!isAsesor && (
-                <section>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Calendar size={14} className="text-primary" />
-                    <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-foreground">
-                      Seguimientos Mensuales
-                    </h3>
-                    <span className="text-[10px] font-mono text-muted-foreground ml-auto">
-                      {meses.filter((m) => m.pago_cliente_realizado).length} /{" "}
-                      {meses.length} pagados
-                    </span>
-                  </div>
+                <>
+                  <section>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard size={14} className="text-primary" />
+                        <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-foreground">
+                          Datos de Seguimiento
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={editingHeader ? saveHeader : openHeaderEdit}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:opacity-80 transition-opacity"
+                      >
+                        {editingHeader ? (
+                          <Save size={12} />
+                        ) : (
+                          <Edit3 size={12} />
+                        )}
+                        {editingHeader ? "Guardar" : "Editar"}
+                      </button>
+                    </div>
 
-                  {meses.length === 0 ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-[13px] py-6 justify-center">
-                      <Clock size={16} /> Sin registros mensuales
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {meses.map((mes, idx) => (
-                        <MesCard
-                          key={mes.id}
-                          mes={mes}
-                          seguimientoId={seg.id}
-                          isBlocked={isBlocked(mes.mes_numero)}
-                          isPenalizado={isPenalizado}
-                          isLast={idx === meses.length - 1}
+                    {editingHeader ? (
+                      <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1">
+                              Código de Pago
+                            </label>
+                            <input
+                              value={headerForm.codigo_pago}
+                              onChange={(e) =>
+                                setHeaderForm((f) => ({
+                                  ...f,
+                                  codigo_pago: e.target.value,
+                                }))
+                              }
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              placeholder="Ej. COD-00123"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1">
+                              Ciclo Facturación
+                            </label>
+                            <input
+                              type="date"
+                              value={headerForm.ciclo_facturacion}
+                              onChange={(e) =>
+                                setHeaderForm((f) => ({
+                                  ...f,
+                                  ciclo_facturacion: e.target.value,
+                                }))
+                              }
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1">
+                              Estado
+                            </label>
+                            <select
+                              value={headerForm.estado}
+                              onChange={(e) =>
+                                setHeaderForm((f) => ({
+                                  ...f,
+                                  estado: e.target.value as
+                                    | EstadoSeguimientoType
+                                    | "",
+                                }))
+                              }
+                              className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/50"
+                            >
+                              <option value="">Sin estado</option>
+                              <option value="PENALIZADO">Penalizado</option>
+                              <option value="SUSPENDIDO">Suspendido</option>
+                              <option value="DESACTIVADO">Desactivado</option>
+                            </select>
+                          </div>
+                          <div className="flex items-end pb-1">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={headerForm.descuento_realizado}
+                                onChange={(e) =>
+                                  setHeaderForm((f) => ({
+                                    ...f,
+                                    descuento_realizado: e.target.checked,
+                                  }))
+                                }
+                                className="rounded border-border accent-primary"
+                              />
+                              <span className="text-[12px] text-foreground">
+                                Descuento Realizado
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditingHeader(false)}
+                            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-muted/30 rounded-xl p-4 space-y-0">
+                        <DataRow label="Código Pago" value={seg.codigo_pago} />
+                        <DataRow
+                          label="Ciclo Facturación"
+                          value={formatDate(seg.ciclo_facturacion)}
                         />
-                      ))}
+                        <DataRow
+                          label="Descuento"
+                          value={seg.descuento_realizado ? "✓ Realizado" : "No"}
+                        />
+                      </div>
+                    )}
+                  </section>
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Calendar size={14} className="text-primary" />
+                      <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-foreground">
+                        Seguimientos Mensuales
+                      </h3>
+                      <span className="text-[10px] font-mono text-muted-foreground ml-auto">
+                        {meses.filter((m) => m.pago_cliente_realizado).length} /{" "}
+                        {meses.length} pagados
+                      </span>
                     </div>
-                  )}
-                </section>
+
+                    {meses.length === 0 ? (
+                      <div className="flex items-center gap-2 text-muted-foreground text-[13px] py-6 justify-center">
+                        <Clock size={16} /> Sin registros mensuales
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {meses.map((mes, idx) => (
+                          <MesCard
+                            key={mes.id}
+                            mes={mes}
+                            seguimientoId={seg.id}
+                            isBlocked={isBlocked(mes.mes_numero)}
+                            isPenalizado={isPenalizado}
+                            isLast={idx === meses.length - 1}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
               )}
             </div>
           )}
