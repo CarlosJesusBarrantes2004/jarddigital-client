@@ -85,7 +85,7 @@ function MesCard({
   isLast: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const [showObs, setShowObs] = useState(false);
+
   const [form, setForm] = useState({
     observacion: mes.observacion ?? "",
     conformidad: mes.conformidad as ConformidadType | null,

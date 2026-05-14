@@ -82,7 +82,6 @@ export function useUpdateSeguimientoMensual() {
   return useMutation({
     mutationFn: async ({
       id,
-      seguimientoId, // eslint-disable-line @typescript-eslint/no-unused-vars
       data,
     }: {
       id: number;
