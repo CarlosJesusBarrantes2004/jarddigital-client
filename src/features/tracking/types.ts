@@ -24,15 +24,23 @@ export interface VentaParaSeguimiento {
   cliente_nombre: string;
   cliente_apellido?: string;
   cliente_dni?: string;
-  cliente_telefono?: string; // <-- AÑADIDO PARA EL REPORTE DE QA
+  cliente_numero_doc?: string;
+  cliente_telefono?: string;
   cliente_direccion?: string;
+  direccion_detalle?: string;
   cliente_fecha_nacimiento?: string;
   cliente_lugar_nacimiento?: string;
+  departamento_nacimiento_nombre?: string;
+  provincia_nacimiento_nombre?: string;
+  distrito_nacimiento_nombre?: string;
   cliente_padre?: string;
+  cliente_papa?: string;
   cliente_madre?: string;
+  cliente_mama?: string;
   cliente_correo?: string;
+  cliente_email?: string;
   cliente_genero?: GeneroCliente;
-  fecha_real_inst?: string; // ISO date — "Día 0"
+  fecha_real_inst?: string;
   id_producto?: {
     id: number;
     nombre: string;

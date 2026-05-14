@@ -2,21 +2,14 @@ import { useState } from "react";
 import {
   X,
   User,
-  MapPin,
-  Mail,
-  Phone,
   Calendar,
   CreditCard,
   CheckCircle2,
   XCircle,
   Clock,
-  ChevronRight,
-  AlertTriangle,
   Edit3,
   Save,
   RotateCcw,
-  Eye,
-  EyeOff,
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,7 +20,6 @@ import {
 } from "../api";
 import { formatDate, getNombreAsesor, getNombreProducto } from "../utils";
 import type {
-  Seguimiento,
   SeguimientoMensual,
   ConformidadType,
   EstadoSeguimientoType,

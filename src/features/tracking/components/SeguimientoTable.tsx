@@ -72,7 +72,6 @@ function SeguimientoRow({
                 <Star
                   size={10}
                   className="text-amber-500 shrink-0 fill-amber-500"
-                  title="Alto Valor"
                 />
               )}
             </div>
