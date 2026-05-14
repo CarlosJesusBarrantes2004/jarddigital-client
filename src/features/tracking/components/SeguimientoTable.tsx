@@ -234,6 +234,9 @@ export function SeguimientoTable() {
   const hasPrev = !Array.isArray(data) && !!data?.previous;
   const currentPage = filters.page ?? 1;
 
+  const PAGE_SIZE = 20;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1;
+
   const toggleOrder = (field: string) => {
     setOrdering((prev) => (prev === field ? `-${field}` : field));
   };
@@ -356,7 +359,7 @@ export function SeguimientoTable() {
 
       <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-background shrink-0">
         <span className="text-[12px] font-medium text-muted-foreground">
-          Página {currentPage}
+          Página {currentPage} de {totalPages}
         </span>
         <div className="flex items-center gap-2">
           <button
