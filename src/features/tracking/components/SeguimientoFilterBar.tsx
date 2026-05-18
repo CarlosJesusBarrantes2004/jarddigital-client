@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { MESES_ES } from "../utils";
 import { exportarExcelPendientes } from "../api";
 import type { SeguimientoFilters, EstadoSeguimientoType } from "../types";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 interface FilterBarProps {
   filters: SeguimientoFilters;
@@ -81,6 +82,9 @@ export function SeguimientoFilterBar({
 }: FilterBarProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const { user } = useAuth();
+
+  const workspaces = user?.sucursales ?? [];
 
   const activeCount = Object.entries(filters).filter(
     ([k, v]) => k !== "search" && v !== undefined && v !== "" && v !== null,
@@ -89,7 +93,7 @@ export function SeguimientoFilterBar({
   const update = (partial: Partial<SeguimientoFilters>) =>
     onChange({ ...filters, ...partial, page: 1 });
 
-  const clear = () => onChange({ page: 1 });
+  const clear = () => onChange({ page: 1, page_size: 50 });
 
   const handleExport = async () => {
     try {
@@ -259,6 +263,26 @@ export function SeguimientoFilterBar({
       {/* Advanced filters panel */}
       {showAdvanced && (
         <div className="flex items-center gap-4 flex-wrap pt-3 border-t border-border/50">
+          {role === "encargado" && workspaces.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
+                Sede:
+              </span>
+              <Select
+                value={String(filters.modalidad_sede ?? "")}
+                onChange={(v) =>
+                  update({ modalidad_sede: v ? Number(v) : undefined })
+                }
+                placeholder="Todas las sedes"
+                options={workspaces.map((ws) => ({
+                  label: `${ws.nombre_sucursal} - ${ws.nombre_modalidad}`,
+                  value: String(ws.id_modalidad_sede),
+                }))}
+                className="w-48"
+              />
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
               Instalación:

@@ -217,6 +217,7 @@ export function SeguimientoTable() {
       mes_instalacion: now.getMonth() + 1,
       anio_instalacion: now.getFullYear(),
       page: 1,
+      page_size: 50,
     };
   });
 
@@ -234,8 +235,8 @@ export function SeguimientoTable() {
   const hasPrev = !Array.isArray(data) && !!data?.previous;
   const currentPage = filters.page ?? 1;
 
-  const PAGE_SIZE = 20;
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1;
+  const PAGE_SIZE = 50;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const toggleOrder = (field: string) => {
     setOrdering((prev) => (prev === field ? `-${field}` : field));
