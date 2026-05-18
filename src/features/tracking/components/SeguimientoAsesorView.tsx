@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
-// CORRECCIÓN QA: Extractor importado
 import { formatDate, MESES_ES, getNombreProducto } from "../utils";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
 import type { Seguimiento, SeguimientoFilters } from "../types";
@@ -69,9 +68,26 @@ function AsesorSeguimientoCard({
           )}
         </div>
 
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5">
-            {seg.venta.codigo_sot}
+        <div className="flex flex-wrap items-center gap-3 mt-0.5">
+          {/* CORRECCIÓN QA: Identificadores claros de SOT, DNI/RUC y Celular para vista asesor */}
+          <span className="text-[10px] font-mono text-muted-foreground flex flex-wrap items-center gap-1.5">
+            <span className="flex items-center gap-1">
+              <span className="font-semibold text-foreground/70">SOT:</span>
+              {seg.venta.codigo_sot}
+            </span>
+
+            {seg.venta.cliente_numero_doc && (
+              <>
+                <span className="text-border">•</span>
+                <span className="flex items-center gap-1">
+                  <span className="font-semibold text-foreground/70">
+                    DNI/RUC:
+                  </span>
+                  {seg.venta.cliente_numero_doc}
+                </span>
+              </>
+            )}
+
             {seg.venta.cliente_telefono && (
               <>
                 <span className="text-border">•</span>

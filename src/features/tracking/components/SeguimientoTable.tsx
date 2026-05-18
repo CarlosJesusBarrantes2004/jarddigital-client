@@ -58,12 +58,12 @@ function SeguimientoRow({
 
   return (
     <tr className="group border-b border-border/40 hover:bg-muted/30 transition-colors">
-      <td className="px-3 py-3 min-w-[180px]">
+      <td className="px-3 py-3 min-w-[220px]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary shrink-0">
             {seg.venta.cliente_nombre?.substring(0, 2).toUpperCase()}
           </div>
-          <div className="overflow-hidden">
+          <div className="overflow-hidden flex-1">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] font-semibold text-foreground truncate max-w-[140px]">
                 {seg.venta.cliente_nombre}
@@ -75,8 +75,25 @@ function SeguimientoRow({
                 />
               )}
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1.5 mt-0.5">
-              {seg.venta.codigo_sot}
+            {/* CORRECCIÓN QA: Identificadores claros de SOT, DNI/RUC y Celular */}
+            <span className="text-[10px] font-mono text-muted-foreground flex flex-wrap items-center gap-1.5 mt-0.5">
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-foreground/70">SOT:</span>
+                {seg.venta.codigo_sot}
+              </span>
+
+              {seg.venta.cliente_numero_doc && (
+                <>
+                  <span className="text-border">•</span>
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold text-foreground/70">
+                      DNI/RUC:
+                    </span>
+                    {seg.venta.cliente_numero_doc}
+                  </span>
+                </>
+              )}
+
               {seg.venta.cliente_telefono && (
                 <>
                   <span className="text-border">•</span>
@@ -104,7 +121,6 @@ function SeguimientoRow({
         </span>
       </td>
 
-      {/* CORRECCIÓN QA: Uso del extractor de Asesor */}
       <td className="px-3 py-3">
         <span
           className="text-[11px] font-medium text-foreground truncate block max-w-[120px]"
@@ -114,7 +130,6 @@ function SeguimientoRow({
         </span>
       </td>
 
-      {/* CORRECCIÓN QA: Uso del extractor de Producto */}
       <td className="px-3 py-3">
         <span
           className="text-[11px] text-muted-foreground truncate block max-w-[120px]"
