@@ -172,19 +172,26 @@ function SeguimientoRow({
               <div className="flex flex-col items-center gap-1">
                 <PagoBadge paid={mes.pago_cliente_realizado} />
 
-                {mes.conformidad && (
+                {(mes.conformidad || mes.observacion) && (
                   <div className="group relative flex justify-center">
                     <span
                       className={cn(
-                        "text-[9px] font-mono font-bold cursor-help",
+                        "text-[9px] font-mono font-bold",
+                        mes.observacion ? "cursor-help" : "",
                         mes.conformidad === "CONFORME"
                           ? "text-blue-500"
-                          : "text-orange-500",
+                          : mes.conformidad === "INCONFORME"
+                            ? "text-orange-500"
+                            : "text-zinc-500", // Para SIN DEFINIR o estados vacíos
                       )}
                     >
-                      {mes.conformidad.substring(0, 3)}
+                      {mes.conformidad
+                        ? mes.conformidad.substring(0, 3)
+                        : "SIN"}
                     </span>
-                    {mes.conformidad === "INCONFORME" && mes.observacion && (
+
+                    {/* El tooltip ahora aparece SIEMPRE que haya una observación */}
+                    {mes.observacion && (
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-popover/95 backdrop-blur text-popover-foreground text-[10px] font-medium leading-relaxed rounded-lg shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none text-left">
                         {mes.observacion}
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-b border-r border-border rotate-45" />

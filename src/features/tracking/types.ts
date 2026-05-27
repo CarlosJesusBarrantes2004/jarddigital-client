@@ -88,17 +88,17 @@ export interface SeguimientoFilters {
 
 // ─── Update payloads ─────────────────────────────────────────
 export interface UpdateSeguimientoPayload {
-  codigo_pago?: string;
-  ciclo_facturacion?: string;
+  codigo_pago?: string | null;
+  ciclo_facturacion?: string | null;
   estado?: EstadoSeguimientoType | null;
   descuento_realizado?: boolean;
 }
 
 export interface UpdateSeguimientoMensualPayload {
   pago_cliente_realizado?: boolean;
-  fecha_seguimiento?: string;
-  fecha_validacion_pago?: string;
-  observacion?: string;
+  fecha_seguimiento?: string | null;
+  fecha_validacion_pago?: string | null;
+  observacion?: string | null;
   conformidad?: ConformidadType | null;
 }
 

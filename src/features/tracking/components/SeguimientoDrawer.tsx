@@ -113,10 +113,11 @@ function MesCard({
       id: mes.id,
       seguimientoId,
       data: {
-        observacion: form.observacion || undefined,
+        observacion: form.observacion.trim() === "" ? null : form.observacion,
         conformidad: form.conformidad,
-        fecha_seguimiento: form.fecha_seguimiento || undefined,
-        fecha_validacion_pago: form.fecha_validacion_pago || undefined,
+        // Para las fechas sí mantenemos el undefined porque el backend espera un formato fecha válido o null
+        fecha_seguimiento: form.fecha_seguimiento || null,
+        fecha_validacion_pago: form.fecha_validacion_pago || null,
       },
     });
     setEditing(false);
