@@ -13,7 +13,11 @@ function cleanParams(filters: SeguimientoFilters) {
   const params: Record<string, any> = {};
   Object.entries(filters).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") {
-      params[k] = v;
+      if (Array.isArray(v)) {
+        if (v.length > 0) params[k] = v.join(",");
+      } else {
+        params[k] = v;
+      }
     }
   });
   return params;
@@ -107,9 +111,12 @@ export function useUpdateSeguimientoMensual() {
  * NUEVO: Mutación para descargar el Excel de Pendientes Mes 1
  */
 export async function exportarExcelPendientes(filters?: Record<string, any>) {
+  // Aseguramos que exportar también envíe los arrays parseados
+  const params = filters ? cleanParams(filters) : undefined;
+
   const response = await api.get(
     "/tracking/seguimientos/exportar_pendientes_mes_1/",
-    { params: filters, responseType: "blob" },
+    { params, responseType: "blob" },
   );
   const url = window.URL.createObjectURL(new Blob([response.data]));
   const link = document.createElement("a");

@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSeguimientos } from "../api";
-// CORRECCIÓN QA: Importamos los extractores
 import { formatDate, getNombreAsesor, getNombreProducto } from "../utils";
 import { SeguimientoFilterBar } from "./SeguimientoFilterBar";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
@@ -75,7 +74,6 @@ function SeguimientoRow({
                 />
               )}
             </div>
-            {/* CORRECCIÓN QA: Identificadores claros de SOT, DNI/RUC y Celular */}
             <span className="text-[10px] font-mono text-muted-foreground flex flex-wrap items-center gap-1.5 mt-0.5">
               <span className="flex items-center gap-1">
                 <span className="font-semibold text-foreground/70">SOT:</span>
@@ -182,7 +180,7 @@ function SeguimientoRow({
                           ? "text-blue-500"
                           : mes.conformidad === "INCONFORME"
                             ? "text-orange-500"
-                            : "text-zinc-500", // Para SIN DEFINIR o estados vacíos
+                            : "text-zinc-500",
                       )}
                     >
                       {mes.conformidad
@@ -190,7 +188,6 @@ function SeguimientoRow({
                         : "SIN"}
                     </span>
 
-                    {/* El tooltip ahora aparece SIEMPRE que haya una observación */}
                     {mes.observacion && (
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-popover/95 backdrop-blur text-popover-foreground text-[10px] font-medium leading-relaxed rounded-lg shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none text-left">
                         {mes.observacion}
@@ -236,7 +233,7 @@ export function SeguimientoTable() {
   const [filters, setFilters] = useState<SeguimientoFilters>(() => {
     const now = new Date();
     return {
-      mes_instalacion: now.getMonth() + 1,
+      mes_instalacion: [now.getMonth() + 1],
       anio_instalacion: now.getFullYear(),
       page: 1,
       page_size: 50,
@@ -296,7 +293,8 @@ export function SeguimientoTable() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border bg-background/60 backdrop-blur-sm shrink-0">
+      {/* CORRECCIÓN: relative z-30 y sin backdrop-blur para el panel superior */}
+      <div className="p-4 border-b border-border bg-background shrink-0 relative z-30">
         <SeguimientoFilterBar
           filters={filters}
           onChange={setFilters}

@@ -17,6 +17,72 @@ import { formatDate, MESES_ES, getNombreProducto } from "../utils";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
 import type { Seguimiento, SeguimientoFilters } from "../types";
 
+function MultiSelectCheckbox({
+  values = [],
+  onChange,
+  options,
+  placeholder,
+  className,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: { label: string; value: string }[];
+  placeholder: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const toggle = (val: string) => {
+    if (values.includes(val)) onChange(values.filter((v) => v !== val));
+    else onChange([...values, val]);
+  };
+
+  const getLabel = () => {
+    if (values.length === 0) return placeholder;
+    if (values.length === 1)
+      return options.find((o) => o.value === values[0])?.label;
+    if (values.length === options.length) return "Todos los meses";
+    return `${values.length} meses selec.`;
+  };
+
+  return (
+    <div className={cn("relative", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full h-8 pl-2.5 pr-7 rounded-lg border border-border bg-background text-[11px] text-foreground flex items-center focus:outline-none focus:ring-1 focus:ring-primary/50"
+      >
+        <span className="truncate flex-1 text-left">{getLabel()}</span>
+        <ChevronDown
+          size={12}
+          className="absolute right-2 text-muted-foreground shrink-0"
+        />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute top-[calc(100%+4px)] left-0 min-w-full w-max bg-popover border border-border rounded-xl shadow-xl z-50 py-1.5 flex flex-col max-h-[240px] overflow-y-auto animate-in fade-in slide-in-from-top-2">
+            {options.map((o) => (
+              <label
+                key={o.value}
+                className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50 cursor-pointer text-[11px] text-foreground transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={values.includes(o.value)}
+                  onChange={() => toggle(o.value)}
+                  className="rounded border-border accent-primary w-3.5 h-3.5"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function groupByMesInstalacion(segs: Seguimiento[]) {
   const groups: Record<string, Seguimiento[]> = {};
   segs.forEach((s) => {
@@ -69,7 +135,6 @@ function AsesorSeguimientoCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mt-0.5">
-          {/* CORRECCIÓN QA: Identificadores claros de SOT, DNI/RUC y Celular para vista asesor */}
           <span className="text-[10px] font-mono text-muted-foreground flex flex-wrap items-center gap-1.5">
             <span className="flex items-center gap-1">
               <span className="font-semibold text-foreground/70">SOT:</span>
@@ -232,7 +297,7 @@ export function SeguimientoAsesorView() {
   const [filters, setFilters] = useState<SeguimientoFilters>(() => {
     const now = new Date();
     return {
-      mes_instalacion: now.getMonth() + 1,
+      mes_instalacion: [now.getMonth() + 1],
       anio_instalacion: now.getFullYear(),
       page: 1,
       page_size: 50,
@@ -267,14 +332,6 @@ export function SeguimientoAsesorView() {
     setFilters((prev) => ({ ...prev, page: 1 }));
   };
 
-  const handleMesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters({
-      ...filters,
-      mes_instalacion: e.target.value ? Number(e.target.value) : undefined,
-      page: 1,
-    });
-  };
-
   const handleAnioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setFilters({
       ...filters,
@@ -290,7 +347,8 @@ export function SeguimientoAsesorView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border bg-background/60 backdrop-blur-sm shrink-0 space-y-3">
+      {/* CORRECCIÓN: relative z-30 y sin backdrop-blur */}
+      <div className="p-4 border-b border-border bg-background shrink-0 space-y-3 relative z-30">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-[280px]">
             <input
@@ -302,18 +360,22 @@ export function SeguimientoAsesorView() {
           </div>
 
           <div className="flex items-center gap-2 mr-2">
-            <select
-              value={filters.mes_instalacion ?? ""}
-              onChange={handleMesChange}
-              className="h-8 pl-2 pr-6 rounded-lg border border-border bg-background text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
-            >
-              <option value="">Todo (Mes)</option>
-              {MESES_ES.map((m, i) => (
-                <option key={i} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <MultiSelectCheckbox
+              values={(filters.mes_instalacion ?? []).map(String)}
+              onChange={(arr) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  mes_instalacion: arr.map(Number),
+                  page: 1,
+                }))
+              }
+              placeholder="Meses"
+              options={MESES_ES.map((m, i) => ({
+                label: m,
+                value: String(i + 1),
+              }))}
+              className="w-[140px]"
+            />
             <select
               value={filters.anio_instalacion ?? ""}
               onChange={handleAnioChange}

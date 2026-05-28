@@ -70,7 +70,9 @@ export interface SeguimientoFilters {
   es_alto_valor?: boolean;
   estado?: EstadoSeguimientoType;
   descuento_realizado?: boolean;
-  mes_instalacion?: number;
+
+  mes_instalacion?: number[];
+
   anio_instalacion?: number;
   primer_mes_pagado?: boolean;
   genero?: GeneroCliente;

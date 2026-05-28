@@ -72,6 +72,76 @@ function Select({
   );
 }
 
+// ---> NUEVO COMPONENTE: MultiSelect con Checkboxes <---
+function MultiSelectCheckbox({
+  values = [],
+  onChange,
+  options,
+  placeholder,
+  className,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  options: { label: string; value: string }[];
+  placeholder: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const toggle = (val: string) => {
+    if (values.includes(val)) {
+      onChange(values.filter((v) => v !== val));
+    } else {
+      onChange([...values, val]);
+    }
+  };
+
+  const getLabel = () => {
+    if (values.length === 0) return placeholder;
+    if (values.length === 1)
+      return options.find((o) => o.value === values[0])?.label;
+    if (values.length === options.length) return "Todos los meses";
+    return `${values.length} meses selec.`;
+  };
+
+  return (
+    <div className={cn("relative", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full h-8 pl-2.5 pr-7 rounded-lg border border-border bg-background text-[11px] text-foreground flex items-center focus:outline-none focus:ring-1 focus:ring-primary/50"
+      >
+        <span className="truncate flex-1 text-left">{getLabel()}</span>
+        <ChevronDown
+          size={12}
+          className="absolute right-2 text-muted-foreground shrink-0"
+        />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute top-[calc(100%+4px)] left-0 min-w-full w-max bg-popover border border-border rounded-xl shadow-xl z-50 py-1.5 flex flex-col max-h-[240px] overflow-y-auto animate-in fade-in slide-in-from-top-2">
+            {options.map((o) => (
+              <label
+                key={o.value}
+                className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50 cursor-pointer text-[11px] text-foreground transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={values.includes(o.value)}
+                  onChange={() => toggle(o.value)}
+                  className="rounded border-border accent-primary w-3.5 h-3.5"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1];
 
@@ -87,7 +157,14 @@ export function SeguimientoFilterBar({
   const workspaces = user?.sucursales ?? [];
 
   const activeCount = Object.entries(filters).filter(
-    ([k, v]) => k !== "search" && v !== undefined && v !== "" && v !== null,
+    ([k, v]) =>
+      k !== "search" &&
+      k !== "page" &&
+      k !== "page_size" &&
+      v !== undefined &&
+      v !== "" &&
+      v !== null &&
+      (Array.isArray(v) ? v.length > 0 : true),
   ).length;
 
   const update = (partial: Partial<SeguimientoFilters>) =>
@@ -176,7 +253,6 @@ export function SeguimientoFilterBar({
 
       {/* Row 2: Quick chips */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* CORRECCIÓN QA: Filtros de Género movidos al principio */}
         {role === "encargado" && (
           <>
             <FilterChip
@@ -287,17 +363,16 @@ export function SeguimientoFilterBar({
             <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
               Instalación:
             </span>
-            <Select
-              value={String(filters.mes_instalacion ?? "")}
-              onChange={(v) =>
-                update({ mes_instalacion: v ? Number(v) : undefined })
-              }
-              placeholder="Mes"
+            {/* CORRECCIÓN: Instanciamos el MultiSelect para los meses */}
+            <MultiSelectCheckbox
+              values={(filters.mes_instalacion ?? []).map(String)}
+              onChange={(arr) => update({ mes_instalacion: arr.map(Number) })}
+              placeholder="Meses"
               options={MESES_ES.map((m, i) => ({
                 label: m,
                 value: String(i + 1),
               }))}
-              className="w-32"
+              className="w-[140px]"
             />
             <Select
               value={String(filters.anio_instalacion ?? "")}
