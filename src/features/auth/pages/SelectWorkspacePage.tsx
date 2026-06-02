@@ -6,17 +6,19 @@ import type { Workspace } from "../types";
 
 export const SelectWorkspacePage = () => {
   const navigate = useNavigate();
-  // 1. Extraemos activeWorkspace para usarlo como candado
   const { user, activeWorkspace, selectWorkspace, logout } = useAuth();
   const workspaces: Workspace[] = user?.sucursales ?? [];
 
   useEffect(() => {
     const rolCodigo = user?.rol?.codigo;
 
+    // ---> CORRECCIÓN: Agregamos RRHH y DUENO <---
     if (
       rolCodigo === "BACKOFFICE" ||
       rolCodigo === "COORDINADOR" ||
-      rolCodigo === "SEGUIMIENTO"
+      rolCodigo === "SEGUIMIENTO" ||
+      rolCodigo === "RRHH" ||
+      rolCodigo === "DUENO"
     ) {
       if (workspaces.length > 0 && !activeWorkspace) {
         selectWorkspace(workspaces[0]);
@@ -36,11 +38,13 @@ export const SelectWorkspacePage = () => {
     navigate("/auth/login");
   };
 
-  // Evitamos el parpadeo visual mientras se redirige al Backoffice
+  // ---> Evitamos el parpadeo visual <---
   if (
     user?.rol?.codigo === "BACKOFFICE" ||
     user?.rol?.codigo === "COORDINADOR" ||
-    user?.rol.codigo === "SEGUIMIENTO"
+    user?.rol?.codigo === "SEGUIMIENTO" ||
+    user?.rol?.codigo === "RRHH" ||
+    user?.rol?.codigo === "DUENO"
   )
     return null;
 

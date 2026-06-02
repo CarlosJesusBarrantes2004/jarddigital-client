@@ -92,7 +92,6 @@ const SECTIONS: RouteSection[] = [
         label: "Asistencia",
         href: "/attendance",
         roles: ["DUENO", "RRHH"],
-        disabled: true,
       },
     ],
   },
@@ -247,13 +246,15 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
 
   const workspaces: Workspace[] = user?.sucursales ?? [];
 
-  // Agregamos SEGUIMIENTO aquí por si debe comportarse como Backoffice en la vista global
+  // ---> CORRECCIÓN: RRHH y DUENO agregados para que vean la Vista Global en el Sidebar <---
   const esVistaGlobal =
     user?.rol?.codigo === "BACKOFFICE" ||
     user?.rol?.codigo === "COORDINADOR" ||
-    user?.rol?.codigo === "SEGUIMIENTO";
+    user?.rol?.codigo === "SEGUIMIENTO" ||
+    user?.rol?.codigo === "RRHH" ||
+    user?.rol?.codigo === "DUENO";
 
-  if (workspaces.length === 0) return null;
+  if (workspaces.length === 0 && !esVistaGlobal) return null;
 
   if (esVistaGlobal) {
     return (
@@ -268,7 +269,7 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
               Vista Global
             </span>
             <span className="block text-[10px] text-muted-foreground font-mono uppercase tracking-wider truncate">
-              Tus Sedes Asignadas
+              Todos los accesos
             </span>
           </div>
         )}
@@ -284,6 +285,7 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
 
   return (
     <div className="relative">
+      {/* ... El resto de WorkspaceSwitcher se mantiene idéntico ... */}
       <button
         type="button"
         className={cn(

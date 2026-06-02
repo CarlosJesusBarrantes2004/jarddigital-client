@@ -11,6 +11,7 @@ import { MainLayout } from "@/layouts/MainLayout";
 import { PrivateRoute } from "./PrivateRoute";
 import { ProductosPage } from "@/features/products";
 import { TrackingPage } from "@/features/tracking";
+import { AttendancePage } from "@/features/attendance/AttendancePage";
 
 export const AppRouter = () => {
   return (
@@ -36,6 +37,7 @@ export const AppRouter = () => {
             element={<ProductosPage></ProductosPage>}
           ></Route>
           <Route path="/tracking" element={<TrackingPage />} />
+          <Route path="/attendance" element={<AttendancePage />}></Route>
 
           {/* Corporative Configuration */}
           <Route path="/configuracion">

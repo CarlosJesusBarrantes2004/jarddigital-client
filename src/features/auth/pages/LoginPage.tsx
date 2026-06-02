@@ -32,10 +32,13 @@ export const LoginPage = () => {
       const workspaces = userData.sucursales ?? [];
       const rolCodigo = userData.rol?.codigo;
 
+      // ---> CORRECCIÓN: Agregamos RRHH y DUENO al Bypass Global <---
       if (
         rolCodigo === "BACKOFFICE" ||
         rolCodigo === "COORDINADOR" ||
-        rolCodigo === "SEGUIMIENTO"
+        rolCodigo === "SEGUIMIENTO" ||
+        rolCodigo === "RRHH" ||
+        rolCodigo === "DUENO"
       ) {
         if (workspaces.length > 0) selectWorkspace(workspaces[0]);
         navigate("/dashboard");
@@ -171,10 +174,6 @@ export const LoginPage = () => {
             )}
           </button>
         </form>
-
-        {/*<div className="absolute bottom-6 right-8 font-mono text-[10px] text-muted-foreground/50 tracking-[0.1em] uppercase">
-          v2.0 · JARD
-        </div>*/}
       </div>
     </div>
   );
