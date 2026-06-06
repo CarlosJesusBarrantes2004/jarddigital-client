@@ -42,6 +42,7 @@ export interface ProductoFiltros {
   es_alto_valor?: boolean;
   activo?: boolean;
   page?: number;
+  page_size?: number;
 }
 
 // En productos.types.ts — agrega este tipo

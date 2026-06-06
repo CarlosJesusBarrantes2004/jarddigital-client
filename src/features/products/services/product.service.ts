@@ -21,7 +21,7 @@ export const productosService = {
   getAll: async (filtros: ProductoFiltros = {}): Promise<ProductosResponse> => {
     const { page = 1, ...rest } = filtros;
     const { data } = await api.get("/sales/productos/", {
-      params: cleanParams({ ...rest, page }),
+      params: cleanParams({ ...rest, page, page_size: 50 }),
     });
     return data;
   },
