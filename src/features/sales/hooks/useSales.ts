@@ -45,8 +45,9 @@ export const salesKeys = {
 // ==========================================
 
 export function useVentas(filtros?: VentaFiltros) {
+  // ---> CORRECCIÓN QA: Garantizamos bloques de 50 en 50 <---
   const filtrosConPageSize: VentaFiltros | undefined = filtros?.page
-    ? { page_size: 5, ...filtros }
+    ? { page_size: 50, ...filtros }
     : filtros;
 
   return useQuery({
@@ -85,7 +86,6 @@ export function useEstadisticasAsesor(filtrosFecha?: {
     (s) => s.codigo.toUpperCase() === "RECHAZADO",
   )?.id;
 
-  // Base de fechas que se propaga a todas las queries
   const fechaBase: VentaFiltros = {
     ...(filtrosFecha?.fecha_inicio
       ? { fecha_inicio: filtrosFecha.fecha_inicio }

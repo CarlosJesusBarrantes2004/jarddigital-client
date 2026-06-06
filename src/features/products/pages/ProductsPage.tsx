@@ -1,17 +1,3 @@
-/**
- * features/products/pages/ProductsPage.tsx
- *
- * FIX #7 — El chip "Inactivos" ahora realmente muestra los productos inactivos.
- *
- * El problema original: cuando se pulsaba el chip "Inactivos" se mandaba
- * ?activo=false al backend, PERO el ProductoViewSet extiende SoftDeleteModelViewSet
- * cuyo get_queryset base devuelve solo activos. Resultado: lista vacía.
- *
- * Solución en el frontend: separamos la consulta en dos instancias de useProductos —
- * una para activos y otra para inactivos — y las mostramos en tabs.
- * El botón Reactivar ya existe en buildColumnsProductos (RotateCcw) y en
- * useReactivateProducto, solo faltaba que los inactivos llegaran.
- */
 import { useState, useMemo, memo, useEffect, useRef } from "react";
 import {
   Plus,
@@ -53,10 +39,8 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-// ── Tab ───────────────────────────────────────────────────────────────────────
 type Tab = "activos" | "inactivos";
 
-// ── StatCard ──────────────────────────────────────────────────────────────────
 const StatCard = memo(function StatCard({
   icon,
   label,
@@ -109,7 +93,6 @@ const StatCard = memo(function StatCard({
   );
 });
 
-// ── FilterChip ────────────────────────────────────────────────────────────────
 const FilterChip = memo(function FilterChip({
   label,
   active,
@@ -137,8 +120,6 @@ const FilterChip = memo(function FilterChip({
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 export function ProductosPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [productoEditar, setProductoEditar] = useState<Producto | null>(null);
@@ -148,8 +129,6 @@ export function ProductosPage() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [tab, setTab] = useState<Tab>("activos");
 
-  // Filtros compartidos (búsqueda, campaña, tipo)
-  // El filtro `activo` lo manejamos internamente vía tab, no a través del chip
   const [filtros, setFiltros] = useState<Omit<ProductoFiltros, "activo">>({});
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
@@ -165,15 +144,18 @@ export function ProductosPage() {
     setPage(1);
   }, [busquedaDebounced]);
 
-  // FIX #7: dos queries separadas — una para activos, otra para inactivos
-  const filtrosActivos: ProductoFiltros = { ...filtros, activo: true, page };
-  const filtrosInactivos: ProductoFiltros = { ...filtros, activo: false, page };
+  // ---> CORRECCIÓN QA: Agregamos explícitamente el page_size: 50 a los filtros <---
+  const filtrosBase = { ...filtros, page, page_size: 50 };
+  const filtrosActivos: ProductoFiltros = { ...filtrosBase, activo: true };
+  const filtrosInactivos: ProductoFiltros = { ...filtrosBase, activo: false };
 
+  // Solo hacemos fetch de la pestaña que el usuario está viendo actualmente para ahorrar recursos
   const {
     data: dataActivos,
     isLoading: loadingActivos,
     refetch: refetchActivos,
   } = useProductos(filtrosActivos);
+
   const {
     data: dataInactivos,
     isLoading: loadingInactivos,
@@ -190,6 +172,7 @@ export function ProductosPage() {
   const productosInactivos: Producto[] = Array.isArray(dataInactivos)
     ? dataInactivos
     : (dataInactivos?.results ?? []);
+
   const productos = tab === "activos" ? productosActivos : productosInactivos;
 
   const stats = useMemo(() => {
@@ -199,6 +182,8 @@ export function ProductosPage() {
     const totalInactivos = Array.isArray(dataInactivos)
       ? dataInactivos.length
       : (dataInactivos?.count ?? 0);
+
+    // El alto valor y promedio se calculan solo de lo que se tiene en memoria actualmente (la página visible)
     const alto_valor = productosActivos.filter((p) => p.es_alto_valor).length;
     const promedio_comision = productosActivos.length
       ? (
@@ -208,6 +193,7 @@ export function ProductosPage() {
           ) / productosActivos.length
         ).toFixed(2)
       : "0.00";
+
     return {
       total: totalActivos + totalInactivos,
       activos: totalActivos,
@@ -243,7 +229,7 @@ export function ProductosPage() {
       toast.success(`"${productoEliminar.nombre_paquete}" desactivado`);
       setProductoEliminar(null);
       refetchActivos();
-      refetchInactivos(); // FIX #7: refrescamos inactivos también
+      refetchInactivos();
     } catch {
       toast.error("Error al desactivar el producto");
     }
@@ -253,8 +239,8 @@ export function ProductosPage() {
     try {
       await reactivar(p.id);
       toast.success(`"${p.nombre_paquete}" reactivado`);
-      refetchActivos(); // FIX #7: vuelve a aparecer en activos
-      refetchInactivos(); // FIX #7: desaparece de inactivos
+      refetchActivos();
+      refetchInactivos();
     } catch {
       toast.error("Error al reactivar el producto");
     }
@@ -269,6 +255,7 @@ export function ProductosPage() {
     setProductoEliminar,
     handleReactivar,
   );
+
   const paginado =
     tab === "activos"
       ? !Array.isArray(dataActivos)
@@ -279,6 +266,11 @@ export function ProductosPage() {
         : null;
 
   const isLoading = tab === "activos" ? loadingActivos : loadingInactivos;
+
+  // Matemática de la Paginación
+  const currentPage = page;
+  const totalItems = paginado?.count ?? productos.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / 50));
 
   return (
     <>
@@ -342,10 +334,13 @@ export function ProductosPage() {
           />
         </div>
 
-        {/* ── FIX #7: Tabs Activos / Inactivos ── */}
+        {/* ── Tabs Activos / Inactivos ── */}
         <div className="flex gap-1 bg-muted/40 p-1 rounded-xl w-fit border border-border">
           <button
-            onClick={() => setTab("activos")}
+            onClick={() => {
+              setTab("activos");
+              setPage(1);
+            }}
             className={cn(
               "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
               tab === "activos"
@@ -356,7 +351,10 @@ export function ProductosPage() {
             Activos ({loadingActivos ? "…" : stats.activos})
           </button>
           <button
-            onClick={() => setTab("inactivos")}
+            onClick={() => {
+              setTab("inactivos");
+              setPage(1);
+            }}
             className={cn(
               "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
               tab === "inactivos"
@@ -368,7 +366,7 @@ export function ProductosPage() {
           </button>
         </div>
 
-        {/* ── Filter chips — solo para activos ── */}
+        {/* ── Filter chips ── */}
         {tab === "activos" && (
           <div className="flex flex-wrap gap-2 items-center">
             <FilterChip
@@ -382,15 +380,16 @@ export function ProductosPage() {
               label="⭐ Alto valor"
               active={(filtros as ProductoFiltros).es_alto_valor === true}
               activeClass="bg-[#C9975A]/10 text-[#C9975A] border-[#C9975A]/30"
-              onClick={() =>
+              onClick={() => {
+                setPage(1);
                 setFiltros((f) => ({
                   ...f,
                   es_alto_valor:
                     (f as ProductoFiltros).es_alto_valor === true
                       ? undefined
                       : true,
-                }))
-              }
+                }));
+              }}
             />
             <div className="h-4 w-px bg-border mx-1" />
             {TIPOS_SOLUCION.map((tipo) => (
@@ -399,15 +398,16 @@ export function ProductosPage() {
                 label={tipo}
                 active={(filtros as ProductoFiltros).tipo_solucion === tipo}
                 activeClass="bg-primary/10 text-primary border-primary/30"
-                onClick={() =>
+                onClick={() => {
+                  setPage(1);
                   setFiltros((f) => ({
                     ...f,
                     tipo_solucion:
                       (f as ProductoFiltros).tipo_solucion === tipo
                         ? undefined
                         : tipo,
-                  }))
-                }
+                  }));
+                }}
               />
             ))}
           </div>
@@ -491,15 +491,16 @@ export function ProductosPage() {
                     value={
                       (filtros as ProductoFiltros).nombre_campana ?? "todos"
                     }
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setPage(1);
                       setFiltros((f) => ({
                         ...f,
                         nombre_campana:
                           e.target.value === "todos"
                             ? undefined
                             : e.target.value,
-                      }))
-                    }
+                      }));
+                    }}
                     disabled={loadingCampanas}
                     className="w-full h-11 bg-background/50 border border-border/50 rounded-xl pl-4 pr-10 text-sm text-foreground focus:border-primary/50 appearance-none outline-none transition-all cursor-pointer"
                   >
@@ -531,6 +532,7 @@ export function ProductosPage() {
                     }
                     onChange={(e) => {
                       const v = e.target.value;
+                      setPage(1);
                       setFiltros((f) => ({
                         ...f,
                         es_alto_valor: v === "todos" ? undefined : v === "true",
@@ -553,7 +555,7 @@ export function ProductosPage() {
         </div>
 
         {/* ── Tabla ── */}
-        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <DataTable
             columns={columns}
             data={productos}
@@ -564,37 +566,34 @@ export function ProductosPage() {
                 : "No hay productos que coincidan con los filtros aplicados"
             }
           />
-        </div>
 
-        {/* ── Paginación ── */}
-        {paginado && (paginado.next || paginado.previous) && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
-            <span>
-              <strong className="text-primary font-mono font-semibold">
-                {paginado.count}
-              </strong>{" "}
-              productos en total
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={!paginado.previous}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-4 py-2 rounded-lg bg-card border border-border text-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
-              >
-                ← Anterior
-              </button>
-              <button
-                type="button"
-                disabled={!paginado.next}
-                onClick={() => setPage((p) => p + 1)}
-                className="px-4 py-2 rounded-lg bg-card border border-border text-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
-              >
-                Siguiente →
-              </button>
+          {/* ---> CORRECCIÓN QA: Controles de paginación explícitos <--- */}
+          {paginado && (paginado.next || paginado.previous) && (
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-card shrink-0">
+              <span className="text-[12px] font-medium text-muted-foreground">
+                Página {currentPage} de {totalPages} ({paginado.count} totales)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!paginado.previous}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="h-8 px-3 rounded-lg border border-border text-[12px] font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  disabled={!paginado.next}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-8 px-3 rounded-lg border border-border text-[12px] font-medium text-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-colors"
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <ProductoForm

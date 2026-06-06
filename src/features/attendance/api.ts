@@ -121,3 +121,38 @@ export function useSaveMultiAsistenciaMasiva() {
     },
   });
 }
+
+export async function exportarExcelAsistencias(filters: AttendanceFilters) {
+  // Limpiamos los filtros para no enviar nulos
+  const cleanFilters: Record<string, any> = {};
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") {
+      cleanFilters[k] = v;
+    }
+  });
+
+  const response = await api.get("/finances/asistencias/exportar_excel/", {
+    params: cleanFilters,
+    responseType: "blob",
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement("a");
+  link.href = url;
+
+  // El nombre de archivo lo determina el backend (Content-Disposition),
+  // pero le ponemos un fallback por si acaso
+  const contentDisposition = response.headers["content-disposition"];
+  let filename = `Asistencias_${filters.mes}_${filters.anio}.xlsx`;
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+    if (filenameMatch?.length === 2) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
