@@ -38,7 +38,7 @@ import { useBranches } from "@/features/core/hooks/useBranches";
 import { VentaFormAsesor } from "../components/VentaFormAsesor";
 import { useAuth } from "@/features/auth/context/useAuth";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 50;
 
 type TabEstado =
   | "todos"
