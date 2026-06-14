@@ -13,6 +13,7 @@ import {
   Moon,
   Sun,
   Laptop,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -79,6 +80,23 @@ const SECTIONS: RouteSection[] = [
     ],
   },
   {
+    title: "Finanzas",
+    Icon: Wallet,
+    collapsible: true,
+    items: [
+      {
+        label: "Mi Liquidación",
+        href: "/finances/me",
+        roles: ["ASESOR"],
+      },
+      {
+        label: "Gestión de Planillas",
+        href: "/finances/planillas",
+        roles: ["DUENO", "RRHH"],
+      },
+    ],
+  },
+  {
     title: "Capital Humano",
     Icon: Users,
     collapsible: true,
@@ -114,6 +132,11 @@ const SECTIONS: RouteSection[] = [
       {
         label: "Productos",
         href: "/configuracion/productos",
+        roles: ["DUENO"],
+      },
+      {
+        label: "Reglas de Comisión",
+        href: "/configuracion/reglas-comision",
         roles: ["DUENO"],
       },
     ],

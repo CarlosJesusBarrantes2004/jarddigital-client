@@ -19,6 +19,11 @@ export interface UserWorkspace {
   etiqueta: string;
 }
 
+export interface PerfilLaboral {
+  sueldo_base_part_time: string;
+  fecha_inicio_contrato: string | null;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -29,6 +34,7 @@ export interface User {
   rol?: Role;
   sucursales: UserWorkspace[];
   activo: boolean;
+  perfil_laboral?: PerfilLaboral | null;
 }
 
 export interface CreateUserPayload {
@@ -40,6 +46,7 @@ export interface CreateUserPayload {
   celular?: string | null;
   ids_modalidades_sede?: number[];
   activo?: boolean;
+  perfil_laboral?: PerfilLaboral | null;
 }
 
 export interface UpdateUserPayload {
@@ -50,6 +57,7 @@ export interface UpdateUserPayload {
   celular?: string | null;
   ids_modalidades_sede?: number[];
   activo?: boolean;
+  perfil_laboral?: PerfilLaboral | null;
 }
 
 export interface SupervisorAssignmentPayload {

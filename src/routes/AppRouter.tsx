@@ -12,6 +12,9 @@ import { PrivateRoute } from "./PrivateRoute";
 import { ProductosPage } from "@/features/products";
 import { TrackingPage } from "@/features/tracking";
 import { AttendancePage } from "@/features/attendance/AttendancePage";
+import { AsesorFinancesPage } from "@/features/finances/pages/AsesorFinancesPage";
+import { AdminFinancesPage } from "@/features/finances/pages/AdminFinancesPage";
+import { ReglasComisionPage } from "@/features/finances/pages/ReglasComisionPage";
 
 export const AppRouter = () => {
   return (
@@ -39,10 +42,23 @@ export const AppRouter = () => {
           <Route path="/tracking" element={<TrackingPage />} />
           <Route path="/attendance" element={<AttendancePage />}></Route>
 
+          <Route
+            path="/finances/me"
+            element={<AsesorFinancesPage></AsesorFinancesPage>}
+          ></Route>
+          <Route
+            path="/finances/planillas"
+            element={<AdminFinancesPage></AdminFinancesPage>}
+          ></Route>
+
           {/* Corporative Configuration */}
           <Route path="/configuracion">
             <Route index element={<Navigate to="sucursales" replace />} />
             <Route path=":tab" element={<CorporativeConfigPage />} />
+            <Route
+              path="reglas-comision"
+              element={<ReglasComisionPage></ReglasComisionPage>}
+            ></Route>
           </Route>
         </Route>
       </Route>

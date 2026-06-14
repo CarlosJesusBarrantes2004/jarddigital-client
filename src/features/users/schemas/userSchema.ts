@@ -29,6 +29,15 @@ export const userFormSchema = z.object({
     .min(1, "Selecciona un rol"),
 
   activo: z.boolean(),
+
+  sueldo_base_part_time: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || (!isNaN(Number(val)) && Number(val) >= 0),
+      "Debe ser un monto numérico positivo",
+    ),
+  fecha_inicio_contrato: z.string().optional(),
 });
 
 export type UserFormValues = z.infer<typeof userFormSchema>;

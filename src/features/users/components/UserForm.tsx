@@ -4,7 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlertCircle,
   AlertTriangle,
+  Calendar,
   Check,
+  DollarSign,
   Loader2,
   Lock,
   ShieldAlert,
@@ -137,6 +139,9 @@ export const UserForm = ({
       password: "",
       id_rol: user?.id_rol ?? 0,
       activo: user?.activo ?? true,
+      // Mapeo seguro con Optional Chaining desde el backend
+      sueldo_base_part_time: user?.perfil_laboral?.sueldo_base_part_time ?? "",
+      fecha_inicio_contrato: user?.perfil_laboral?.fecha_inicio_contrato ?? "",
     },
   });
 
@@ -156,7 +161,6 @@ export const UserForm = ({
 
   const wasSupervior = originalRoleCode === "SUPERVISOR";
 
-  // Detectar si le quitan rol supervisor o lo desactivan
   useEffect(() => {
     if (!isEditing || !wasSupervior) {
       setShowRemoveSupervisorWarning(false);
@@ -165,7 +169,6 @@ export const UserForm = ({
     setShowRemoveSupervisorWarning(!isSupervisor || watchedActivo === false);
   }, [isEditing, wasSupervior, isSupervisor, watchedActivo]);
 
-  // Verificar conflictos al cambiar sedes seleccionadas (solo si es supervisor)
   useEffect(() => {
     if (
       !isSupervisor ||
@@ -185,7 +188,6 @@ export const UserForm = ({
           user?.id,
         );
         if (assignment) {
-          // Preservar estado "resolved" si ya existía
           const previo = conflicts.find((c) => c.wsId === wsId);
           nuevosConflictos.push({
             wsId,
@@ -202,14 +204,11 @@ export const UserForm = ({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSupervisor, selectedWsIds, checkActiveSupervisorAssignment, user?.id]);
 
-  // ¿Quedan conflictos sin resolver?
   const unresolvedConflicts = conflicts.filter((c) => !c.resolved);
   const hasBlockingConflicts = unresolvedConflicts.length > 0;
 
-  // Desactivar asignación anterior (el "muro histórico")
   const handleResolveConflict = async (conflict: ConflictingAssignment) => {
     if (!deactivateSupervisorAssignment) return;
     setResolvingId(conflict.assignmentId);
@@ -223,7 +222,6 @@ export const UserForm = ({
         ),
       );
     } catch {
-      // Podrías mostrar un toast de error aquí si tienes acceso a él
       console.error("Error al desactivar asignación anterior");
     } finally {
       setResolvingId(null);
@@ -289,33 +287,40 @@ export const UserForm = ({
   };
 
   const onSubmit = async (values: UserFormValues) => {
-    if (hasBlockingConflicts) return; // Seguridad extra
+    if (hasBlockingConflicts) return;
     if (needsWorkspace && selectedWsIds.length === 0) return;
 
     setIsSubmitting(true);
     const celularFinal = values.celular?.trim() || null;
 
-    const payload: CreateUserPayload | UpdateUserPayload = isEditing
+    // Construcción del objeto anidado o null según la nota técnica del backend
+    const perfilLaboralFinal =
+      values.sueldo_base_part_time || values.fecha_inicio_contrato
+        ? {
+            sueldo_base_part_time: values.sueldo_base_part_time
+              ? Number(values.sueldo_base_part_time).toFixed(2)
+              : "0.00",
+            fecha_inicio_contrato: values.fecha_inicio_contrato || null,
+          }
+        : null;
+
+    const basePayload = {
+      username: values.username,
+      nombre_completo: values.nombre_completo,
+      email: values.email,
+      celular: celularFinal,
+      id_rol: values.id_rol,
+      activo: values.activo,
+      ids_modalidades_sede: isOwner ? [] : selectedWsIds,
+      perfil_laboral: perfilLaboralFinal, // Inyección de datos financieros
+    };
+
+    const payload = isEditing
       ? {
-          username: values.username,
-          nombre_completo: values.nombre_completo,
-          email: values.email,
-          celular: celularFinal,
-          id_rol: values.id_rol,
-          activo: values.activo,
-          ids_modalidades_sede: isOwner ? [] : selectedWsIds,
+          ...basePayload,
           ...(values.password ? { password: values.password } : {}),
         }
-      : {
-          username: values.username,
-          nombre_completo: values.nombre_completo,
-          email: values.email,
-          celular: celularFinal,
-          password: values.password ?? "",
-          id_rol: values.id_rol,
-          activo: values.activo,
-          ids_modalidades_sede: isOwner ? [] : selectedWsIds,
-        };
+      : { ...basePayload, password: values.password ?? "" };
 
     const ok = await onSave(payload, isSupervisor, selectedWsIds);
     if (!ok) setIsSubmitting(false);
@@ -330,7 +335,6 @@ export const UserForm = ({
       onSubmit={handleSubmit(onSubmit)}
       noValidate
     >
-      {/* Banner: cambio de rol supervisor */}
       {showRemoveSupervisorWarning && (
         <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 animate-in fade-in slide-in-from-top-2 duration-300">
           <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
@@ -382,7 +386,7 @@ export const UserForm = ({
               type="text"
               placeholder="carlos_b"
               className={cn(
-                "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50 disabled:cursor-not-allowed",
+                "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
                 errors.username ? "border-destructive" : "border-border",
               )}
               {...register("username")}
@@ -416,7 +420,7 @@ export const UserForm = ({
 
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
-              Celular
+              Celular{" "}
               <span className="text-muted-foreground/50 text-[10px] normal-case font-sans tracking-normal ml-1">
                 (para WhatsApp)
               </span>
@@ -460,6 +464,57 @@ export const UserForm = ({
             {errors.password && (
               <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
                 <AlertCircle size={11} /> {errors.password.message}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── NUEVA SECCIÓN: Perfil Laboral (Módulo Finanzas) ── */}
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm border-l-4 border-l-blue-500">
+        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-4">
+          Perfil Laboral (Módulo Finanzas)
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
+              <DollarSign size={12} /> Sueldo Base Part-Time
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: 950.00"
+              className={cn(
+                "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10",
+                errors.sueldo_base_part_time
+                  ? "border-destructive"
+                  : "border-border",
+              )}
+              {...register("sueldo_base_part_time")}
+            />
+            {errors.sueldo_base_part_time && (
+              <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
+                <AlertCircle size={11} /> {errors.sueldo_base_part_time.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
+              <Calendar size={12} /> Fecha Inicio de Contrato
+            </label>
+            <input
+              type="date"
+              className={cn(
+                "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10",
+                errors.fecha_inicio_contrato
+                  ? "border-destructive"
+                  : "border-border",
+              )}
+              {...register("fecha_inicio_contrato")}
+            />
+            {errors.fecha_inicio_contrato && (
+              <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
+                <AlertCircle size={11} /> {errors.fecha_inicio_contrato.message}
               </p>
             )}
           </div>
@@ -595,7 +650,6 @@ export const UserForm = ({
                         <Check size={12} strokeWidth={3} />
                       ) : null}
                     </div>
-
                     <div className="flex-1 flex justify-between items-center min-w-0">
                       <div className="min-w-0">
                         <span
@@ -644,18 +698,16 @@ export const UserForm = ({
             </p>
           )}
 
-          {/* Panel de resolución de conflictos */}
           {isSupervisor && conflicts.length > 0 && (
             <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden animate-in fade-in duration-200">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-500/20">
                 <ShieldAlert size={14} className="text-amber-500 shrink-0" />
                 <p className="text-[12px] font-semibold text-amber-600 dark:text-amber-400">
                   {unresolvedConflicts.length > 0
-                    ? `${unresolvedConflicts.length === 1 ? "Hay un supervisor activo" : `Hay ${unresolvedConflicts.length} supervisores activos"}`} — acción requerida`
+                    ? `Hay ${unresolvedConflicts.length === 1 ? "un supervisor activo" : `${unresolvedConflicts.length} supervisores activos`} — acción requerida`
                     : "Conflictos resueltos — puedes guardar"}
                 </p>
               </div>
-
               <div className="divide-y divide-amber-500/10">
                 {conflicts.map((conflict) => (
                   <div
@@ -676,7 +728,6 @@ export const UserForm = ({
                         </span>
                       </p>
                     </div>
-
                     {conflict.resolved ? (
                       <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-2.5 py-1">
                         <Check size={11} strokeWidth={3} /> Dado de baja
@@ -705,7 +756,6 @@ export const UserForm = ({
                   </div>
                 ))}
               </div>
-
               {unresolvedConflicts.length > 0 && (
                 <div className="px-4 py-2.5 bg-amber-500/5 border-t border-amber-500/20">
                   <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
@@ -747,7 +797,7 @@ export const UserForm = ({
           disabled={
             isSubmitting ||
             (needsWorkspace && selectedWsIds.length === 0) ||
-            hasBlockingConflicts // bloqueado solo si hay conflictos SIN resolver
+            hasBlockingConflicts
           }
           className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
