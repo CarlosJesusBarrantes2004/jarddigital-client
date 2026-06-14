@@ -248,7 +248,7 @@ export const AsesorFinancesPage = () => {
                 </span>{" "}
                 pagadas de{" "}
                 <span className="font-medium text-foreground">
-                  {dashboard.ventas_instaladas}
+                  {detalleVentas.length}
                 </span>{" "}
                 instaladas
               </div>
