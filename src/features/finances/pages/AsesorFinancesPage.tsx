@@ -70,7 +70,7 @@ export const AsesorFinancesPage = () => {
     } catch (error) {
       console.error(error);
       setDashboard(null);
-      toast.error("No pudimos cargar tus finanzas");
+      toast.error(extraerErrorFinanzas(error));
     } finally {
       setIsLoading(false);
     }
