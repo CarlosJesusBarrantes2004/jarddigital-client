@@ -48,7 +48,9 @@ export interface HistoricoPlanilla {
 export interface MiDashboardRespuesta {
   id_usuario: number;
   nombre_completo: string;
-  escenario_aplicado: "ESTANDAR" | "ELITE";
+  // escenario_aplicado: "ESTANDAR" | "ELITE";
+  escenario_sueldo: "ESTANDAR" | "ELITE";
+  escenario_comisiones: "ESTANDAR" | "ELITE";
   ventas_instaladas: number;
   ventas_pagadas: number;
   ventas_alto_valor: number;

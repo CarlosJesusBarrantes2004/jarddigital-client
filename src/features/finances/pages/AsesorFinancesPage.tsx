@@ -7,6 +7,8 @@ import {
   Info,
   RefreshCw,
   Package,
+  Filter,
+  Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -46,6 +48,10 @@ export const AsesorFinancesPage = () => {
   // Estado auxiliar para la tabla de desglose
   const [detalleVentas, setDetalleVentas] = useState<any[]>([]);
 
+  const [filtroAltoValor, setFiltroAltoValor] = useState<"TODOS" | "SI" | "NO">(
+    "TODOS",
+  );
+
   const fetchDashboard = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -80,13 +86,18 @@ export const AsesorFinancesPage = () => {
     fetchDashboard();
   }, [fetchDashboard]);
 
+  const ventasFiltradas = detalleVentas.filter((venta: any) => {
+    if (filtroAltoValor === "SI") return venta.producto_es_alto_valor === true;
+    if (filtroAltoValor === "NO") return venta.producto_es_alto_valor === false;
+    return true; // "TODOS"
+  });
+
   const mesAnteriorObj = MESES.find(
     (m) => m.valor === (mes === 1 ? 12 : mes - 1),
   );
 
   return (
     <div className="p-6 max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-300">
-      {/* CABECERA Y FILTROS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card border border-border rounded-xl p-5 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -135,13 +146,12 @@ export const AsesorFinancesPage = () => {
         </div>
       ) : dashboard ? (
         <>
-          {/* TARJETAS DE RESUMEN (CARDS) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* CARD 1: Sueldo Base */}
             <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between shadow-sm">
               <div className="flex justify-between items-start">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Sueldo Base Aplicado
+                  Sueldo Base
                 </span>
                 <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg">
                   <BadgeDollarSign size={18} />
@@ -151,9 +161,10 @@ export const AsesorFinancesPage = () => {
                 <span className="text-2xl font-bold text-foreground">
                   S/ {Number(dashboard.sueldo_base_aplicado).toFixed(2)}
                 </span>
-                {dashboard.escenario_aplicado === "ELITE" && (
+                {/* ---> APLICAMOS escenario_sueldo <--- */}
+                {dashboard.escenario_sueldo === "ELITE" && (
                   <p className="text-[11px] font-medium text-yellow-600 mt-1 uppercase tracking-wider">
-                    ★ Escenario Élite Activado
+                    ★ Sueldo Élite Activado
                   </p>
                 )}
               </div>
@@ -163,7 +174,7 @@ export const AsesorFinancesPage = () => {
             <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between shadow-sm">
               <div className="flex justify-between items-start">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Descuento Inasistencias
+                  Faltas / Desc.
                 </span>
                 <div className="p-2 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-lg">
                   <AlertTriangle size={18} />
@@ -174,7 +185,7 @@ export const AsesorFinancesPage = () => {
                   - S/ {Number(dashboard.descuento_faltas).toFixed(2)}
                 </span>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Registraste {dashboard.dias_falta} falta(s) en{" "}
+                  {dashboard.dias_falta} falta(s) en{" "}
                   {MESES.find((m) => m.valor === mes)?.nombre}
                 </p>
               </div>
@@ -184,7 +195,7 @@ export const AsesorFinancesPage = () => {
             <div className="bg-card border border-border rounded-xl p-5 flex flex-col justify-between shadow-sm">
               <div className="flex justify-between items-start">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Comisiones Ganadas
+                  Comisiones
                 </span>
                 <div className="p-2 bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 rounded-lg">
                   <TrendingUp size={18} />
@@ -195,9 +206,7 @@ export const AsesorFinancesPage = () => {
                   + S/ {Number(dashboard.comision_neta).toFixed(2)}
                 </span>
                 <div className="flex items-center gap-2 mt-1 text-xs">
-                  <span className="text-muted-foreground">
-                    Multiplicador AV:
-                  </span>
+                  <span className="text-muted-foreground">Mult. AV:</span>
                   <span
                     className={cn(
                       "font-bold",
@@ -211,6 +220,12 @@ export const AsesorFinancesPage = () => {
                     x{Number(dashboard.multiplicador_av).toFixed(2)}
                   </span>
                 </div>
+                {/* ---> APLICAMOS escenario_comisiones <--- */}
+                {dashboard.escenario_comisiones === "ELITE" && (
+                  <p className="text-[11px] font-medium text-yellow-600 mt-1 uppercase tracking-wider">
+                    ★ Regla Élite Aplicada
+                  </p>
+                )}
               </div>
             </div>
 
@@ -229,28 +244,45 @@ export const AsesorFinancesPage = () => {
                   S/ {Number(dashboard.sueldo_neto_final).toFixed(2)}
                 </span>
                 <p className="text-xs text-primary-foreground/70 mt-1">
-                  Sujeto a confirmación final de RRHH.
+                  Sujeto a confirmación final.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* TABLA DE DETALLE DE VENTAS DEL MES ANTERIOR */}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col mt-4">
-            <div className="p-4 border-b border-border bg-muted/20 flex justify-between items-center">
+            <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <Package size={16} className="text-primary" />
                 Ventas de {mesAnteriorObj?.nombre} (Base para comisión)
               </h3>
-              <div className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  {dashboard.ventas_pagadas}
-                </span>{" "}
-                pagadas de{" "}
-                <span className="font-medium text-foreground">
-                  {detalleVentas.length}
-                </span>{" "}
-                instaladas
+
+              {/* CONTROLES DE LA TABLA: Info y Filtro */}
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                  <span className="font-medium text-foreground">
+                    {dashboard.ventas_pagadas}
+                  </span>{" "}
+                  pagadas de{" "}
+                  <span className="font-medium text-foreground">
+                    {detalleVentas.length}
+                  </span>{" "}
+                  instaladas
+                </div>
+
+                {/* SELECT DE FILTRO ALTO VALOR */}
+                <div className="flex items-center gap-2 bg-background border border-border rounded-md px-2 h-8 w-full sm:w-auto">
+                  <Filter size={14} className="text-muted-foreground" />
+                  <select
+                    value={filtroAltoValor}
+                    onChange={(e) => setFiltroAltoValor(e.target.value as any)}
+                    className="text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground w-full"
+                  >
+                    <option value="TODOS">Todas las ventas</option>
+                    <option value="SI">Solo Alto Valor</option>
+                    <option value="NO">Ventas Normales</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -260,25 +292,25 @@ export const AsesorFinancesPage = () => {
                   <tr>
                     <th className="px-4 py-3">Cliente</th>
                     <th className="px-4 py-3">Producto / Plan</th>
-                    <th className="px-4 py-3 text-center">
-                      Estado de Pago (Seguimiento)
-                    </th>
+                    {/* NUEVA COLUMNA */}
+                    <th className="px-4 py-3 text-center">Alto Valor</th>
+                    <th className="px-4 py-3 text-center">Estado (Mes 1)</th>
                     <th className="px-4 py-3 text-right">Costo Fijo</th>
                     <th className="px-4 py-3 text-right">Comisión Base</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {detalleVentas.length === 0 ? (
+                  {ventasFiltradas.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-4 py-8 text-center text-muted-foreground"
                       >
-                        No hay ventas registradas para este periodo.
+                        No se encontraron ventas para este filtro o periodo.
                       </td>
                     </tr>
                   ) : (
-                    detalleVentas.map((venta: any) => (
+                    ventasFiltradas.map((venta: any) => (
                       <tr key={venta.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <p className="font-medium text-foreground">
@@ -296,6 +328,21 @@ export const AsesorFinancesPage = () => {
                             {venta.producto_campana || "Campaña"}
                           </p>
                         </td>
+
+                        {/* CELDA DE ALTO VALOR */}
+                        <td className="px-4 py-3 text-center">
+                          {venta.producto_es_alto_valor ? (
+                            <span className="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-500 font-medium text-xs">
+                              <Star size={14} className="fill-current" />
+                              Sí
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">
+                              —
+                            </span>
+                          )}
+                        </td>
+
                         <td className="px-4 py-3 text-center">
                           {venta.pago_primer_mes ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -310,11 +357,9 @@ export const AsesorFinancesPage = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">
-                          {/* MOCK DE COSTO - Esto dependerá de la data real de ventas */}
                           S/ {Number(venta.producto_costo_fijo || 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-foreground">
-                          {/* MOCK COMISIÓN */}
                           S/{" "}
                           {Number(venta.producto_comision_base || 0).toFixed(2)}
                         </td>
