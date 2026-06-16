@@ -338,7 +338,7 @@ export const AsesorFinancesPage = () => {
                             </span>
                           ) : (
                             <span className="text-muted-foreground text-xs">
-                              —
+                              No
                             </span>
                           )}
                         </td>

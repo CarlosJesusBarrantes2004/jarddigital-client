@@ -61,17 +61,34 @@ export const useUsers = () => {
   }, []);
 
   // ── Carga de activos ─────────────────────────────────────────────────────────
+
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
+      // ---> CORRECCIÓN AQUÍ <---
+      // Definimos qué roles tienen visión global (pueden ver todas las sedes)
+      const rolesConVisionGlobal = [
+        "DUENO",
+        "RRHH",
+        "BACKOFFICE",
+        "COORDINADOR",
+      ];
+      const tieneVisionGlobal = rolesConVisionGlobal.includes(
+        currentUser?.rol?.codigo || "",
+      );
+
       const effectiveFilters: UserFilters = {
         ...filters,
         activo: true, // FIX #7: explícito para que el backend no filtre mal
-        id_modalidad_sede:
-          currentUser?.rol?.codigo !== "DUENO" && activeWorkspace
-            ? (filters.id_modalidad_sede ?? activeWorkspace.id_modalidad_sede)
-            : filters.id_modalidad_sede,
+
+        // Nueva lógica de sede:
+        // Si el usuario TIENE visión global: Usa solo el filtro manual (filters.id_modalidad_sede). Si no eligió nada, se manda undefined (ve todo).
+        // Si el usuario NO tiene visión global (Ej. Supervisor): Siempre inyecta su sede activa, ignorando cualquier filtro manual.
+        id_modalidad_sede: tieneVisionGlobal
+          ? filters.id_modalidad_sede
+          : activeWorkspace?.id_modalidad_sede,
       };
+
       const data = await userService.getAll({
         search: effectiveFilters.search || undefined,
         id_rol: effectiveFilters.id_rol || undefined,
@@ -90,19 +107,29 @@ export const useUsers = () => {
   const fetchInactiveUsers = useCallback(async () => {
     setIsLoadingInactive(true);
     try {
+      // ---> CORRECCIÓN AQUÍ <---
+      const rolesConVisionGlobal = [
+        "DUENO",
+        "RRHH",
+        "BACKOFFICE",
+        "COORDINADOR",
+      ];
+      const tieneVisionGlobal = rolesConVisionGlobal.includes(
+        currentUser?.rol?.codigo || "",
+      );
+
       const data = await userService.getAll({
         activo: false,
-        // Aplicamos los mismos filtros de texto/rol si existen
         search: filters.search || undefined,
         id_rol: filters.id_rol || undefined,
-        id_modalidad_sede:
-          currentUser?.rol?.codigo !== "DUENO" && activeWorkspace
-            ? (filters.id_modalidad_sede ?? activeWorkspace.id_modalidad_sede)
-            : filters.id_modalidad_sede,
+
+        // Misma lógica aplicada a los inactivos
+        id_modalidad_sede: tieneVisionGlobal
+          ? filters.id_modalidad_sede
+          : activeWorkspace?.id_modalidad_sede,
       });
       setInactiveUsers(data);
     } catch {
-      // No mostramos toast para no saturar — simplemente dejamos la lista vacía
       setInactiveUsers([]);
     } finally {
       setIsLoadingInactive(false);
