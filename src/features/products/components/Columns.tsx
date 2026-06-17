@@ -66,22 +66,32 @@ export function buildColumnsProductos(
         const p = row.original;
         return (
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-muted-foreground w-8">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] text-muted-foreground">
                 COSTO
               </span>
-              <span className="font-mono text-sm font-semibold text-foreground">
+              <span className="font-mono text-[12px] font-semibold text-foreground">
                 S/ {Number(p.costo_fijo_plan).toFixed(2)}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-muted-foreground w-8">
-                COM.
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] text-muted-foreground">
+                C. CALL
               </span>
-              <span className="font-mono text-sm font-semibold text-emerald-500">
-                S/ {Number(p.comision_base).toFixed(2)}
+              <span className="font-mono text-[12px] font-semibold text-blue-500">
+                S/ {Number(p.comision_base_call).toFixed(2)}
               </span>
             </div>
+            {p.comision_base_campo && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  C. CAMPO
+                </span>
+                <span className="font-mono text-[12px] font-semibold text-emerald-500">
+                  S/ {Number(p.comision_base_campo).toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         );
       },

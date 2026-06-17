@@ -188,7 +188,7 @@ export function ProductosPage() {
     const promedio_comision = productosActivos.length
       ? (
           productosActivos.reduce(
-            (acc, p) => acc + Number(p.comision_base || 0),
+            (acc, p) => acc + Number(p.comision_base_call || 0),
             0,
           ) / productosActivos.length
         ).toFixed(2)

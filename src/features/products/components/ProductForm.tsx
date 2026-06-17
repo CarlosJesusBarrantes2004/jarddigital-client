@@ -26,17 +26,19 @@ const schema = z.object({
   costo_fijo_plan: z
     .string()
     .min(1, "Requerido")
-    .refine(
-      (v) => !isNaN(Number(v)) && Number(v) >= 0,
-      "Debe ser un número positivo",
-    ),
-  comision_base: z
+    .refine((v) => !isNaN(Number(v)) && Number(v) >= 0, "Debe ser positivo"),
+  comision_base_call: z
     .string()
     .min(1, "Requerido")
-    .refine(
-      (v) => !isNaN(Number(v)) && Number(v) >= 0,
-      "Debe ser un número positivo",
-    ),
+    .refine((v) => !isNaN(Number(v)) && Number(v) >= 0, "Debe ser positivo"),
+  comision_base_campo: z
+    .string()
+    .optional()
+    .nullable()
+    .refine((v) => {
+      if (!v) return true; // Es opcional/nulo
+      return !isNaN(Number(v)) && Number(v) >= 0;
+    }, "Debe ser positivo si se ingresa"),
   fecha_fin_vigencia: z.string().nullable().optional(),
   activo: z.boolean(),
 });
@@ -230,7 +232,10 @@ const PreviewCard = memo(function PreviewCard({
   values: Partial<FormValues>;
 }) {
   const costo = Number(values.costo_fijo_plan || 0);
-  const comision = Number(values.comision_base || 0);
+  const comisionCall = Number(values.comision_base_call || 0);
+  const comisionCampo = values.comision_base_campo
+    ? Number(values.comision_base_campo)
+    : null;
 
   return (
     <div className="flex flex-col gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10 relative overflow-hidden">
@@ -263,8 +268,14 @@ const PreviewCard = memo(function PreviewCard({
 
       <div className="h-px bg-border/50 my-1 relative z-10" />
 
-      <div className="grid grid-cols-2 gap-3 relative z-10">
-        <div className="p-3 rounded-xl bg-background/50 border border-border/50">
+      {/* Grid adaptable para mostrar costo y comisiones */}
+      <div
+        className={cn(
+          "grid gap-3 relative z-10",
+          comisionCampo !== null ? "grid-cols-3" : "grid-cols-2",
+        )}
+      >
+        <div className="p-3 rounded-xl bg-background/50 border border-border/50 flex flex-col justify-center">
           <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">
             Costo fijo
           </p>
@@ -272,14 +283,24 @@ const PreviewCard = memo(function PreviewCard({
             S/ {costo.toFixed(2)}
           </p>
         </div>
-        <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-          <p className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest mb-1">
-            Comisión base
+        <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 flex flex-col justify-center">
+          <p className="text-[10px] font-mono text-blue-500/70 uppercase tracking-widest mb-1">
+            Com. Call
           </p>
-          <p className="font-mono text-lg font-bold text-emerald-500 leading-none">
-            S/ {comision.toFixed(2)}
+          <p className="font-mono text-lg font-bold text-blue-500 leading-none">
+            S/ {comisionCall.toFixed(2)}
           </p>
         </div>
+        {comisionCampo !== null && (
+          <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col justify-center">
+            <p className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest mb-1">
+              Com. Campo
+            </p>
+            <p className="font-mono text-lg font-bold text-emerald-500 leading-none">
+              S/ {comisionCampo.toFixed(2)}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -313,7 +334,8 @@ export function ProductoForm({
       nombre_paquete: "",
       es_alto_valor: false,
       costo_fijo_plan: "",
-      comision_base: "",
+      comision_base_call: "",
+      comision_base_campo: "",
       fecha_fin_vigencia: null,
       activo: true,
     },
@@ -330,7 +352,8 @@ export function ProductoForm({
         nombre_paquete: productoParaEditar.nombre_paquete,
         es_alto_valor: productoParaEditar.es_alto_valor,
         costo_fijo_plan: productoParaEditar.costo_fijo_plan,
-        comision_base: productoParaEditar.comision_base,
+        comision_base_call: productoParaEditar.comision_base_call,
+        comision_base_campo: productoParaEditar.comision_base_campo || "",
         fecha_fin_vigencia: productoParaEditar.fecha_fin_vigencia ?? null,
         activo: productoParaEditar.activo,
       });
@@ -341,7 +364,8 @@ export function ProductoForm({
         nombre_paquete: "",
         es_alto_valor: false,
         costo_fijo_plan: "",
-        comision_base: "",
+        comision_base_call: "",
+        comision_base_campo: "",
         fecha_fin_vigencia: null,
         activo: true,
       });
@@ -351,6 +375,10 @@ export function ProductoForm({
   const onSubmit = form.handleSubmit(async (values) => {
     const payload = {
       ...values,
+      // Aseguramos que envíe null si está vacío
+      comision_base_campo: values.comision_base_campo
+        ? values.comision_base_campo
+        : null,
       fecha_fin_vigencia: values.fecha_fin_vigencia || null,
     };
 
@@ -387,7 +415,7 @@ export function ProductoForm({
     <>
       <div
         onClick={handleClose}
-        className="fixed inset-0 z-[1000] animate-in fade-in duration-300"
+        className="fixed inset-0 z-[1000] animate-in fade-in duration-300 bg-background/50 backdrop-blur-sm"
       />
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-[560px] bg-card border-l border-border z-[1001] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
         <div className="p-6 border-b border-border bg-card/50 flex items-start justify-between shrink-0">
@@ -471,13 +499,13 @@ export function ProductoForm({
               <SectionTitle className="text-emerald-500">
                 Precios y Comisiones
               </SectionTitle>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Controller
                   control={form.control}
                   name="costo_fijo_plan"
                   render={({ field }) => (
                     <TextInput
-                      label="Costo fijo del plan (S/)"
+                      label="Costo Fijo (S/)"
                       required
                       type="number"
                       step="0.01"
@@ -490,37 +518,88 @@ export function ProductoForm({
                 />
                 <Controller
                   control={form.control}
-                  name="comision_base"
+                  name="comision_base_call"
                   render={({ field }) => (
                     <TextInput
-                      label="Comisión base (S/)"
+                      label="Comisión CALL (S/)"
                       required
                       type="number"
                       step="0.01"
                       min="0"
                       placeholder="15.00"
-                      error={err.comision_base?.message}
+                      error={err.comision_base_call?.message}
                       {...field}
+                    />
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="comision_base_campo"
+                  render={({ field }) => (
+                    <TextInput
+                      label="Comisión CAMPO (S/)"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Opcional"
+                      error={err.comision_base_campo?.message}
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        field.onChange(e.target.value || null)
+                      }
                     />
                   )}
                 />
               </div>
 
-              {watchedValues.costo_fijo_plan && watchedValues.comision_base && (
-                <div className="flex items-center gap-2 mt-4 px-3.5 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <span className="text-[11px] text-emerald-500/80 font-medium">
-                    Margen de ganancia:
-                  </span>
-                  <span className="font-mono font-bold text-sm text-emerald-500">
-                    {(
-                      (Number(watchedValues.comision_base) /
-                        Math.max(Number(watchedValues.costo_fijo_plan), 0.01)) *
-                      100
-                    ).toFixed(1)}
-                    %
-                  </span>
-                </div>
-              )}
+              {watchedValues.costo_fijo_plan &&
+                (watchedValues.comision_base_call ||
+                  watchedValues.comision_base_campo) && (
+                  <div className="flex flex-col gap-2 mt-4 px-4 py-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider">
+                      Márgenes de ganancia aproximados
+                    </span>
+                    <div className="flex items-center gap-6">
+                      {watchedValues.comision_base_call && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">
+                            Call:
+                          </span>
+                          <span className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">
+                            {(
+                              (Number(watchedValues.comision_base_call) /
+                                Math.max(
+                                  Number(watchedValues.costo_fijo_plan),
+                                  0.01,
+                                )) *
+                              100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
+                      )}
+                      {watchedValues.comision_base_campo && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">
+                            Campo:
+                          </span>
+                          <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                            {(
+                              (Number(watchedValues.comision_base_campo) /
+                                Math.max(
+                                  Number(watchedValues.costo_fijo_plan),
+                                  0.01,
+                                )) *
+                              100
+                            ).toFixed(1)}
+                            %
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
             </div>
 
             <Divider />

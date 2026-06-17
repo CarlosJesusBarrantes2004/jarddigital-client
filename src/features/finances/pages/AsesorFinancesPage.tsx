@@ -360,8 +360,16 @@ export const AsesorFinancesPage = () => {
                           S/ {Number(venta.producto_costo_fijo || 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-foreground">
+                          {/* Evalúa dinámicamente qué comisión sacar basándose en el dashboard principal */}
                           S/{" "}
-                          {Number(venta.producto_comision_base || 0).toFixed(2)}
+                          {dashboard.modalidad_aplicada === "CAMPO" &&
+                          venta.producto_comision_base_campo
+                            ? Number(
+                                venta.producto_comision_base_campo,
+                              ).toFixed(2)
+                            : Number(venta.producto_comision_base_call).toFixed(
+                                2,
+                              )}
                         </td>
                       </tr>
                     ))

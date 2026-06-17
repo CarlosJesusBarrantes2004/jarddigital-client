@@ -251,7 +251,10 @@ export const AdminFinancesPage = () => {
                     className="hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-4 py-3 font-medium text-foreground">
-                      {row.nombre_asesor}
+                      <p>{row.nombre_asesor}</p>
+                      <span className="inline-block mt-0.5 px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded text-[10px] font-bold uppercase tracking-wider">
+                        {row.modalidad_aplicada}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span

@@ -8,6 +8,8 @@ export interface ReglaComision {
   id: number;
   periodo_inicio: string; // Formato YYYY-MM-DD
   escenario: "ESTANDAR" | "ELITE";
+  id_modalidad: number;
+  codigo_modalidad: string;
   min_ventas_pagadas_medio: number;
   min_ventas_pagadas_optimo: number;
   alto_valor_nivel_1: number;
@@ -20,7 +22,7 @@ export interface ReglaComision {
 
 export interface ReglaComisionPayload extends Omit<
   ReglaComision,
-  "id" | "creado_en"
+  "id" | "creado_en" | "codigo_modalidad"
 > {}
 
 export interface HistoricoPlanilla {
@@ -29,6 +31,7 @@ export interface HistoricoPlanilla {
   nombre_asesor: string;
   mes_fiscal: number;
   anio_fiscal: number;
+  modalidad_aplicada: string;
   ventas_instaladas_mes_actual: number;
   ventas_pagadas_mes_anterior: number;
   ventas_alto_valor_pagadas: number;
@@ -48,7 +51,7 @@ export interface HistoricoPlanilla {
 export interface MiDashboardRespuesta {
   id_usuario: number;
   nombre_completo: string;
-  // escenario_aplicado: "ESTANDAR" | "ELITE";
+  modalidad_aplicada: string;
   escenario_sueldo: "ESTANDAR" | "ELITE";
   escenario_comisiones: "ESTANDAR" | "ELITE";
   ventas_instaladas: number;
@@ -179,4 +182,12 @@ export const extraerErrorFinanzas = (error: any): string => {
     }
   }
   return "Error de conexión con el servidor.";
+};
+
+export const getModalidades = async () => {
+  const { data } =
+    await api.get<{ id: number; codigo: string; nombre: string }[]>(
+      `/core/modalidades/`,
+    );
+  return data;
 };

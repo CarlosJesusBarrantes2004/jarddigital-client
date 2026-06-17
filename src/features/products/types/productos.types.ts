@@ -9,7 +9,8 @@ export interface Producto {
   nombre_paquete: string;
   es_alto_valor: boolean;
   costo_fijo_plan: string; // Django DecimalField → string en DRF
-  comision_base: string;
+  comision_base_call: string;
+  comision_base_campo: string | null;
   fecha_inicio_vigencia: string;
   fecha_fin_vigencia: string | null;
   activo: boolean;
@@ -21,7 +22,8 @@ export interface CreateProductoPayload {
   nombre_paquete: string;
   es_alto_valor: boolean;
   costo_fijo_plan: string;
-  comision_base: string;
+  comision_base_call: string;
+  comision_base_campo?: string | null;
   fecha_fin_vigencia: string | null;
   activo: boolean;
 }
