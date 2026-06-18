@@ -150,7 +150,10 @@ export const UsersTable = ({
                             {user.nombre_completo}
                           </span>
                           <span className="block text-[11px] text-muted-foreground font-mono">
-                            {user.email}
+                            {user.email}{" "}
+                            {user.dni
+                              ? `· DNI: ${user.dni}`
+                              : `· DNI: Pendiente`}
                           </span>
                         </div>
                       </div>
@@ -280,8 +283,18 @@ export const UsersTable = ({
                       <span className="block text-[14px] font-medium text-foreground leading-tight">
                         {user.nombre_completo}
                       </span>
-                      <span className="block text-[11px] text-muted-foreground font-mono mt-0.5">
+                      <span className="block text-[11px] text-muted-foreground font-mono mt-0.5 truncate">
                         {user.email}
+                      </span>
+                      <span
+                        className={cn(
+                          "block text-[10px] font-mono mt-0.5",
+                          user.dni
+                            ? "text-muted-foreground/80"
+                            : "text-amber-500 font-medium",
+                        )}
+                      >
+                        {user.dni ? `DNI: ${user.dni}` : `DNI Falta Actualizar`}
                       </span>
                     </div>
                   </div>

@@ -6,14 +6,15 @@ import {
   AlertCircle,
   CheckCircle2,
   FileSpreadsheet,
+  Download, // <-- IMPORTANTE: Agregar este icono
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Importamos nuestros servicios
 import {
   getPlanillas,
   ejecutarLiquidacionMasiva,
   extraerErrorFinanzas,
+  getExportarPlanillasExcelUrl, // <-- IMPORTAR LA NUEVA FUNCIÓN
   type HistoricoPlanilla,
 } from "../services/finances.api";
 
@@ -37,16 +38,13 @@ const MESES = [
 export const AdminFinancesPage = () => {
   const hoy = new Date();
 
-  // Estados para filtros
   const [mes, setMes] = useState<number>(hoy.getMonth() + 1);
   const [anio, setAnio] = useState<number>(hoy.getFullYear());
 
-  // Estados de datos y carga
   const [planillas, setPlanillas] = useState<HistoricoPlanilla[]>([]);
   const [isLoadingTable, setIsLoadingTable] = useState<boolean>(true);
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
 
-  // Función para cargar la tabla
   const fetchPlanillas = useCallback(async () => {
     setIsLoadingTable(true);
     try {
@@ -60,47 +58,36 @@ export const AdminFinancesPage = () => {
     }
   }, [mes, anio]);
 
-  // Cargar al montar el componente o cambiar filtros
   useEffect(() => {
     fetchPlanillas();
   }, [fetchPlanillas]);
 
-  // Handler para el Botón de Pánico
   const handleEjecutarLiquidacion = () => {
     const mesNombre = MESES.find((m) => m.valor === mes)?.nombre;
 
-    // 1. Toast interactivo de Confirmación (Reemplaza a Swal.fire modal)
     toast.warning(`¿Liquidar mes de ${mesNombre} ${anio}?`, {
       description:
         "Esto calculará y guardará irreversiblemente el sueldo de todos los asesores activos. ¿Deseas continuar?",
-      duration: 10000, // Le damos 10 segundos para que no se cierre rápido
+      duration: 10000,
       action: {
         label: "Sí, ejecutar",
         onClick: async () => {
-          // 2. Ejecución de la API
           setIsLiquidating(true);
-
-          // Creamos un toast de carga que no se cierra hasta que el backend responda
           const toastId = toast.loading(
             "Calculando liquidaciones de toda la empresa...",
           );
 
           try {
             const respuesta = await ejecutarLiquidacionMasiva(mes, anio);
-
-            // 3. Éxito: Actualizamos el toast de carga a un toast de éxito
             toast.success("¡Liquidación Exitosa!", {
-              id: toastId, // Usamos el ID para reemplazar el de carga
+              id: toastId,
               description: respuesta.mensaje,
               duration: 4000,
             });
-
-            // Refrescamos la tabla para ver los nuevos datos
             fetchPlanillas();
           } catch (error) {
-            // 4. Error: Actualizamos el toast mostrando el 400, 403 o 409
             toast.error("No se pudo liquidar", {
-              id: toastId, // Reemplaza el toast de carga
+              id: toastId,
               description: extraerErrorFinanzas(error),
               duration: 6000,
             });
@@ -111,7 +98,7 @@ export const AdminFinancesPage = () => {
       },
       cancel: {
         label: "Cancelar",
-        onClick: () => toast.dismiss(), // Cierra el toast limpiamente
+        onClick: () => toast.dismiss(),
       },
     });
   };
@@ -174,35 +161,47 @@ export const AdminFinancesPage = () => {
           </div>
         </div>
 
-        {/* BOTÓN DE PÁNICO (RRHH) */}
-        <button
-          onClick={handleEjecutarLiquidacion}
-          disabled={isLiquidating}
-          className={cn(
-            "h-10 px-6 rounded-md font-medium text-sm flex items-center gap-2 text-primary-foreground shadow-sm transition-all whitespace-nowrap",
-            isLiquidating
-              ? "bg-primary/70 cursor-not-allowed"
-              : "bg-primary hover:bg-primary/90 hover:-translate-y-0.5",
-          )}
-        >
-          {isLiquidating ? (
-            <>
-              <RefreshCw size={16} className="animate-spin" />
-              Procesando...
-            </>
-          ) : (
-            <>
-              <FileSpreadsheet size={16} />
-              Ejecutar Liquidación del Mes
-            </>
-          )}
-        </button>
+        {/* BOTONES DE ACCIÓN: EXCEL Y LIQUIDAR */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-4 md:mt-0">
+          <a
+            href={getExportarPlanillasExcelUrl(mes, anio)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "h-10 px-4 rounded-md font-medium text-sm flex items-center justify-center gap-2 border border-border bg-card text-foreground hover:bg-muted shadow-sm transition-all whitespace-nowrap",
+              (isLiquidating || planillas.length === 0) &&
+                "pointer-events-none opacity-50",
+            )}
+          >
+            <Download size={16} /> Exportar Excel
+          </a>
+
+          <button
+            onClick={handleEjecutarLiquidacion}
+            disabled={isLiquidating}
+            className={cn(
+              "h-10 px-6 rounded-md font-medium text-sm flex items-center justify-center gap-2 text-primary-foreground shadow-sm transition-all whitespace-nowrap",
+              isLiquidating
+                ? "bg-primary/70 cursor-not-allowed"
+                : "bg-primary hover:bg-primary/90 hover:-translate-y-0.5",
+            )}
+          >
+            {isLiquidating ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" /> Procesando...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet size={16} /> Ejecutar Liquidación
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* CONTENEDOR DE LA TABLA */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
         {isLoadingTable ? (
-          // ESTADO DE CARGA
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <RefreshCw size={32} className="animate-spin text-primary mb-4" />
             <p className="text-sm font-medium">
@@ -210,19 +209,17 @@ export const AdminFinancesPage = () => {
             </p>
           </div>
         ) : planillas.length === 0 ? (
-          // ESTADO VACÍO
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <AlertCircle size={40} className="text-muted-foreground/50 mb-3" />
             <p className="text-base font-medium text-foreground">
               No hay liquidaciones para este mes
             </p>
             <p className="text-sm mt-1 max-w-sm text-center">
-              Haz clic en "Ejecutar Liquidación del Mes" para calcular las
-              comisiones de los asesores correspondientes a este periodo.
+              Haz clic en "Ejecutar Liquidación" para calcular las comisiones de
+              los asesores.
             </p>
           </div>
         ) : (
-          // TABLA DE DATOS
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/50 text-muted-foreground uppercase text-[11px] font-semibold tracking-wider">
@@ -230,12 +227,12 @@ export const AdminFinancesPage = () => {
                   <th className="px-4 py-3">Asesor</th>
                   <th className="px-4 py-3 text-center">
                     Ventas <br />
-                    (Inst. mes actual / Pag. mes anterior)
+                    (Inst. / Pag.)
                   </th>
                   <th className="px-4 py-3 text-right">Sueldo Base</th>
                   <th className="px-4 py-3 text-right">
                     Comisión <br />
-                    (% / Multiplicador)
+                    (% / Mult.)
                   </th>
                   <th className="px-4 py-3 text-right">Desc. Faltas</th>
                   <th className="px-4 py-3 text-right bg-primary/5 text-primary">
@@ -250,13 +247,28 @@ export const AdminFinancesPage = () => {
                     key={row.id}
                     className="hover:bg-muted/30 transition-colors"
                   >
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      <p>{row.nombre_asesor}</p>
-                      <span className="inline-block mt-0.5 px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded text-[10px] font-bold uppercase tracking-wider">
-                        {row.modalidad_aplicada}
-                      </span>
+                    {/* ---> LA NUEVA COLUMNA CON DNI Y SEDE <--- */}
+                    <td className="px-4 py-3 text-foreground">
+                      <p className="font-medium leading-tight">
+                        {row.nombre_asesor}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                        DNI: {row.dni_asesor || "Pendiente"}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        <span className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded text-[9px] font-bold uppercase tracking-wider">
+                          {row.modalidad_aplicada}
+                        </span>
+                        <span
+                          className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground rounded text-[9px] font-bold uppercase tracking-wider truncate max-w-[120px]"
+                          title={row.sede_aplicada}
+                        >
+                          {row.sede_aplicada}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-center">
+
+                    <td className="px-4 py-3 text-center align-top pt-4">
                       <span
                         className="font-medium text-foreground"
                         title="Instaladas"
@@ -271,10 +283,10 @@ export const AdminFinancesPage = () => {
                         {row.ventas_pagadas_mes_anterior}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
+                    <td className="px-4 py-3 text-right text-muted-foreground align-top pt-4">
                       S/ {Number(row.sueldo_base_aplicado).toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right align-top pt-3">
                       <div className="flex flex-col items-end gap-1">
                         <span className="font-medium text-green-600 dark:text-green-500">
                           + S/ {Number(row.comision_neta_ganada).toFixed(2)}
@@ -298,7 +310,7 @@ export const AdminFinancesPage = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right align-top pt-4">
                       {Number(row.descuento_inasistencias) > 0 ? (
                         <span className="text-red-600 dark:text-red-400 font-medium">
                           - S/ {Number(row.descuento_inasistencias).toFixed(2)}
@@ -310,15 +322,20 @@ export const AdminFinancesPage = () => {
                         ({row.cantidad_faltas} días)
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right bg-primary/5">
+                    <td className="px-4 py-3 text-right bg-primary/5 align-top pt-4">
                       <span className="font-bold text-base text-primary">
                         S/ {Number(row.sueldo_neto_final).toFixed(2)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-muted-foreground">
+                    <td className="px-4 py-3 text-center text-xs text-muted-foreground align-top pt-4">
                       <div className="flex items-center justify-center gap-1">
-                        <CheckCircle2 size={12} className="text-green-500" />
-                        {row.nombre_rrhh}
+                        <CheckCircle2
+                          size={12}
+                          className="text-green-500 shrink-0"
+                        />
+                        <span className="truncate max-w-[80px]">
+                          {row.nombre_rrhh}
+                        </span>
                       </div>
                     </td>
                   </tr>

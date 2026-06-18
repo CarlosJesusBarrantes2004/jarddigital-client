@@ -29,6 +29,7 @@ export interface User {
   username: string;
   nombre_completo: string;
   email: string;
+  dni?: string | null;
   celular?: string | null;
   id_rol: number;
   rol?: Role;
@@ -42,6 +43,7 @@ export interface CreateUserPayload {
   nombre_completo: string;
   email: string;
   password: string;
+  dni?: string | null;
   id_rol: number;
   celular?: string | null;
   ids_modalidades_sede?: number[];
@@ -53,6 +55,7 @@ export interface UpdateUserPayload {
   nombre_completo?: string;
   email?: string;
   password?: string;
+  dni?: string | null;
   id_rol?: number;
   celular?: string | null;
   ids_modalidades_sede?: number[];

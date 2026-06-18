@@ -135,6 +135,7 @@ export const UserForm = ({
       nombre_completo: user?.nombre_completo ?? "",
       username: user?.username ?? "",
       email: user?.email ?? "",
+      dni: user?.dni ?? "",
       celular: user?.celular ?? "",
       password: "",
       id_rol: user?.id_rol ?? 0,
@@ -292,6 +293,7 @@ export const UserForm = ({
 
     setIsSubmitting(true);
     const celularFinal = values.celular?.trim() || null;
+    const dniFinal = values.dni?.trim() || null;
 
     // Construcción del objeto anidado o null según la nota técnica del backend
     const perfilLaboralFinal =
@@ -308,6 +310,7 @@ export const UserForm = ({
       username: values.username,
       nombre_completo: values.nombre_completo,
       email: values.email,
+      dni: dniFinal,
       celular: celularFinal,
       id_rol: values.id_rol,
       activo: values.activo,
@@ -418,34 +421,59 @@ export const UserForm = ({
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
-              Celular{" "}
-              <span className="text-muted-foreground/50 text-[10px] normal-case font-sans tracking-normal ml-1">
-                (para WhatsApp)
-              </span>
-            </label>
-            <input
-              type="tel"
-              placeholder="Ej: 987654321"
-              className={cn(
-                "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
-                errors.celular
-                  ? "border-destructive focus:border-destructive focus:ring-destructive/10"
-                  : "border-border",
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
+                DNI
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: 71234567"
+                maxLength={8}
+                className={cn(
+                  "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                  errors.dni
+                    ? "border-destructive focus:border-destructive"
+                    : "border-border",
+                )}
+                {...register("dni")}
+              />
+              {errors.dni && (
+                <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
+                  <AlertCircle size={11} /> {errors.dni.message}
+                </p>
               )}
-              {...register("celular")}
-            />
-            {errors.celular ? (
-              <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
-                <AlertCircle size={11} /> {errors.celular.message}
-              </p>
-            ) : (
-              <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                9 dígitos comenzando en 9. Se usa para enviar el guión de
-                grabación.
-              </p>
-            )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
+                Celular
+                <span className="text-muted-foreground/50 text-[10px] normal-case font-sans tracking-normal ml-1">
+                  (para WhatsApp)
+                </span>
+              </label>
+              <input
+                type="tel"
+                placeholder="Ej: 987654321"
+                maxLength={9}
+                className={cn(
+                  "h-11 bg-background border rounded-xl px-3.5 font-sans text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                  errors.celular
+                    ? "border-destructive focus:border-destructive"
+                    : "border-border",
+                )}
+                {...register("celular")}
+              />
+              {errors.celular ? (
+                <p className="text-[11px] text-destructive flex items-center gap-1 mt-0.5">
+                  <AlertCircle size={11} /> {errors.celular.message}
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground/60 mt-0.5 leading-tight">
+                  Se usa para enviar el guión de grabación.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5 md:col-span-2">

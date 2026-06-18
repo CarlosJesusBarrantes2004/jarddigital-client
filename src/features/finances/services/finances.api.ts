@@ -29,6 +29,9 @@ export interface HistoricoPlanilla {
   id: number;
   id_usuario: number;
   nombre_asesor: string;
+  dni_asesor: string | null;
+  sede_aplicada: string;
+
   mes_fiscal: number;
   anio_fiscal: number;
   modalidad_aplicada: string;
@@ -190,4 +193,9 @@ export const getModalidades = async () => {
       `/core/modalidades/`,
     );
   return data;
+};
+
+export const getExportarPlanillasExcelUrl = (mes: number, anio: number) => {
+  const baseUrl = api.defaults.baseURL || "";
+  return `${baseUrl}/finances/planillas/exportar-excel/?mes_fiscal=${mes}&anio_fiscal=${anio}`;
 };

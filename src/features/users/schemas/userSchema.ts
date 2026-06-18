@@ -14,6 +14,8 @@ export const userFormSchema = z.object({
 
   email: z.string().email("Correo electrónico inválido"),
 
+  dni: z.string().email("Correo electrónico inválido"),
+
   // Acepta vacío (usuarios existentes sin celular) o formato peruano válido.
   // Si está vacío se envía null al backend para no pisar con string vacío.
   celular: z
