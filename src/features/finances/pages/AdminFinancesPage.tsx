@@ -6,18 +6,16 @@ import {
   AlertCircle,
   CheckCircle2,
   FileSpreadsheet,
-  Download, // <-- IMPORTANTE: Agregar este icono
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
 import {
   getPlanillas,
   ejecutarLiquidacionMasiva,
   extraerErrorFinanzas,
-  getExportarPlanillasExcelUrl, // <-- IMPORTAR LA NUEVA FUNCIÓN
+  getExportarPlanillasExcelUrl,
   type HistoricoPlanilla,
 } from "../services/finances.api";
-
 import { toast } from "sonner";
 
 const MESES = [
@@ -37,10 +35,8 @@ const MESES = [
 
 export const AdminFinancesPage = () => {
   const hoy = new Date();
-
   const [mes, setMes] = useState<number>(hoy.getMonth() + 1);
   const [anio, setAnio] = useState<number>(hoy.getFullYear());
-
   const [planillas, setPlanillas] = useState<HistoricoPlanilla[]>([]);
   const [isLoadingTable, setIsLoadingTable] = useState<boolean>(true);
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
@@ -51,7 +47,6 @@ export const AdminFinancesPage = () => {
       const data = await getPlanillas({ mes_fiscal: mes, anio_fiscal: anio });
       setPlanillas(data);
     } catch (error) {
-      console.error("Error al cargar planillas:", error);
       toast.error("Error de lectura");
     } finally {
       setIsLoadingTable(false);
@@ -64,7 +59,6 @@ export const AdminFinancesPage = () => {
 
   const handleEjecutarLiquidacion = () => {
     const mesNombre = MESES.find((m) => m.valor === mes)?.nombre;
-
     toast.warning(`¿Liquidar mes de ${mesNombre} ${anio}?`, {
       description:
         "Esto calculará y guardará irreversiblemente el sueldo de todos los asesores activos. ¿Deseas continuar?",
@@ -76,7 +70,6 @@ export const AdminFinancesPage = () => {
           const toastId = toast.loading(
             "Calculando liquidaciones de toda la empresa...",
           );
-
           try {
             const respuesta = await ejecutarLiquidacionMasiva(mes, anio);
             toast.success("¡Liquidación Exitosa!", {
@@ -96,21 +89,16 @@ export const AdminFinancesPage = () => {
           }
         },
       },
-      cancel: {
-        label: "Cancelar",
-        onClick: () => toast.dismiss(),
-      },
+      cancel: { label: "Cancelar", onClick: () => toast.dismiss() },
     });
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-300">
-      {/* HEADER DE LA PÁGINA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Calculator className="text-primary" />
-            Gestión de Planillas y Liquidaciones
+            <Calculator className="text-primary" /> Gestión de Planillas
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Visualiza el histórico de pagos o ejecuta el cálculo mensual de los
@@ -119,10 +107,8 @@ export const AdminFinancesPage = () => {
         </div>
       </div>
 
-      {/* BARRA DE HERRAMIENTAS Y FILTROS */}
       <div className="bg-card border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4 items-end justify-between shadow-sm">
         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-          {/* Select de Mes */}
           <div className="flex flex-col gap-1.5 w-full md:w-40">
             <label className="text-[13px] font-medium text-muted-foreground flex items-center gap-1.5">
               <Calendar size={14} /> Mes Fiscal
@@ -131,7 +117,7 @@ export const AdminFinancesPage = () => {
               value={mes}
               onChange={(e) => setMes(Number(e.target.value))}
               disabled={isLiquidating}
-              className="h-10 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 outline-none"
+              className="h-10 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none"
             >
               {MESES.map((m) => (
                 <option key={m.valor} value={m.valor}>
@@ -140,8 +126,6 @@ export const AdminFinancesPage = () => {
               ))}
             </select>
           </div>
-
-          {/* Select de Año */}
           <div className="flex flex-col gap-1.5 w-full md:w-32">
             <label className="text-[13px] font-medium text-muted-foreground">
               Año Fiscal
@@ -150,7 +134,7 @@ export const AdminFinancesPage = () => {
               value={anio}
               onChange={(e) => setAnio(Number(e.target.value))}
               disabled={isLiquidating}
-              className="h-10 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 outline-none"
+              className="h-10 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none"
             >
               {[anio - 1, anio, anio + 1].map((year) => (
                 <option key={year} value={year}>
@@ -161,7 +145,6 @@ export const AdminFinancesPage = () => {
           </div>
         </div>
 
-        {/* BOTONES DE ACCIÓN: EXCEL Y LIQUIDAR */}
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-4 md:mt-0">
           <a
             href={getExportarPlanillasExcelUrl(mes, anio)}
@@ -175,7 +158,6 @@ export const AdminFinancesPage = () => {
           >
             <Download size={16} /> Exportar Excel
           </a>
-
           <button
             onClick={handleEjecutarLiquidacion}
             disabled={isLiquidating}
@@ -199,7 +181,6 @@ export const AdminFinancesPage = () => {
         </div>
       </div>
 
-      {/* CONTENEDOR DE LA TABLA */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
         {isLoadingTable ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -213,10 +194,6 @@ export const AdminFinancesPage = () => {
             <AlertCircle size={40} className="text-muted-foreground/50 mb-3" />
             <p className="text-base font-medium text-foreground">
               No hay liquidaciones para este mes
-            </p>
-            <p className="text-sm mt-1 max-w-sm text-center">
-              Haz clic en "Ejecutar Liquidación" para calcular las comisiones de
-              los asesores.
             </p>
           </div>
         ) : (
@@ -247,7 +224,6 @@ export const AdminFinancesPage = () => {
                     key={row.id}
                     className="hover:bg-muted/30 transition-colors"
                   >
-                    {/* ---> LA NUEVA COLUMNA CON DNI Y SEDE <--- */}
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium leading-tight">
                         {row.nombre_asesor}
@@ -267,7 +243,6 @@ export const AdminFinancesPage = () => {
                         </span>
                       </div>
                     </td>
-
                     <td className="px-4 py-3 text-center align-top pt-4">
                       <span
                         className="font-medium text-foreground"
@@ -318,9 +293,6 @@ export const AdminFinancesPage = () => {
                       ) : (
                         <span className="text-muted-foreground">S/ 0.00</span>
                       )}
-                      <div className="text-[10px] text-muted-foreground mt-0.5">
-                        ({row.cantidad_faltas} días)
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-right bg-primary/5 align-top pt-4">
                       <span className="font-bold text-base text-primary">

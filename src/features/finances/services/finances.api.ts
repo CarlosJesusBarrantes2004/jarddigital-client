@@ -55,6 +55,7 @@ export interface MiDashboardRespuesta {
   id_usuario: number;
   nombre_completo: string;
   modalidad_aplicada: string;
+  sede_aplicada: string;
   escenario_sueldo: "ESTANDAR" | "ELITE";
   escenario_comisiones: "ESTANDAR" | "ELITE";
   ventas_instaladas: number;

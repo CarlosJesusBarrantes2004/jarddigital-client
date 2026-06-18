@@ -9,6 +9,7 @@ import {
   Package,
   Filter,
   Star,
+  MapPin, // <-- IMPORTADO PARA EL ICONO DE SEDE
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -16,8 +17,8 @@ import { toast } from "sonner";
 import {
   getMiDashboardFinanciero,
   extraerErrorFinanzas,
+  type MiDashboardRespuesta,
 } from "../services/finances.api";
-import { type MiDashboardRespuesta } from "../services/finances.api";
 import { api } from "@/api/axios";
 
 const MESES = [
@@ -38,16 +39,13 @@ const MESES = [
 export const AsesorFinancesPage = () => {
   const hoy = new Date();
 
-  // Por defecto, cargamos el mes actual (el backend evaluará internamente las ventas del mes anterior)
   const [mes, setMes] = useState<number>(hoy.getMonth() + 1);
   const [anio, setAnio] = useState<number>(hoy.getFullYear());
 
   const [dashboard, setDashboard] = useState<MiDashboardRespuesta | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Estado auxiliar para la tabla de desglose
   const [detalleVentas, setDetalleVentas] = useState<any[]>([]);
-
   const [filtroAltoValor, setFiltroAltoValor] = useState<"TODOS" | "SI" | "NO">(
     "TODOS",
   );
@@ -55,12 +53,9 @@ export const AsesorFinancesPage = () => {
   const fetchDashboard = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Traemos los totales
       const data = await getMiDashboardFinanciero(mes, anio);
       setDashboard(data);
 
-      // 2. PETICIÓN AUXILIAR PARA LA TABLA (Vía rápida frontend)
-      // Nota: Le pedimos al endpoint de ventas las instaladas el mes anterior
       const mesAnterior = mes === 1 ? 12 : mes - 1;
       const anioAnterior = mes === 1 ? anio - 1 : anio;
 
@@ -68,10 +63,8 @@ export const AsesorFinancesPage = () => {
         params: {
           mes_instalacion: mesAnterior,
           anio_instalacion: anioAnterior,
-          // Idealmente agregaríamos un filtro ?pagadas=true si el backend lo soporta
         },
       });
-      // Asumimos que viene paginado { results: [...] } o directo [...]
       setDetalleVentas(ventasResponse.results || ventasResponse || []);
     } catch (error) {
       console.error(error);
@@ -89,7 +82,7 @@ export const AsesorFinancesPage = () => {
   const ventasFiltradas = detalleVentas.filter((venta: any) => {
     if (filtroAltoValor === "SI") return venta.producto_es_alto_valor === true;
     if (filtroAltoValor === "NO") return venta.producto_es_alto_valor === false;
-    return true; // "TODOS"
+    return true;
   });
 
   const mesAnteriorObj = MESES.find(
@@ -111,6 +104,18 @@ export const AsesorFinancesPage = () => {
             calcula en base a tus ventas de{" "}
             <strong>{mesAnteriorObj?.nombre}</strong>.
           </p>
+
+          {/* ---> NUEVO: PINTAMOS LA SEDE Y MODALIDAD AQUÍ <--- */}
+          {dashboard && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground rounded text-[10px] font-bold uppercase tracking-wider border border-border">
+                <MapPin size={10} /> {dashboard.sede_aplicada}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded text-[10px] font-bold uppercase tracking-wider border border-purple-200 dark:border-purple-800">
+                {dashboard.modalidad_aplicada}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3">
@@ -161,7 +166,6 @@ export const AsesorFinancesPage = () => {
                 <span className="text-2xl font-bold text-foreground">
                   S/ {Number(dashboard.sueldo_base_aplicado).toFixed(2)}
                 </span>
-                {/* ---> APLICAMOS escenario_sueldo <--- */}
                 {dashboard.escenario_sueldo === "ELITE" && (
                   <p className="text-[11px] font-medium text-yellow-600 mt-1 uppercase tracking-wider">
                     ★ Sueldo Élite Activado
@@ -220,7 +224,6 @@ export const AsesorFinancesPage = () => {
                     x{Number(dashboard.multiplicador_av).toFixed(2)}
                   </span>
                 </div>
-                {/* ---> APLICAMOS escenario_comisiones <--- */}
                 {dashboard.escenario_comisiones === "ELITE" && (
                   <p className="text-[11px] font-medium text-yellow-600 mt-1 uppercase tracking-wider">
                     ★ Regla Élite Aplicada
@@ -257,7 +260,6 @@ export const AsesorFinancesPage = () => {
                 Ventas de {mesAnteriorObj?.nombre} (Base para comisión)
               </h3>
 
-              {/* CONTROLES DE LA TABLA: Info y Filtro */}
               <div className="flex items-center gap-4 w-full sm:w-auto">
                 <div className="text-xs text-muted-foreground whitespace-nowrap">
                   <span className="font-medium text-foreground">
@@ -270,13 +272,12 @@ export const AsesorFinancesPage = () => {
                   instaladas
                 </div>
 
-                {/* SELECT DE FILTRO ALTO VALOR */}
                 <div className="flex items-center gap-2 bg-background border border-border rounded-md px-2 h-8 w-full sm:w-auto">
                   <Filter size={14} className="text-muted-foreground" />
                   <select
                     value={filtroAltoValor}
                     onChange={(e) => setFiltroAltoValor(e.target.value as any)}
-                    className="text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground w-full"
+                    className="text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground w-full cursor-pointer"
                   >
                     <option value="TODOS">Todas las ventas</option>
                     <option value="SI">Solo Alto Valor</option>
@@ -292,7 +293,6 @@ export const AsesorFinancesPage = () => {
                   <tr>
                     <th className="px-4 py-3">Cliente</th>
                     <th className="px-4 py-3">Producto / Plan</th>
-                    {/* NUEVA COLUMNA */}
                     <th className="px-4 py-3 text-center">Alto Valor</th>
                     <th className="px-4 py-3 text-center">Estado (Mes 1)</th>
                     <th className="px-4 py-3 text-right">Costo Fijo</th>
@@ -328,30 +328,26 @@ export const AsesorFinancesPage = () => {
                             {venta.producto_campana || "Campaña"}
                           </p>
                         </td>
-
-                        {/* CELDA DE ALTO VALOR */}
                         <td className="px-4 py-3 text-center">
                           {venta.producto_es_alto_valor ? (
                             <span className="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-500 font-medium text-xs">
-                              <Star size={14} className="fill-current" />
-                              Sí
+                              <Star size={14} className="fill-current" /> Sí
                             </span>
                           ) : (
                             <span className="text-muted-foreground text-xs">
-                              No
+                              —
                             </span>
                           )}
                         </td>
-
                         <td className="px-4 py-3 text-center">
                           {venta.pago_primer_mes ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>{" "}
                               Pagado
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-500">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>{" "}
                               Pendiente
                             </span>
                           )}
@@ -360,7 +356,6 @@ export const AsesorFinancesPage = () => {
                           S/ {Number(venta.producto_costo_fijo || 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-foreground">
-                          {/* Evalúa dinámicamente qué comisión sacar basándose en el dashboard principal */}
                           S/{" "}
                           {dashboard.modalidad_aplicada === "CAMPO" &&
                           venta.producto_comision_base_campo
