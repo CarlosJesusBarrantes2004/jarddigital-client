@@ -14,7 +14,14 @@ export const userFormSchema = z.object({
 
   email: z.string().email("Correo electrónico inválido"),
 
-  dni: z.string().email("Correo electrónico inválido"),
+  dni: z
+    .string()
+    .refine(
+      (val) => val === "" || /^\d{8}$/.test(val),
+      "El DNI debe tener exactamente 8 dígitos numéricos",
+    )
+    .optional()
+    .nullable(),
 
   // Acepta vacío (usuarios existentes sin celular) o formato peruano válido.
   // Si está vacío se envía null al backend para no pisar con string vacío.
