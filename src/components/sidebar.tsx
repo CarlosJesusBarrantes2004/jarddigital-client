@@ -50,7 +50,7 @@ const SECTIONS: RouteSection[] = [
           "RRHH",
           "BACKOFFICE",
           "ASESOR",
-          "SEGUIMIENTO", // Agregado para que no se quede sin dashboard
+          "SEGUIMIENTO",
         ],
       },
     ],
@@ -74,7 +74,6 @@ const SECTIONS: RouteSection[] = [
       {
         label: "Seguimiento",
         href: "/tracking",
-        // RESTRICCIÓN APLICADA: Solo SEGUIMIENTO y DUENO
         roles: ["SEGUIMIENTO", "DUENO"],
       },
     ],
@@ -85,14 +84,15 @@ const SECTIONS: RouteSection[] = [
     collapsible: true,
     items: [
       {
-        label: "Mi Liquidación",
+        label: "Mi Pago",
         href: "/finances/me",
-        roles: ["ASESOR"],
+        // roles: ["ASESOR"],
+        roles: [],
       },
       {
         label: "Gestión de Planillas",
         href: "/finances/planillas",
-        roles: ["DUENO", "RRHH"],
+        roles: ["DUENO", "RRHH", "COORDINADOR"],
       },
     ],
   },
