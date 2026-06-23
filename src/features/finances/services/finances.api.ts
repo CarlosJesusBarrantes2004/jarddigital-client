@@ -1,12 +1,11 @@
 import { api } from "@/api/axios";
 
 // ==========================================
-// 1. INTERFACES Y TIPOS (Basados en los Serializers de Django)
+// 1. INTERFACES Y TIPOS
 // ==========================================
-
 export interface ReglaComision {
   id: number;
-  periodo_inicio: string; // Formato YYYY-MM-DD
+  periodo_inicio: string;
   escenario: "ESTANDAR" | "ELITE";
   id_modalidad: number;
   codigo_modalidad: string;
@@ -31,7 +30,6 @@ export interface HistoricoPlanilla {
   nombre_asesor: string;
   dni_asesor: string | null;
   sede_aplicada: string;
-
   mes_fiscal: number;
   anio_fiscal: number;
   modalidad_aplicada: string;
@@ -78,8 +76,15 @@ export interface LiquidacionRespuesta {
   actualizados: number;
 }
 
+// ---> INTERFAZ PARA EL DUEÑO/COORDINADOR <---
+export interface ProyeccionAsesorLiveResponse {
+  tipo_dato: string;
+  alerta: string | null;
+  data: MiDashboardRespuesta;
+}
+
 // ==========================================
-// 2. ENDPOINT 1: REGLAS DE COMISIÓN (DUEÑO)
+// 2. ENDPOINTS DE LA API
 // ==========================================
 
 export const getReglasComision = async (page = 1) => {
@@ -113,16 +118,11 @@ export const deleteReglaComision = async (id: number) => {
   return data;
 };
 
-// ==========================================
-// 3. ENDPOINT 2: PLANILLAS Y LIQUIDACIÓN (RRHH / DUEÑO)
-// ==========================================
-
 export const getPlanillas = async (params?: {
   mes_fiscal?: number;
   anio_fiscal?: number;
   id_usuario?: number;
 }) => {
-  // api.get procesa automáticamente el objeto params a una query string (?mes_fiscal=6&...)
   const { data } = await api.get<HistoricoPlanilla[]>(`/finances/planillas/`, {
     params,
   });
@@ -130,26 +130,17 @@ export const getPlanillas = async (params?: {
 };
 
 export const ejecutarLiquidacionMasiva = async (mes: number, anio: number) => {
-  // Nota: Si esto falla (400, 409, 500), Axios lanzará un error que debemos capturar en el componente.
   const { data } = await api.post<LiquidacionRespuesta>(
     `/finances/planillas/ejecutar_liquidacion/`,
-    {
-      mes,
-      anio,
-    },
+    { mes, anio },
   );
   return data;
 };
-
-// ==========================================
-// 4. ENDPOINT 3: DASHBOARD EN VIVO (ASESOR)
-// ==========================================
 
 export const getMiDashboardFinanciero = async (mes?: number, anio?: number) => {
   const params: Record<string, number> = {};
   if (mes) params.mes = mes;
   if (anio) params.anio = anio;
-
   const { data } = await api.get<MiDashboardRespuesta>(
     `/finances/mi-dashboard/`,
     { params },
@@ -157,35 +148,40 @@ export const getMiDashboardFinanciero = async (mes?: number, anio?: number) => {
   return data;
 };
 
-// ==========================================
-// UTILERÍA: MANEJO DE ERRORES DEL BACKEND
-// ==========================================
-/**
- * Utilidad para extraer el mensaje de error semántico que manda el backend de Django.
- * Ideal para usarlo en bloques try/catch dentro de tus componentes y mostrarlo en un SweetAlert o Toast.
- */
+// ---> NUEVO ENDPOINT: OJO DE DIOS (PROYECCIÓN EN VIVO) <---
+export const getProyeccionAsesorLive = async (
+  idUsuario: number,
+  mes: number,
+  anio: number,
+) => {
+  const { data } = await api.get<ProyeccionAsesorLiveResponse>(
+    `/finances/planillas/proyeccion-asesor/`,
+    {
+      params: { id_usuario: idUsuario, mes, anio },
+    },
+  );
+  return data;
+};
+
 export const extraerErrorFinanzas = (error: any): string => {
   if (error.response) {
     const status = error.response.status;
     const data = error.response.data;
-
-    // Manejo del error 409 (Lock de concurrencia)
-    if (status === 409) {
+    if (status === 409)
       return (
-        data.error ||
-        "Ya existe un proceso de liquidación ejecutándose. Por favor, espere."
+        data.error || "Ya existe un proceso ejecutándose. Espere unos segundos."
       );
-    }
-    // Manejo de errores de validación (400) o permisos (403)
-    if (status === 400 || status === 403) {
+    if (status === 400 || status === 403)
       return data.error || "Datos inválidos o acción no permitida.";
-    }
-    // Errores internos (500)
-    if (status >= 500) {
+    if (status >= 500)
       return "Error crítico en el servidor al procesar las finanzas.";
-    }
   }
   return "Error de conexión con el servidor.";
+};
+
+export const getExportarPlanillasExcelUrl = (mes: number, anio: number) => {
+  const baseUrl = api.defaults.baseURL || "";
+  return `${baseUrl}/finances/planillas/exportar-excel/?mes_fiscal=${mes}&anio_fiscal=${anio}`;
 };
 
 export const getModalidades = async () => {
@@ -194,9 +190,4 @@ export const getModalidades = async () => {
       `/core/modalidades/`,
     );
   return data;
-};
-
-export const getExportarPlanillasExcelUrl = (mes: number, anio: number) => {
-  const baseUrl = api.defaults.baseURL || "";
-  return `${baseUrl}/finances/planillas/exportar-excel/?mes_fiscal=${mes}&anio_fiscal=${anio}`;
 };
