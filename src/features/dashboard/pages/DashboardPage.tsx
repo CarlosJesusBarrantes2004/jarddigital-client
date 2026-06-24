@@ -24,7 +24,7 @@ export const DashboardPage = () => {
 
   return (
     <div className="flex flex-col items-center justify-center h-[60vh] animate-in fade-in duration-500 space-y-4 text-center">
-      <p>Se agregará algo nuevo, muy muy pronto</p>
+      <p>Gracias por venir</p>
     </div>
   );
 };

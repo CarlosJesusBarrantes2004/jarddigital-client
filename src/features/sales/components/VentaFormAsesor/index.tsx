@@ -231,6 +231,133 @@ function NativeSelect({
   );
 }
 
+// ── NUEVO COMPONENTE: Dropdown con Buscador (Combobox) ────────────────────────
+function SearchableSelect({
+  label,
+  error,
+  required,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  error?: string;
+  required?: boolean;
+  value?: string | number | null;
+  onChange: (v: number | undefined) => void;
+  options: { id: number; label: string }[];
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((o) => o.id === value);
+  const filteredOptions = options.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={cn(
+          "w-full h-11 px-3.5 rounded-xl bg-background border text-sm font-sans flex items-center justify-between transition-all duration-200",
+          disabled
+            ? "bg-muted opacity-60 cursor-not-allowed text-muted-foreground"
+            : "cursor-pointer hover:border-primary/50",
+          error
+            ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+            : "border-border focus:border-primary",
+          isOpen ? "ring-4 ring-primary/10 border-primary" : "",
+        )}
+      >
+        <span
+          className={cn(
+            "truncate pr-4",
+            selectedOption ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn(
+            "text-muted-foreground shrink-0 transition-transform",
+            isOpen && "rotate-180",
+          )}
+        />
+      </div>
+
+      {isOpen && !disabled && (
+        <div className="absolute z-[1002] top-full mt-2 w-full bg-popover border border-border rounded-xl shadow-xl flex flex-col max-h-60 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+          <div className="p-2 border-b border-border sticky top-0 bg-popover">
+            <input
+              type="text"
+              placeholder="Buscar grabador por nombre..."
+              autoFocus
+              className="w-full h-9 px-3 text-sm bg-background border border-input rounded-md outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="overflow-y-auto p-1 flex-1 scrollbar-thin scrollbar-thumb-border">
+            {filteredOptions.length === 0 ? (
+              <p className="text-xs text-muted-foreground p-3 text-center">
+                No se encontraron grabadores.
+              </p>
+            ) : (
+              filteredOptions.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(o.id);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-sm rounded-lg transition-colors truncate",
+                    value === o.id
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-foreground hover:bg-muted",
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      {error && (
+        <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Toggle({
   label,
   description,
@@ -360,16 +487,12 @@ export function VentaFormAsesor({
     ? (ventaOrigen!.id_grabador_audios ?? undefined)
     : undefined;
 
-  // true = el asesor NO cambió el DNI → grabador bloqueado al del origen
   const reingresoMismoDNI =
     esReingreso && !!dniOrigenReingreso && dniActual === dniOrigenReingreso;
 
-  // true = DNI cambió → grabador habilitado pero sin el grabador antiguo
   const reingreSoDNIDistinto =
     esReingreso && !!dniActual && dniActual !== dniOrigenReingreso;
 
-  // ── ESTADO PENDIENTE: la venta existe pero NO tiene estado (código vacío/null)
-  // En este caso todos los campos excepto audios + grabador deben estar bloqueados
   const esPendiente =
     esEdicion &&
     !ventaOrigen?.codigo_estado &&
@@ -383,7 +506,6 @@ export function VentaFormAsesor({
     !tieneAudiosEnBD;
   const todosBloqueado =
     esEdicion && !ventaOrigen?.solicitud_correccion && tieneAudiosEnBD;
-  // esPendienteSinAudios: pendiente y sin audios subidos (flujo solo-audios)
   const esPendienteSinAudios =
     esEdicion &&
     !ventaOrigen?.solicitud_correccion &&
@@ -403,15 +525,12 @@ export function VentaFormAsesor({
   const [filtroCampana, setFiltroCampana] = useState("");
   const [filtroSolucion, setFiltroSolucion] = useState("");
 
-  // ── Estado de audios ─────────────────────────────────────────────────────
   const [audioUrls, setAudioUrls] = useState<(string | null)[]>([]);
   const [audioTokens, setAudioTokens] = useState<(string | undefined)[]>([]);
   const [audioUploading, setAudioUploading] = useState<boolean[]>([]);
   const [audioErrors, setAudioErrors] = useState<(string | null)[]>([]);
   const [audioRechazados, setAudioRechazados] = useState<boolean[]>([]);
   const [audioMotivos, setAudioMotivos] = useState<(string | null)[]>([]);
-
-  // NUEVO: rastrea si algún slot tiene una grabación de micrófono pendiente de confirmar
   const [audiosPendientesConfirmar, setAudiosPendientesConfirmar] = useState<
     boolean[]
   >([]);
@@ -422,13 +541,10 @@ export function VentaFormAsesor({
 
   const isInitialMount = useRef(true);
   const prevLengthRef = useRef(0);
-
   const hasLoadedDraftRef = useRef(false);
   const isClosingRef = useRef(false);
 
   const tieneAlMenosUnAudio = audioUrls.some(Boolean);
-
-  // NUEVO: ¿hay alguna grabación de micrófono en modo "preview" sin confirmar?
   const hayGrabacionSinConfirmar = audiosPendientesConfirmar.some(Boolean);
 
   const watchedValues = form.watch();
@@ -484,7 +600,6 @@ export function VentaFormAsesor({
     }
   }, [tieneAlMenosUnAudio, form]);
 
-  // ── Inicialización ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
 
@@ -717,7 +832,6 @@ export function VentaFormAsesor({
     form,
   ]);
 
-  // ── Borrador ──────────────────────────────────────────────────────────────
   const handleLimpiarBorrador = () => {
     sessionStorage.removeItem("jard_venta_draft");
     form.reset({
@@ -743,7 +857,6 @@ export function VentaFormAsesor({
     isClosingRef.current = true;
 
     if (esVentaNuevaPura && !skip) {
-      // Guardado forzado del estado exacto en el instante de cerrar
       sessionStorage.setItem(
         "jard_venta_draft",
         JSON.stringify({
@@ -759,7 +872,6 @@ export function VentaFormAsesor({
       return;
     }
 
-    // Cierre post-envío exitoso o edición/reingreso → limpiar todo
     form.reset();
     setPaso(0);
     setAudioUrls([]);
@@ -771,7 +883,6 @@ export function VentaFormAsesor({
     onClose();
   };
 
-  // ── Handlers de audio ────────────────────────────────────────────────────
   const handleAudioUploaded = useCallback(
     (i: number, url: string, token?: string) => {
       setAudioUrls((p) => {
@@ -794,7 +905,6 @@ export function VentaFormAsesor({
         n[i] = null;
         return n;
       });
-      // Al confirmar y subir, ya no está pendiente
       setAudiosPendientesConfirmar((p) => {
         const n = [...p];
         n[i] = false;
@@ -853,7 +963,6 @@ export function VentaFormAsesor({
     });
   }, []);
 
-  // NUEVO: handler que recibe la notificación del AudioUploadField
   const handleAudioPendienteConfirmar = useCallback(
     (i: number, pendiente: boolean) => {
       setAudiosPendientesConfirmar((p) => {
@@ -867,7 +976,6 @@ export function VentaFormAsesor({
 
   const algunoSubiendo = audioUploading.some(Boolean);
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -882,7 +990,6 @@ export function VentaFormAsesor({
       return;
     }
 
-    // NUEVO: validar grabaciones de micrófono sin confirmar
     if (hayGrabacionSinConfirmar) {
       toast.error(
         "Tienes grabaciones pendientes de confirmar. Haz clic en '✓ Usar esta grabación' en cada una antes de continuar.",
@@ -905,8 +1012,6 @@ export function VentaFormAsesor({
       return;
     }
 
-    // Para ventas en estado PENDIENTE (esPendienteSinAudios), solo validamos los campos de audio
-    // no los demás campos del formulario (que están bloqueados)
     if (!soloAudios && !esPendiente) {
       const isValid = await form.trigger();
       if (!isValid) {
@@ -983,7 +1088,6 @@ export function VentaFormAsesor({
       audios: audiosPayload,
     };
 
-    // Flujo Exclusivo de Audios (Ventas en ejecución o pendientes sin audios)
     if (soloAudios || esPendienteSinAudios) {
       try {
         await editarVenta({
@@ -999,7 +1103,6 @@ export function VentaFormAsesor({
       return;
     }
 
-    // Flujo Normal (Creación, Reingreso o Correcciones generales)
     try {
       if (esEdicion) {
         await editarVenta(payload);
@@ -1014,15 +1117,11 @@ export function VentaFormAsesor({
             ? "Venta reingresada correctamente"
             : "Venta creada correctamente",
         );
-        // CORRECCIÓN: al guardar exitosamente la venta nueva, borramos el borrador
-        // y reseteamos la bandera para que la próxima apertura arranque limpia
         if (esVentaNuevaPura) {
           sessionStorage.removeItem("jard_venta_draft");
           hasLoadedDraftRef.current = false;
         }
       }
-
-      // skipSave=true: no volvemos a guardar el borrador al cerrar tras éxito
       handleClose(true);
     } catch (err) {
       toast.error(extractApiError(err));
@@ -1065,15 +1164,10 @@ export function VentaFormAsesor({
   const depNacId = form.watch("dep_nac_id") ?? null;
   const provNacId = form.watch("prov_nac_id") ?? null;
 
-  // ── Flags de bloqueo de campos por sección ────────────────────────────────
-  // Paso 0 y 1 bloqueados cuando: soloAudios | todosBloqueado | esPendiente
   const bloquearCamposFormulario = soloAudios || todosBloqueado || esPendiente;
 
-  // El grabador solo se puede asignar si hay al menos un audio subido
-  // En correcciones sin audios previos (con solicitud_correccion), el grabador NO es obligatorio
   const esCorreccionConSolicitud =
     esEdicion && !!ventaOrigen?.solicitud_correccion;
-  // Corrección con solicitud pero SIN audios existentes: audios y grabador son opcionales
   const esCorreccionSinAudios = esCorreccionConSolicitud && !tieneAudiosEnBD;
 
   return (
@@ -1150,7 +1244,6 @@ export function VentaFormAsesor({
               </p>
             </div>
           )}
-          {/* NUEVO: banner para venta en estado PENDIENTE */}
           {esPendiente && !soloAudios && !todosBloqueado && (
             <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
               <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
@@ -1253,7 +1346,6 @@ export function VentaFormAsesor({
                 paso !== 0 && "hidden",
               )}
             >
-              {/* ── Sección bloqueada: Plan, Cliente, Equipos ── */}
               <div
                 className={cn(
                   "space-y-8",
@@ -1616,31 +1708,17 @@ export function VentaFormAsesor({
                       if (reingresoMismoDNI) {
                         return (
                           <div>
-                            <FieldLabel>Grabador asignado</FieldLabel>
-                            <div className="relative">
-                              <select
-                                disabled
-                                value={field.value ?? grabadorOrigenId ?? ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value
-                                      ? Number(e.target.value)
-                                      : undefined,
-                                  )
-                                }
-                                className="w-full h-11 pl-3.5 pr-10 rounded-xl bg-muted opacity-60 border border-border text-sm font-sans outline-none appearance-none cursor-not-allowed"
-                              >
-                                {grabadores.map((g) => (
-                                  <option key={g.id} value={g.id}>
-                                    {g.nombre_completo}
-                                  </option>
-                                ))}
-                              </select>
-                              <Lock
-                                size={14}
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                              />
-                            </div>
+                            <SearchableSelect
+                              label="Grabador asignado"
+                              disabled={true}
+                              value={field.value ?? grabadorOrigenId ?? ""}
+                              onChange={() => {}}
+                              placeholder="Seleccione el responsable"
+                              options={grabadores.map((g) => ({
+                                id: g.id,
+                                label: g.nombre_completo,
+                              }))}
+                            />
                             <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1 italic">
                               <Lock
                                 size={12}
@@ -1662,25 +1740,21 @@ export function VentaFormAsesor({
                           : grabadores;
 
                       return (
-                        <NativeSelect
+                        <SearchableSelect
                           label="Grabador asignado"
                           disabled={
                             todosBloqueado ||
                             (!tieneAlMenosUnAudio && !esCorreccionSinAudios)
                           }
                           value={field.value ?? ""}
-                          onChange={(v) =>
-                            field.onChange(v ? Number(v) : undefined)
-                          }
-                          placeholder="Seleccione el responsable"
+                          onChange={(v) => field.onChange(v)}
+                          placeholder="Buscar responsable..."
                           error={errorsObj.id_grabador_audios?.message}
-                        >
-                          {grabadoresDisponibles.map((g) => (
-                            <option key={g.id} value={g.id}>
-                              {g.nombre_completo}
-                            </option>
-                          ))}
-                        </NativeSelect>
+                          options={grabadoresDisponibles.map((g) => ({
+                            id: g.id,
+                            label: g.nombre_completo,
+                          }))}
+                        />
                       );
                     }}
                   />
@@ -1749,7 +1823,6 @@ export function VentaFormAsesor({
               className={cn(
                 "space-y-8 animate-in fade-in duration-300",
                 paso !== 1 && "hidden",
-                // CAMBIADO: usamos bloquearCamposFormulario
                 bloquearCamposFormulario &&
                   "pointer-events-none opacity-60 grayscale-[20%]",
               )}
@@ -1925,7 +1998,6 @@ export function VentaFormAsesor({
                     ? "Al reingresar debes subir audios nuevos desde cero."
                     : "Sube los archivos de audio (cualquier formato)."}
                 </p>
-                {/* NUEVO: Aviso si hay grabaciones pendientes de confirmar */}
                 {hayGrabacionSinConfirmar && (
                   <div className="mt-2 flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                     <AlertTriangle
@@ -1960,7 +2032,6 @@ export function VentaFormAsesor({
                     onRemove={() => handleAudioRemove(i)}
                     onUploadStart={() => handleAudioStart(i)}
                     onUploadError={(err) => handleAudioError(i, err)}
-                    // NUEVO: notificación de grabación pendiente
                     onPendienteConfirmar={(pendiente) =>
                       handleAudioPendienteConfirmar(i, pendiente)
                     }
