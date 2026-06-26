@@ -1,30 +1,29 @@
-// import { useAuth } from "@/features/auth/context/useAuth";
-// import { QuickActions } from "../components/QuickActions";
-// import { StatGrid } from "../components/StatGrid";
-// import { SystemStatus } from "../components/SystemStatus";
+import { useAuth } from "@/features/auth/context/useAuth";
+import { AnalyticsDashboardPage } from "@/features/analytics/pages/AnalyticsDashboardPage";
+import { ResumenAsesorMensual } from "../components/ResumenAsesorMensual";
 
 export const DashboardPage = () => {
-  // const { user } = useAuth();
-  // const isOwner = user?.rol.codigo === "DUENO";
+  const { user } = useAuth();
+  const roleCode = user?.rol?.codigo;
 
-  // const branchRaw = sessionStorage.getItem("currentBranch");
-  /*const branchData = branchRaw
-    ? JSON.parse(branchRaw)
-    : { name: "Todas las Sedes" };*/
+  if (roleCode === "ASESOR") {
+    return <ResumenAsesorMensual />;
+  }
 
-  // const modalityRaw = sessionStorage.getItem("currentModality");
-  // const modality = modalityRaw ? JSON.parse(modalityRaw) : { name: "GLOBAL" };
+  if (
+    roleCode === "DUENO" ||
+    roleCode === "COORDINADOR" ||
+    roleCode === "SUPERVISOR"
+  ) {
+    return <AnalyticsDashboardPage />;
+  }
 
-  /*const modalityDisplay =
-    modality.name === "CALL CENTER"
-      ? "Centro de Llamadas"
-      : modality.name === "GLOBAL"
-        ? "Acceso Total"
-        : "Ventas de Campo";*/
-
+  // BACKOFFICE, RRHH, SEGUIMIENTO: sin panel analítico específico todavía
   return (
     <div className="flex flex-col items-center justify-center h-[60vh] animate-in fade-in duration-500 space-y-4 text-center">
-      <p>Gracias por venir</p>
+      <p className="text-muted-foreground">
+        No hay un panel configurado para tu rol.
+      </p>
     </div>
   );
 };
