@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { MatrizPivote } from "../components/MatrizPivote";
 import { BarrasRendimientoMes } from "../components/BarrasRendimientoMes";
 import { EvolucionMensualAsesores } from "../components/EvolucionMensualAsesores";
@@ -5,6 +6,8 @@ import { TendenciaDiariaComparativa } from "../components/TendenciaDiariaCompara
 import { ArbolJerarquico } from "../components/ArbolJerarquico";
 
 export const AnalyticsDashboardPage = () => {
+  const [hayMuchosAsesores, setHayMuchosAsesores] = useState(false);
+
   return (
     <div className="flex flex-col gap-5 animate-in fade-in duration-500">
       <div>
@@ -16,10 +19,10 @@ export const AnalyticsDashboardPage = () => {
         </p>
       </div>
 
-      {/* Fila 1: barras del mes + evolución anual lado a lado en pantallas grandes */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      {/* Fila 1: barras del mes + evolución anual. Layout dinámico basado en estado */}
+      <div className={`grid grid-cols-1 ${hayMuchosAsesores ? "" : "xl:grid-cols-2"} gap-5`}>
         <BarrasRendimientoMes />
-        <EvolucionMensualAsesores />
+        <EvolucionMensualAsesores onMuchosAsesores={setHayMuchosAsesores} />
       </div>
 
       {/* Fila 2: tendencia diaria comparativa, ancho completo */}

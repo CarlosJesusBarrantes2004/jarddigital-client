@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -12,6 +12,7 @@ import {
 import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import { useEvolucionMensual } from "../hooks/useAnalytics";
 import { FiltrosGlobales } from "./FiltrosGlobales";
+import { FiltroSedeModalidad } from "./FiltroSedeModalidad";
 import type { EstadoSOT } from "../types/analytics.types";
 
 const MESES_CORTOS = [
@@ -43,19 +44,37 @@ const PALETA = [
   "#f97316",
 ];
 
-export const EvolucionMensualAsesores = () => {
+/** Umbral de asesores para considerarse "muchos" y ajustar layout */
+export const UMBRAL_MUCHOS_ASESORES = 8;
+
+export const EvolucionMensualAsesores = ({
+  onMuchosAsesores,
+}: {
+  onMuchosAsesores?: (muchos: boolean) => void;
+}) => {
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
+  const [filtroSede, setFiltroSede] = useState("");
 
   const { data, isLoading, isFetching } = useEvolucionMensual({
     anio,
     estado_sot: estadoSot,
   });
 
-  // Transformamos de [{asesor_nombre, num_mes, total_ventas}, ...] (formato "largo")
-  // a [{mes: 'Ene', AsesorA: 5, AsesorB: 3}, ...] (formato "ancho" que necesita Recharts)
+  // Extraer opciones únicas de sede_modalidad
+  const opcionesSede = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.map((f) => f.sede_modalidad))].sort();
+  }, [data]);
+
+  // Transformamos y filtramos los datos
   const { seriePorMes, nombresAsesores } = useMemo(() => {
     if (!data) return { seriePorMes: [], nombresAsesores: [] };
+
+    // Filtrar por sede_modalidad si hay filtro activo
+    const dataFiltrada = filtroSede
+      ? data.filter((f) => f.sede_modalidad === filtroSede)
+      : data;
 
     const asesoresSet = new Set<string>();
     const mapaMeses = new Map<number, Record<string, number | string>>();
@@ -64,7 +83,7 @@ export const EvolucionMensualAsesores = () => {
       mapaMeses.set(m, { mes: MESES_CORTOS[m - 1] });
     }
 
-    for (const fila of data) {
+    for (const fila of dataFiltrada) {
       if (!fila.num_mes) continue;
       asesoresSet.add(fila.asesor_nombre);
       const filaMes = mapaMeses.get(fila.num_mes);
@@ -75,7 +94,14 @@ export const EvolucionMensualAsesores = () => {
       seriePorMes: Array.from(mapaMeses.values()),
       nombresAsesores: Array.from(asesoresSet),
     };
-  }, [data]);
+  }, [data, filtroSede]);
+
+  const tieneMuchosAsesores = nombresAsesores.length > UMBRAL_MUCHOS_ASESORES;
+
+  // Notificar al padre (AnalyticsDashboardPage) para que ajuste el layout de la Fila 1
+  useEffect(() => {
+    onMuchosAsesores?.(tieneMuchosAsesores);
+  }, [tieneMuchosAsesores, onMuchosAsesores]);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -89,12 +115,19 @@ export const EvolucionMensualAsesores = () => {
             <Loader2 size={13} className="animate-spin text-muted-foreground" />
           )}
         </div>
-        <FiltrosGlobales
-          anio={anio}
-          onAnioChange={setAnio}
-          estadoSot={estadoSot}
-          onEstadoSotChange={setEstadoSot}
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <FiltroSedeModalidad
+            opcionesSede={opcionesSede}
+            filtroSede={filtroSede}
+            onFiltroSedeChange={setFiltroSede}
+          />
+          <FiltrosGlobales
+            anio={anio}
+            onAnioChange={setAnio}
+            estadoSot={estadoSot}
+            onEstadoSotChange={setEstadoSot}
+          />
+        </div>
       </div>
 
       {isLoading ? (
@@ -106,7 +139,10 @@ export const EvolucionMensualAsesores = () => {
           Sin datos para los filtros seleccionados.
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={380}>
+        <ResponsiveContainer
+          width="100%"
+          height={tieneMuchosAsesores ? 480 : 380}
+        >
           <LineChart
             data={seriePorMes}
             margin={{ top: 5, right: 16, bottom: 5, left: 0 }}
@@ -122,7 +158,10 @@ export const EvolucionMensualAsesores = () => {
                 backgroundColor: "var(--card)",
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              layout={tieneMuchosAsesores ? "horizontal" : "horizontal"}
+            />
             {nombresAsesores.map((nombre, i) => (
               <Line
                 key={nombre}

@@ -78,6 +78,7 @@ export interface TendenciaDiariaParams {
   anio: number;
   mes: number;
   modalidad?: Modalidad;
+  id_sede?: number;
 }
 
 // ==========================================
@@ -104,6 +105,8 @@ export interface NivelJerarquicoParams {
   anio?: number;
   padre_id?: string;
   solo_alto_valor?: boolean;
+  modalidad?: Modalidad;
+  id_sede?: number;
 }
 
 // Para mantener el breadcrumb de navegación en el árbol

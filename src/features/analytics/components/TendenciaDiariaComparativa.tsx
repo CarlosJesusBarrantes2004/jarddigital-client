@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -10,8 +10,10 @@ import {
   YAxis,
 } from "recharts";
 import { ChevronDown, Loader2, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useTendenciaDiaria } from "../hooks/useAnalytics";
 import { MODALIDAD_OPTIONS, type Modalidad } from "../types/analytics.types";
+import { coreService } from "@/features/core/services/coreService";
 
 const MESES = [
   "Enero",
@@ -46,9 +48,17 @@ export const TendenciaDiariaComparativa = () => {
     mes: hoy.getMonth() + 1,
   });
   const [modalidad, setModalidad] = useState<Modalidad | undefined>(undefined);
+  const [idSede, setIdSede] = useState<number | undefined>(undefined);
 
-  const queryA = useTendenciaDiaria({ ...periodoA, modalidad });
-  const queryB = useTendenciaDiaria({ ...periodoB, modalidad });
+  // Fetch sedes para el select
+  const { data: sedes } = useQuery({
+    queryKey: ["core", "sucursales"],
+    queryFn: coreService.getBranches,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const queryA = useTendenciaDiaria({ ...periodoA, modalidad, id_sede: idSede });
+  const queryB = useTendenciaDiaria({ ...periodoB, modalidad, id_sede: idSede });
 
   const isLoading = queryA.isLoading || queryB.isLoading;
 
@@ -94,6 +104,33 @@ export const TendenciaDiariaComparativa = () => {
           <span className="text-[12px] text-muted-foreground">vs</span>
           <SelectorPeriodo valor={periodoB} onChange={setPeriodoB} hoy={hoy} />
 
+          {/* Filtro Sede */}
+          {sedes && sedes.length > 0 && (
+            <div className="relative">
+              <select
+                value={idSede ?? ""}
+                onChange={(e) =>
+                  setIdSede(e.target.value ? Number(e.target.value) : undefined)
+                }
+                className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Todas las sedes</option>
+                {sedes
+                  .filter((s) => s.activo)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown
+                size={13}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+          )}
+
+          {/* Filtro Modalidad */}
           <div className="relative">
             <select
               value={modalidad ?? ""}

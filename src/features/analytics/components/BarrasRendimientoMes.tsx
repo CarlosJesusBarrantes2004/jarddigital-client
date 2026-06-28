@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -11,6 +11,7 @@ import {
 import { BarChart3, ChevronDown, Loader2 } from "lucide-react";
 import { useBarrasRendimientoMes } from "../hooks/useAnalytics";
 import { ESTADO_SOT_OPTIONS, type EstadoSOT } from "../types/analytics.types";
+import { FiltroSedeModalidad } from "./FiltroSedeModalidad";
 
 const MESES = [
   "Enero",
@@ -32,12 +33,26 @@ export const BarrasRendimientoMes = () => {
   const [anio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
+  const [filtroSede, setFiltroSede] = useState("");
 
   const { data, isLoading, isFetching } = useBarrasRendimientoMes({
     anio,
     mes,
     estado_sot: estadoSot,
   });
+
+  // Extraer opciones únicas de sede_modalidad de los datos
+  const opcionesSede = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.map((f) => f.sede_modalidad))].sort();
+  }, [data]);
+
+  // Filtrar datos localmente por sede_modalidad
+  const dataFiltrada = useMemo(() => {
+    if (!data) return [];
+    if (!filtroSede) return data;
+    return data.filter((f) => f.sede_modalidad === filtroSede);
+  }, [data, filtroSede]);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -52,7 +67,13 @@ export const BarrasRendimientoMes = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <FiltroSedeModalidad
+            opcionesSede={opcionesSede}
+            filtroSede={filtroSede}
+            onFiltroSedeChange={setFiltroSede}
+          />
+
           <div className="relative">
             <select
               value={mes}
@@ -94,17 +115,17 @@ export const BarrasRendimientoMes = () => {
         <div className="flex items-center justify-center h-72">
           <Loader2 size={20} className="animate-spin text-muted-foreground" />
         </div>
-      ) : !data || data.length === 0 ? (
+      ) : !dataFiltrada || dataFiltrada.length === 0 ? (
         <div className="flex items-center justify-center h-72 text-[13px] text-muted-foreground">
           Sin ventas registradas para este mes.
         </div>
       ) : (
         <ResponsiveContainer
           width="100%"
-          height={Math.max(280, data.length * 36)}
+          height={Math.max(280, dataFiltrada.length * 36)}
         >
           <BarChart
-            data={data}
+            data={dataFiltrada}
             layout="vertical"
             margin={{ left: 8, right: 24 }}
           >

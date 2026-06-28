@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { ChevronRight, Folder, Gem, Loader2, Network } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, Gem, Loader2, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { useNivelJerarquico } from "../hooks/useAnalytics";
 import {
   ESTADO_SOT_OPTIONS,
+  MODALIDAD_OPTIONS,
   type DimensionJerarquica,
   type EstadoSOT,
   type MigaDePan,
+  type Modalidad,
 } from "../types/analytics.types";
+import { coreService } from "@/features/core/services/coreService";
 
 const DIMENSIONES: { value: DimensionJerarquica; label: string }[] = [
   { value: "GEOGRAFIA", label: "Geografía" },
@@ -19,9 +23,18 @@ export const ArbolJerarquico = () => {
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
   const [soloAltoValor, setSoloAltoValor] = useState(false);
   const [migaDePan, setMigaDePan] = useState<MigaDePan[]>([]);
+  const [modalidad, setModalidad] = useState<Modalidad | undefined>(undefined);
+  const [idSede, setIdSede] = useState<number | undefined>(undefined);
 
   const nivelActual = migaDePan.length;
   const padreActual = migaDePan[migaDePan.length - 1]?.item_id;
+
+  // Fetch sedes para el select
+  const { data: sedes } = useQuery({
+    queryKey: ["core", "sucursales"],
+    queryFn: coreService.getBranches,
+    staleTime: 1000 * 60 * 10,
+  });
 
   const { data, isLoading, isFetching } = useNivelJerarquico({
     estado_sot: estadoSot,
@@ -29,6 +42,8 @@ export const ArbolJerarquico = () => {
     nivel: nivelActual,
     padre_id: padreActual,
     solo_alto_valor: soloAltoValor,
+    modalidad,
+    id_sede: idSede,
   });
 
   const cambiarDimension = (nueva: DimensionJerarquica) => {
@@ -80,6 +95,58 @@ export const ArbolJerarquico = () => {
                 {d.label}
               </button>
             ))}
+          </div>
+
+          {/* Filtro Sede */}
+          {sedes && sedes.length > 0 && (
+            <div className="relative">
+              <select
+                value={idSede ?? ""}
+                onChange={(e) => {
+                  setIdSede(e.target.value ? Number(e.target.value) : undefined);
+                  setMigaDePan([]); // resetear drill-down
+                }}
+                className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Todas las sedes</option>
+                {sedes
+                  .filter((s) => s.activo)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown
+                size={13}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+          )}
+
+          {/* Filtro Modalidad */}
+          <div className="relative">
+            <select
+              value={modalidad ?? ""}
+              onChange={(e) => {
+                setModalidad(
+                  (e.target.value || undefined) as Modalidad | undefined,
+                );
+                setMigaDePan([]); // resetear drill-down
+              }}
+              className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">Todas</option>
+              {MODALIDAD_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={13}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
 
           <select
