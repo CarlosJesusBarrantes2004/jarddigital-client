@@ -45,6 +45,48 @@ const PALETA = [
   "#f97316",
 ];
 
+const CustomTooltipEvolucion = ({
+  active,
+  payload,
+  label,
+  onAsesorClick,
+}: any) => {
+  if (active && payload && payload.length) {
+    // Ordenar de mayor a menor
+    const sorted = [...payload].sort((a, b) => (b.value as number) - (a.value as number));
+
+    return (
+      <div 
+        className="bg-card/95 backdrop-blur-md border border-border p-3 rounded-lg shadow-xl"
+        style={{ pointerEvents: 'auto' }}
+      >
+        <p className="text-[12px] font-bold text-foreground mb-3">{label}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
+          {sorted.map((entry, index) => (
+            <button
+              key={index}
+              onClick={() => onAsesorClick(entry.dataKey)}
+              className="flex items-center gap-2 text-[11px] text-left hover:bg-muted p-1 rounded transition-colors w-full"
+            >
+              <div
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-muted-foreground truncate max-w-[120px]" title={entry.dataKey}>
+                {entry.dataKey}
+              </span>
+              <span className="font-semibold text-foreground shrink-0 ml-auto">
+                {entry.value}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 /** Umbral de asesores para considerarse "muchos" y ajustar layout */
 export const UMBRAL_MUCHOS_ASESORES = 8;
 
@@ -94,7 +136,7 @@ export const EvolucionMensualAsesores = ({
       : dataPorSede;
 
     const asesoresSet = new Set<string>();
-    const mapaMeses = new Map<number, Record<string, number | string>>();
+    const mapaMeses = new Map<number, Record<string, number | string | null>>();
 
     for (let m = 1; m <= 12; m++) {
       mapaMeses.set(m, { mes: MESES_CORTOS[m - 1] });
@@ -107,8 +149,19 @@ export const EvolucionMensualAsesores = ({
       if (filaMes) filaMes[fila.asesor_nombre] = fila.total_ventas;
     }
 
+    const serieResult = Array.from(mapaMeses.values());
+    
+    // Rellenar con null explícito para que el connectNulls dibuje la línea correctamente
+    for (const fila of serieResult) {
+      for (const asesor of asesoresSet) {
+        if (!(asesor in fila)) {
+          fila[asesor] = null;
+        }
+      }
+    }
+
     return {
-      seriePorMes: Array.from(mapaMeses.values()),
+      seriePorMes: serieResult,
       nombresAsesores: Array.from(asesoresSet),
       asesoresDisponiblesPorSede: asesoresDisponibles,
     };
@@ -201,15 +254,12 @@ export const EvolucionMensualAsesores = ({
                 <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  contentStyle={{
-                    fontSize: 12,
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--card)",
-                    maxHeight: "300px",
-                    overflowY: "auto"
-                  }}
-                  itemSorter={(item) => -(item.value as number)}
+                  content={<CustomTooltipEvolucion onAsesorClick={(asesor: string) => {
+                    if (!filtroAsesor) {
+                      setAsesorSeleccionadoPanel(asesor);
+                    }
+                  }} />}
+                  cursor={{ strokeDasharray: '3 3' }}
                 />
                 <Legend
                   wrapperStyle={{ fontSize: 11 }}
