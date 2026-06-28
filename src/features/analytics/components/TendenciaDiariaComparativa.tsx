@@ -68,7 +68,7 @@ export const TendenciaDiariaComparativa = () => {
     const labelA = `${MESES[periodoA.mes - 1].slice(0, 3)} ${periodoA.anio}`;
     const labelB = `${MESES[periodoB.mes - 1].slice(0, 3)} ${periodoB.anio}`;
 
-    const resultado: Record<string, number | string | null>[] = [];
+    const resultado: Record<string, number | string>[] = [];
     for (let dia = 1; dia <= maxDias; dia++) {
       const puntoA = queryA.data?.serie.find(
         (p) => Number(p.fecha.split("-")[2]) === dia,
@@ -79,8 +79,8 @@ export const TendenciaDiariaComparativa = () => {
       if (!puntoA && !puntoB && dia > 28) continue; // evitamos colas vacías en meses cortos
       resultado.push({
         dia: `Día ${dia}`,
-        [labelA]: puntoA?.total ?? null,
-        [labelB]: puntoB?.total ?? null,
+        [labelA]: puntoA?.total ?? 0,
+        [labelB]: puntoB?.total ?? 0,
       });
     }
     return { datos: resultado, labelA, labelB };
