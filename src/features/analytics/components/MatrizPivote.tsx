@@ -61,7 +61,7 @@ export const MatrizPivote = () => {
         nuevosTotales[`m${m}`] = suma;
         nuevosTotales.grand_total += suma;
       }
-      totales = nuevosTotales as typeof data.totales_columnas;
+      totales = nuevosTotales as unknown as typeof data.totales_columnas;
     }
 
     return {
