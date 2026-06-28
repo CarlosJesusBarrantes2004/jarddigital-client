@@ -100,6 +100,10 @@ export const EvolucionMensualAsesores = ({
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroAsesor, setFiltroAsesor] = useState("");
   const [asesorSeleccionadoPanel, setAsesorSeleccionadoPanel] = useState<string | null>(null);
+  const [pinnedMonth, setPinnedMonth] = useState<{
+    label: string;
+    payload: any[];
+  } | null>(null);
 
   const { data, isLoading, isFetching } = useEvolucionMensual({
     anio,
@@ -151,11 +155,11 @@ export const EvolucionMensualAsesores = ({
 
     const serieResult = Array.from(mapaMeses.values());
     
-    // Rellenar con null explícito para que el connectNulls dibuje la línea correctamente
+    // Rellenar con 0 explícito para que el connectNulls dibuje la línea bajando a 0 si no hay ventas
     for (const fila of serieResult) {
       for (const asesor of asesoresSet) {
         if (!(asesor in fila)) {
-          fila[asesor] = null;
+          fila[asesor] = 0;
         }
       }
     }
@@ -249,18 +253,35 @@ export const EvolucionMensualAsesores = ({
               <LineChart
                 data={seriePorMes}
                 margin={{ top: 5, right: 16, bottom: 5, left: 0 }}
+                onClick={(e: any) => {
+                  if (e && e.activePayload) {
+                    if (pinnedMonth?.label === e.activeLabel) {
+                      setPinnedMonth(null); // toggle off
+                    } else {
+                      setPinnedMonth({
+                        label: e.activeLabel,
+                        payload: e.activePayload,
+                      });
+                    }
+                  } else {
+                    setPinnedMonth(null);
+                  }
+                }}
               >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip
-                  content={<CustomTooltipEvolucion onAsesorClick={(asesor: string) => {
-                    if (!filtroAsesor) {
-                      setAsesorSeleccionadoPanel(asesor);
-                    }
-                  }} />}
-                  cursor={{ strokeDasharray: '3 3' }}
-                />
+                {!pinnedMonth && (
+                  <Tooltip
+                    content={<CustomTooltipEvolucion onAsesorClick={(asesor: string) => {
+                      if (!filtroAsesor) {
+                        setAsesorSeleccionadoPanel(asesor);
+                        setPinnedMonth(null);
+                      }
+                    }} />}
+                    cursor={{ strokeDasharray: '3 3' }}
+                  />
+                )}
                 <Legend
                   wrapperStyle={{ fontSize: 11 }}
                   layout="horizontal"
@@ -298,6 +319,31 @@ export const EvolucionMensualAsesores = ({
                 })}
               </LineChart>
             </ResponsiveContainer>
+          )}
+
+          {/* Overlay Absoluto para Pinned Month (Ventana Flotante Congelada) */}
+          {pinnedMonth && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-background/30 backdrop-blur-[2px]">
+              <div className="relative max-w-[90%] max-h-[90%] overflow-y-auto custom-scrollbar shadow-2xl rounded-lg">
+                <button
+                  onClick={() => setPinnedMonth(null)}
+                  className="absolute top-2 right-2 p-1.5 bg-destructive/90 hover:bg-destructive rounded-full text-white transition-colors z-50 shadow-md"
+                >
+                  <X size={14} />
+                </button>
+                <CustomTooltipEvolucion
+                  active={true}
+                  payload={pinnedMonth.payload}
+                  label={`${pinnedMonth.label} (Fijado)`}
+                  onAsesorClick={(asesor: string) => {
+                    if (!filtroAsesor) {
+                      setAsesorSeleccionadoPanel(asesor);
+                      setPinnedMonth(null);
+                    }
+                  }}
+                />
+              </div>
+            </div>
           )}
         </div>
 
