@@ -21,14 +21,13 @@ export const FiltrosGlobales = ({
   anioDesde = 2020,
   className,
 }: FiltrosGlobalesProps) => {
-  const anios = generarAniosDisponibles(anioDesde);
 
   return (
     <div className={cn("flex items-center gap-2 flex-wrap", className)}>
       <div className="relative">
         <input
           type="number"
-          min={2020}
+          min={anioDesde}
           max={new Date().getFullYear() + 1}
           value={anio}
           onChange={(e) => onAnioChange(Number(e.target.value))}
