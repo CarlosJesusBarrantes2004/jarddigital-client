@@ -251,20 +251,13 @@ const SelectorPeriodo = ({
       />
     </div>
     <div className="relative">
-      <select
+      <input
+        type="number"
+        min={2020}
+        max={hoy.getFullYear() + 1}
         value={valor.anio}
         onChange={(e) => onChange({ ...valor, anio: Number(e.target.value) })}
-        className="h-9 pl-2.5 pr-7 rounded-lg border border-border bg-background text-[12px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
-      >
-        {Array.from({ length: hoy.getFullYear() - 2020 + 1 }, (_, i) => hoy.getFullYear() - i).map((a) => (
-          <option key={a} value={a}>
-            {a}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        size={11}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+        className="h-9 w-20 px-2.5 rounded-lg border border-border bg-background text-[12px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
     </div>
   </div>
