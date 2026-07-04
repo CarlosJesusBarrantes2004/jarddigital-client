@@ -23,7 +23,7 @@ export const FiltrosGlobales = ({
   onAnioChange,
   estadoSot,
   onEstadoSotChange,
-  anioDesde = 2024,
+  anioDesde = 2020,
   className,
 }: FiltrosGlobalesProps) => {
   const anios = generarAniosDisponibles(anioDesde);

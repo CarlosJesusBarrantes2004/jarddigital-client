@@ -256,7 +256,7 @@ const SelectorPeriodo = ({
         onChange={(e) => onChange({ ...valor, anio: Number(e.target.value) })}
         className="h-9 pl-2.5 pr-7 rounded-lg border border-border bg-background text-[12px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
       >
-        {[hoy.getFullYear(), hoy.getFullYear() - 1].map((a) => (
+        {Array.from({ length: hoy.getFullYear() - 2020 + 1 }, (_, i) => hoy.getFullYear() - i).map((a) => (
           <option key={a} value={a}>
             {a}
           </option>

@@ -61,14 +61,13 @@ export const BarrasRendimientoMes = () => {
 
   // Datos con porcentaje calculado
   const dataConPorcentaje = useMemo(() => {
-    if (totalVentas === 0) return dataFiltrada;
     return dataFiltrada.map((f) => ({
       ...f,
-      porcentaje: Math.round((f.total_ventas / totalVentas) * 100),
+      porcentaje: f.total_ventas > 0 ? Math.round((f.total_pagadas / f.total_ventas) * 100) : 0,
     }));
-  }, [dataFiltrada, totalVentas]);
+  }, [dataFiltrada]);
 
-  // Custom label para mostrar total + porcentaje al lado de cada barra
+  // Custom label para mostrar instaladas / pagadas al lado de cada barra
   const renderBarLabel = (props: any) => {
     const { x, y, width, height, value, index } = props;
     const item = dataConPorcentaje[index] as any;
@@ -77,12 +76,12 @@ export const BarrasRendimientoMes = () => {
       <text
         x={x + width + 6}
         y={y + height / 2}
-        fill="var(--foreground)"
+        className="fill-foreground dark:fill-white"
         fontSize={11}
         fontWeight={600}
         dominantBaseline="central"
       >
-        {value} ({item.porcentaje}%)
+        {value} / {item.total_pagadas} ({item.porcentaje}%)
       </text>
     );
   };
@@ -130,7 +129,7 @@ export const BarrasRendimientoMes = () => {
               onChange={(e) => setAnio(Number(e.target.value))}
               className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              {[hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2].map((a) => (
+              {Array.from({ length: hoy.getFullYear() - 2020 + 1 }, (_, i) => hoy.getFullYear() - i).map((a) => (
                 <option key={a} value={a}>
                   {a}
                 </option>

@@ -49,6 +49,7 @@ export interface FilaBarraRendimiento {
   asesor_nombre: string;
   sede_modalidad: string;
   total_ventas: number;
+  total_pagadas: number;
   num_mes?: number; // solo presente en el modo "evolución" (Gráfico 4, sin mes fijo)
 }
 

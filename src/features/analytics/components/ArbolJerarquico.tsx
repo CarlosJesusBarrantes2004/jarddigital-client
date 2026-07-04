@@ -216,7 +216,7 @@ export const ArbolJerarquico = () => {
               }}
               className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              {[hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2].map((a) => (
+              {Array.from({ length: hoy.getFullYear() - 2020 + 1 }, (_, i) => hoy.getFullYear() - i).map((a) => (
                 <option key={a} value={a}>
                   {a}
                 </option>
