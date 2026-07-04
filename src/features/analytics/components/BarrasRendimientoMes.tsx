@@ -32,7 +32,7 @@ const MESES = [
 export const BarrasRendimientoMes = () => {
   const { user } = useAuth();
   const puedeVerFiltrosSede =
-    user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+    user?.rol?.codigo !== "SUPERVISOR" && user?.rol?.codigo !== "ASESOR";
 
   const hoy = new Date();
   const [anio, setAnio] = useState(hoy.getFullYear());

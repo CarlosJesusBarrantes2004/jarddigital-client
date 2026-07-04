@@ -38,7 +38,7 @@ interface SelectorMesAnio {
 
 export const TendenciaDiariaComparativa = () => {
   const { user } = useAuth();
-  const puedeVerFiltrosSede = user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+  const puedeVerFiltrosSede = user?.rol?.codigo !== "SUPERVISOR" && user?.rol?.codigo !== "ASESOR";
 
   const hoy = new Date();
   const mesAnteriorBase =

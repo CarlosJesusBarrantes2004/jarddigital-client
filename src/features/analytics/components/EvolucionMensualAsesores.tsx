@@ -98,7 +98,7 @@ export const EvolucionMensualAsesores = ({
 }) => {
   const { user } = useAuth();
   const puedeVerFiltrosSede =
-    user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+    user?.rol?.codigo !== "SUPERVISOR" && user?.rol?.codigo !== "ASESOR";
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
