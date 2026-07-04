@@ -53,6 +53,8 @@ export const TendenciaDiariaComparativa = () => {
   });
   const [modalidad, setModalidad] = useState<Modalidad | undefined>(undefined);
   const [idSede, setIdSede] = useState<number | undefined>(undefined);
+  const [diaDesde, setDiaDesde] = useState<number>(1);
+  const [diaHasta, setDiaHasta] = useState<number>(31);
 
   // Fetch sedes para el select
   const { data: sedes } = useQuery({
@@ -90,6 +92,23 @@ export const TendenciaDiariaComparativa = () => {
     return { datos: resultado, labelA, labelB };
   }, [queryA.data, queryB.data, periodoA, periodoB]);
 
+  // Totales acumulados según el rango de días seleccionado
+  const totalesRango = useMemo(() => {
+    const sumarRango = (serie: { fecha: string; total: number }[] | undefined) => {
+      if (!serie) return 0;
+      return serie
+        .filter((p) => {
+          const dia = Number(p.fecha.split("-")[2]);
+          return dia >= diaDesde && dia <= diaHasta;
+        })
+        .reduce((sum, p) => sum + p.total, 0);
+    };
+    return {
+      totalA: sumarRango(queryA.data?.serie),
+      totalB: sumarRango(queryB.data?.serie),
+    };
+  }, [queryA.data, queryB.data, diaDesde, diaHasta]);
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
@@ -107,6 +126,30 @@ export const TendenciaDiariaComparativa = () => {
           <SelectorPeriodo valor={periodoA} onChange={setPeriodoA} hoy={hoy} />
           <span className="text-[12px] text-muted-foreground">vs</span>
           <SelectorPeriodo valor={periodoB} onChange={setPeriodoB} hoy={hoy} />
+
+          {/* Filtro rango de días */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Días</span>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={diaDesde}
+              onChange={(e) => setDiaDesde(Math.max(1, Math.min(31, Number(e.target.value))))}
+              className="h-9 w-14 px-2 rounded-lg border border-border bg-background text-[12px] font-medium text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+              title="Día desde"
+            />
+            <span className="text-[11px] text-muted-foreground">–</span>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={diaHasta}
+              onChange={(e) => setDiaHasta(Math.max(1, Math.min(31, Number(e.target.value))))}
+              className="h-9 w-14 px-2 rounded-lg border border-border bg-background text-[12px] font-medium text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+              title="Día hasta"
+            />
+          </div>
 
           {/* Filtro Sede */}
           {puedeVerFiltrosSede && sedes && sedes.length > 0 && (
@@ -211,7 +254,14 @@ export const TendenciaDiariaComparativa = () => {
               </p>
               <p className="text-[18px] font-bold text-foreground">
                 {queryA.data?.total_mes ?? 0}
+                <span className="text-[11px] font-normal text-muted-foreground ml-1">total mes</span>
               </p>
+              {(diaDesde !== 1 || diaHasta !== 31) && (
+                <p className="text-[13px] font-semibold text-foreground/70">
+                  {totalesRango.totalA}
+                  <span className="text-[10px] font-normal text-muted-foreground ml-1">días {diaDesde}–{diaHasta}</span>
+                </p>
+              )}
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground">
@@ -219,7 +269,14 @@ export const TendenciaDiariaComparativa = () => {
               </p>
               <p className="text-[18px] font-bold text-primary">
                 {queryB.data?.total_mes ?? 0}
+                <span className="text-[11px] font-normal text-muted-foreground ml-1">total mes</span>
               </p>
+              {(diaDesde !== 1 || diaHasta !== 31) && (
+                <p className="text-[13px] font-semibold text-primary/70">
+                  {totalesRango.totalB}
+                  <span className="text-[10px] font-normal text-muted-foreground ml-1">días {diaDesde}–{diaHasta}</span>
+                </p>
+              )}
             </div>
           </div>
         </>

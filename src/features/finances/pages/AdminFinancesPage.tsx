@@ -55,6 +55,7 @@ export const AdminFinancesPage = () => {
   const [noAsesores, setNoAsesores] = useState<NoAsesorPlanilla[]>([]);
   const [isLoadingTable, setIsLoadingTable] = useState<boolean>(true);
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
+  const [busquedaNombre, setBusquedaNombre] = useState<string>("");
 
   // Estados del Ojo de Dios
   const [showLiveModal, setShowLiveModal] = useState<boolean>(false);
@@ -191,6 +192,12 @@ export const AdminFinancesPage = () => {
     (m) => m.valor === (mes === 1 ? 12 : mes - 1),
   );
 
+  // Filtrar planillas por nombre de asesor
+  const planillasFiltradas = planillas.filter((p) =>
+    busquedaNombre === "" ||
+    p.nombre_asesor.toLowerCase().includes(busquedaNombre.toLowerCase())
+  );
+
   console.log(planillas);
 
   return (
@@ -243,6 +250,20 @@ export const AdminFinancesPage = () => {
               ))}
             </select>
           </div>
+          {/* Buscador por nombre de asesor */}
+          <div className="flex flex-col gap-1.5 w-full md:w-56">
+            <label className="text-[13px] font-medium text-muted-foreground flex items-center gap-1.5">
+              <Filter size={14} /> Buscar asesor
+            </label>
+            <input
+              type="text"
+              placeholder="Nombre del asesor..."
+              value={busquedaNombre}
+              onChange={(e) => setBusquedaNombre(e.target.value)}
+              disabled={isLiquidating}
+              className="h-10 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none"
+            />
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-4 md:mt-0">
@@ -289,7 +310,7 @@ export const AdminFinancesPage = () => {
               Cargando registros financieros...
             </p>
           </div>
-        ) : planillas.length === 0 ? (
+        ) : planillasFiltradas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <AlertCircle size={40} className="text-muted-foreground/50 mb-3" />
             <p className="text-base font-medium text-foreground">
@@ -319,7 +340,7 @@ export const AdminFinancesPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {planillas.map((row) => (
+                {planillasFiltradas.map((row) => (
                   <tr
                     key={`planilla-${row.id}-${row.id_usuario}`}
                     className="hover:bg-muted/30 transition-colors group"
