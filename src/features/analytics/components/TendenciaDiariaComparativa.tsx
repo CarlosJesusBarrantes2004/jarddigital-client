@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTendenciaDiaria } from "../hooks/useAnalytics";
 import { MODALIDAD_OPTIONS, type Modalidad } from "../types/analytics.types";
 import { coreService } from "@/features/core/services/coreService";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 const MESES = [
   "Enero",
@@ -36,6 +37,9 @@ interface SelectorMesAnio {
 }
 
 export const TendenciaDiariaComparativa = () => {
+  const { user } = useAuth();
+  const puedeVerFiltrosSede = user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+
   const hoy = new Date();
   const mesAnteriorBase =
     hoy.getMonth() === 0
@@ -105,7 +109,7 @@ export const TendenciaDiariaComparativa = () => {
           <SelectorPeriodo valor={periodoB} onChange={setPeriodoB} hoy={hoy} />
 
           {/* Filtro Sede */}
-          {sedes && sedes.length > 0 && (
+          {puedeVerFiltrosSede && sedes && sedes.length > 0 && (
             <div className="relative">
               <select
                 value={idSede ?? ""}
@@ -131,7 +135,8 @@ export const TendenciaDiariaComparativa = () => {
           )}
 
           {/* Filtro Modalidad */}
-          <div className="relative">
+          {puedeVerFiltrosSede && (
+            <div className="relative">
             <select
               value={modalidad ?? ""}
               onChange={(e) =>
@@ -153,6 +158,7 @@ export const TendenciaDiariaComparativa = () => {
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
           </div>
+          )}
         </div>
       </div>
 

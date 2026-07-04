@@ -3,14 +3,8 @@ import { ChevronDown, ChevronRight, Folder, Gem, Loader2, MapPin, Network } from
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useNivelJerarquico } from "../hooks/useAnalytics";
-import {
-  ESTADO_SOT_OPTIONS,
-  MODALIDAD_OPTIONS,
-  type DimensionJerarquica,
-  type EstadoSOT,
-  type MigaDePan,
-  type Modalidad,
-} from "../types/analytics.types";
+import { ESTADO_SOT_OPTIONS, type EstadoSOT, MODALIDAD_OPTIONS, type DimensionJerarquica, type MigaDePan, type Modalidad } from "../types/analytics.types";
+import { useAuth } from "@/features/auth/context/useAuth";
 import { coreService } from "@/features/core/services/coreService";
 
 const DIMENSIONES: { value: DimensionJerarquica; label: string }[] = [
@@ -29,6 +23,9 @@ const DEPARTAMENTOS_NORTE = [
 ];
 
 export const ArbolJerarquico = () => {
+  const { user } = useAuth();
+  const puedeVerFiltrosSede = user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+
   const hoy = new Date();
   const [dimension, setDimension] = useState<DimensionJerarquica>("GEOGRAFIA");
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
@@ -132,7 +129,7 @@ export const ArbolJerarquico = () => {
           </div>
 
           {/* Filtro Sede */}
-          {sedes && sedes.length > 0 && (
+          {puedeVerFiltrosSede && sedes && sedes.length > 0 && (
             <div className="relative">
               <select
                 value={idSede ?? ""}
@@ -159,29 +156,29 @@ export const ArbolJerarquico = () => {
           )}
 
           {/* Filtro Modalidad */}
-          <div className="relative">
-            <select
-              value={modalidad ?? ""}
-              onChange={(e) => {
-                setModalidad(
-                  (e.target.value || undefined) as Modalidad | undefined,
-                );
-                setMigaDePan([]); // resetear drill-down
-              }}
-              className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
-            >
-              <option value="">Todas</option>
-              {MODALIDAD_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={13}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-            />
-          </div>
+          {puedeVerFiltrosSede && (
+            <div className="relative">
+              <select
+                value={modalidad ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setModalidad(val ? (val as Modalidad) : undefined);
+                }}
+                className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Todas</option>
+                {MODALIDAD_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={13}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+          )}
 
           {/* Filtro Mes */}
           <div className="relative">
