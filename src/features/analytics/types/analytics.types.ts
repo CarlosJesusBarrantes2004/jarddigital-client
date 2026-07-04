@@ -1,4 +1,4 @@
-export type EstadoSOT = "ATENDIDO" | "PENDIENTE" | "RECHAZADO";
+export type EstadoSOT = "ATENDIDO" | "PENDIENTE" | "RECHAZADO" | "EN_EJECUCION";
 export type Modalidad = "CALL" | "CAMPO";
 export type DimensionJerarquica = "GEOGRAFIA" | "PRODUCTO";
 
@@ -6,6 +6,7 @@ export const ESTADO_SOT_OPTIONS: { value: EstadoSOT; label: string }[] = [
   { value: "ATENDIDO", label: "Atendido" },
   { value: "PENDIENTE", label: "Pendiente" },
   { value: "RECHAZADO", label: "Rechazado" },
+  { value: "EN_EJECUCION", label: "En Ejecución" },
 ];
 
 export const MODALIDAD_OPTIONS: { value: Modalidad; label: string }[] = [
@@ -103,6 +104,7 @@ export interface NivelJerarquicoParams {
   dimension: DimensionJerarquica;
   nivel: number;
   anio?: number;
+  mes?: number;
   padre_id?: string;
   solo_alto_valor?: boolean;
   modalidad?: Modalidad;

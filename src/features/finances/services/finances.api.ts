@@ -191,3 +191,28 @@ export const getModalidades = async () => {
     );
   return data;
 };
+
+// ==========================================
+// NO-ASESORES (SUPERVISORES/COORDINADORES)
+// ==========================================
+export interface NoAsesorPlanilla {
+  id_usuario: number;
+  nombre_completo: string;
+  dni: string;
+  rol: string;
+  modalidad_aplicada: string;
+  sede_aplicada: string;
+  sueldo_base: string;
+  comision_neta: string;
+  dias_falta: number;
+  descuento_faltas: string;
+  sueldo_neto_final: string;
+}
+
+export const getPlanillasNoAsesores = async (mes: number, anio: number) => {
+  const { data } = await api.get<NoAsesorPlanilla[]>(
+    `/finances/planillas/no-asesores/`,
+    { params: { mes, anio } },
+  );
+  return data;
+};

@@ -24,8 +24,10 @@ import {
   extraerErrorFinanzas,
   getExportarPlanillasExcelUrl,
   getProyeccionAsesorLive,
+  getPlanillasNoAsesores,
   type HistoricoPlanilla,
   type MiDashboardRespuesta,
+  type NoAsesorPlanilla,
 } from "../services/finances.api";
 import { toast } from "sonner";
 import { api } from "@/api/axios";
@@ -50,6 +52,7 @@ export const AdminFinancesPage = () => {
   const [mes, setMes] = useState<number>(hoy.getMonth() + 1);
   const [anio, setAnio] = useState<number>(hoy.getFullYear());
   const [planillas, setPlanillas] = useState<HistoricoPlanilla[]>([]);
+  const [noAsesores, setNoAsesores] = useState<NoAsesorPlanilla[]>([]);
   const [isLoadingTable, setIsLoadingTable] = useState<boolean>(true);
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
 
@@ -69,8 +72,12 @@ export const AdminFinancesPage = () => {
   const fetchPlanillas = useCallback(async () => {
     setIsLoadingTable(true);
     try {
-      const data = await getPlanillas({ mes_fiscal: mes, anio_fiscal: anio });
-      setPlanillas(data);
+      const [dataAsesores, dataNoAsesores] = await Promise.all([
+        getPlanillas({ mes_fiscal: mes, anio_fiscal: anio }),
+        getPlanillasNoAsesores(mes, anio),
+      ]);
+      setPlanillas(dataAsesores);
+      setNoAsesores(dataNoAsesores);
     } catch (error) {
       toast.error("Error de lectura");
     } finally {
@@ -396,6 +403,63 @@ export const AdminFinancesPage = () => {
                       >
                         <Eye size={15} />
                       </button>
+                    </td>
+                  </tr>
+                ))}
+                {/* Filas de Supervisores/Coordinadores */}
+                {noAsesores.map((row) => (
+                  <tr
+                    key={`no-asesor-${row.id_usuario}`}
+                    className="hover:bg-muted/30 transition-colors group bg-muted/10"
+                  >
+                    <td className="px-4 py-3 text-foreground">
+                      <p className="font-medium leading-tight">
+                        {row.nombre_completo}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                        DNI: {row.dni || "Pendiente"}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        <span className="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded text-[9px] font-bold uppercase tracking-wider">
+                          {row.rol}
+                        </span>
+                        {row.modalidad_aplicada && (
+                          <span className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded text-[9px] font-bold uppercase tracking-wider">
+                            {row.modalidad_aplicada}
+                          </span>
+                        )}
+                        {row.sede_aplicada && (
+                          <span className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground rounded text-[9px] font-bold uppercase tracking-wider truncate max-w-[120px]">
+                            {row.sede_aplicada}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center align-top pt-4">
+                      <span className="text-muted-foreground text-[11px]">N/A</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground align-top pt-4">
+                      S/ {Number(row.sueldo_base).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top pt-3">
+                      <span className="text-muted-foreground text-[11px]">No aplica</span>
+                    </td>
+                    <td className="px-4 py-3 text-right align-top pt-4">
+                      {Number(row.descuento_faltas) > 0 ? (
+                        <span className="text-red-600 font-medium">
+                          - S/ {Number(row.descuento_faltas).toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">S/ 0.00</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right bg-primary/5 align-top pt-4">
+                      <span className="font-bold text-base text-primary">
+                        S/ {Number(row.sueldo_neto_final).toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center align-top pt-3">
+                      <span className="text-[10px] text-muted-foreground">—</span>
                     </td>
                   </tr>
                 ))}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, ChevronRight, Folder, Gem, Loader2, Network } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Folder, Gem, Loader2, MapPin, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useNivelJerarquico } from "../hooks/useAnalytics";
@@ -18,13 +18,26 @@ const DIMENSIONES: { value: DimensionJerarquica; label: string }[] = [
   { value: "PRODUCTO", label: "Producto" },
 ];
 
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+const DEPARTAMENTOS_NORTE = [
+  "TUMBES", "PIURA", "LAMBAYEQUE", "LA LIBERTAD",
+  "CAJAMARCA", "AMAZONAS", "SAN MARTÍN", "SAN MARTIN", "ÁNCASH", "ANCASH",
+];
+
 export const ArbolJerarquico = () => {
+  const hoy = new Date();
   const [dimension, setDimension] = useState<DimensionJerarquica>("GEOGRAFIA");
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
   const [soloAltoValor, setSoloAltoValor] = useState(false);
   const [migaDePan, setMigaDePan] = useState<MigaDePan[]>([]);
   const [modalidad, setModalidad] = useState<Modalidad | undefined>(undefined);
   const [idSede, setIdSede] = useState<number | undefined>(undefined);
+  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [mes, setMes] = useState<number | undefined>(undefined);
 
   const nivelActual = migaDePan.length;
   const padreActual = migaDePan[migaDePan.length - 1]?.item_id;
@@ -40,11 +53,32 @@ export const ArbolJerarquico = () => {
     estado_sot: estadoSot,
     dimension,
     nivel: nivelActual,
+    anio,
+    mes,
     padre_id: padreActual,
     solo_alto_valor: soloAltoValor,
     modalidad,
     id_sede: idSede,
   });
+
+  // Cálculo del panel Norte
+  const panelNorte = useMemo(() => {
+    if (dimension !== "GEOGRAFIA" || nivelActual !== 0 || !data?.items?.length) return null;
+
+    const totalGeneral = data.items.reduce((acc, item) => acc + item.total, 0);
+    if (totalGeneral === 0) return null;
+
+    const itemsNorte = data.items.filter((item) =>
+      DEPARTAMENTOS_NORTE.some(
+        (dep) => item.item_nombre.toUpperCase().trim() === dep
+      )
+    );
+
+    const totalNorte = itemsNorte.reduce((acc, item) => acc + item.total, 0);
+    const porcentaje = Math.round((totalNorte / totalGeneral) * 100);
+
+    return { totalNorte, totalGeneral, porcentaje };
+  }, [data, dimension, nivelActual]);
 
   const cambiarDimension = (nueva: DimensionJerarquica) => {
     setDimension(nueva);
@@ -149,6 +183,51 @@ export const ArbolJerarquico = () => {
             />
           </div>
 
+          {/* Filtro Mes */}
+          <div className="relative">
+            <select
+              value={mes ?? ""}
+              onChange={(e) => {
+                setMes(e.target.value ? Number(e.target.value) : undefined);
+                setMigaDePan([]);
+              }}
+              className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">Todo el año</option>
+              {MESES.map((m, i) => (
+                <option key={i} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={13}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+          </div>
+
+          {/* Filtro Año */}
+          <div className="relative">
+            <select
+              value={anio}
+              onChange={(e) => {
+                setAnio(Number(e.target.value));
+                setMigaDePan([]);
+              }}
+              className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {[hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2].map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={13}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+          </div>
+
           <select
             value={estadoSot}
             onChange={(e) => setEstadoSot(e.target.value as EstadoSOT)}
@@ -176,6 +255,24 @@ export const ArbolJerarquico = () => {
           </button>
         </div>
       </div>
+
+      {/* Panel Norte */}
+      {panelNorte && (
+        <div className="flex items-center gap-3 mb-3 px-1">
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg">
+            <MapPin size={14} />
+            <span className="text-[12px] font-bold">
+              Zona Norte: {panelNorte.totalNorte} ventas
+            </span>
+            <span className="text-[11px] font-medium opacity-70">
+              ({panelNorte.porcentaje}% del total)
+            </span>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            Total general: {panelNorte.totalGeneral}
+          </span>
+        </div>
+      )}
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 text-[12px] mb-3 flex-wrap">
