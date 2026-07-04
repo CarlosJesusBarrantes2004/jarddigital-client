@@ -15,6 +15,7 @@ import { FiltrosGlobales } from "./FiltrosGlobales";
 import { FiltroSedeModalidad } from "./FiltroSedeModalidad";
 import type { EstadoSOT } from "../types/analytics.types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 const MESES_CORTOS = [
   "Ene",
@@ -95,6 +96,10 @@ export const EvolucionMensualAsesores = ({
 }: {
   onMuchosAsesores?: (muchos: boolean) => void;
 }) => {
+  const { user } = useAuth();
+  const puedeVerFiltrosSede =
+    user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
   const [filtroSede, setFiltroSede] = useState("");
@@ -194,7 +199,7 @@ export const EvolucionMensualAsesores = ({
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <FiltroSedeModalidad
-            opcionesSede={opcionesSede}
+            opcionesSede={puedeVerFiltrosSede ? opcionesSede : []}
             filtroSede={filtroSede}
             onFiltroSedeChange={setFiltroSede}
           />

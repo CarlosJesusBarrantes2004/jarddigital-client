@@ -12,6 +12,7 @@ import { BarChart3, ChevronDown, Loader2, TrendingUp } from "lucide-react";
 import { useBarrasRendimientoMes } from "../hooks/useAnalytics";
 import { ESTADO_SOT_OPTIONS, type EstadoSOT } from "../types/analytics.types";
 import { FiltroSedeModalidad } from "./FiltroSedeModalidad";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 const MESES = [
   "Enero",
@@ -29,6 +30,10 @@ const MESES = [
 ];
 
 export const BarrasRendimientoMes = () => {
+  const { user } = useAuth();
+  const puedeVerFiltrosSede =
+    user?.id_rol?.codigo !== "SUPERVISOR" && user?.id_rol?.codigo !== "ASESOR";
+
   const hoy = new Date();
   const [anio, setAnio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
@@ -101,7 +106,7 @@ export const BarrasRendimientoMes = () => {
 
         <div className="flex items-center gap-2 flex-wrap">
           <FiltroSedeModalidad
-            opcionesSede={opcionesSede}
+            opcionesSede={puedeVerFiltrosSede ? opcionesSede : []}
             filtroSede={filtroSede}
             onFiltroSedeChange={setFiltroSede}
           />
