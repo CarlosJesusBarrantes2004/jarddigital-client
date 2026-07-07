@@ -19,7 +19,7 @@ const MESES = [
 
 const DEPARTAMENTOS_NORTE = [
   "TUMBES", "PIURA", "LAMBAYEQUE", "LA LIBERTAD",
-  "CAJAMARCA", "AMAZONAS", "SAN MARTÍN", "SAN MARTIN", "ÁNCASH", "ANCASH",
+  "CAJAMARCA", "AMAZONAS", "ÁNCASH", "ANCASH",
 ];
 
 export const ArbolJerarquico = () => {
