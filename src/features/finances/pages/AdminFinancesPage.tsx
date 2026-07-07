@@ -198,7 +198,11 @@ export const AdminFinancesPage = () => {
     p.nombre_asesor.toLowerCase().includes(busquedaNombre.toLowerCase())
   );
 
-  console.log(planillas);
+  // Filtrar no-asesores por nombre
+  const noAsesoresFiltrados = noAsesores.filter((p) =>
+    busquedaNombre === "" ||
+    p.nombre_completo.toLowerCase().includes(busquedaNombre.toLowerCase())
+  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-300">
@@ -253,7 +257,7 @@ export const AdminFinancesPage = () => {
           {/* Buscador por nombre de asesor */}
           <div className="flex flex-col gap-1.5 w-full md:w-56">
             <label className="text-[13px] font-medium text-muted-foreground flex items-center gap-1.5">
-              <Filter size={14} /> Buscar asesor
+              <Filter size={14} /> Buscar usuario
             </label>
             <input
               type="text"
@@ -310,7 +314,7 @@ export const AdminFinancesPage = () => {
               Cargando registros financieros...
             </p>
           </div>
-        ) : planillasFiltradas.length === 0 ? (
+        ) : planillasFiltradas.length === 0 && noAsesoresFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <AlertCircle size={40} className="text-muted-foreground/50 mb-3" />
             <p className="text-base font-medium text-foreground">
@@ -428,7 +432,7 @@ export const AdminFinancesPage = () => {
                   </tr>
                 ))}
                 {/* Filas de Supervisores/Coordinadores */}
-                {noAsesores.map((row) => (
+                {noAsesoresFiltrados.map((row) => (
                   <tr
                     key={`no-asesor-${row.id_usuario}`}
                     className="hover:bg-muted/30 transition-colors group bg-muted/10"
