@@ -74,7 +74,7 @@ export const RetencionPagos = () => {
   useEffect(() => {
     const fetchSedes = async () => {
       try {
-        const { data } = await api.get("/core/modalidades-sede/");
+        const { data } = await api.get("/core/sucursales-modalidades/");
         // DRF con paginación devuelve data.results
         setSedesOpciones(data.results || data);
       } catch (error) {
