@@ -4,8 +4,9 @@ import { BarrasRendimientoMes } from "../components/BarrasRendimientoMes";
 import { EvolucionMensualAsesores } from "../components/EvolucionMensualAsesores";
 import { TendenciaDiariaComparativa } from "../components/TendenciaDiariaComparativa";
 import { ArbolJerarquico } from "../components/ArbolJerarquico";
+import { RetencionPagos } from "../components/RetencionPagos";
 
-export const AnalyticsDashboardPage = () => {
+export const AnalyticsDashboardPage = ({ anio }: { anio: number }) => {
   const [hayMuchosAsesores, setHayMuchosAsesores] = useState(false);
 
   return (
@@ -19,19 +20,20 @@ export const AnalyticsDashboardPage = () => {
         </p>
       </div>
 
-      {/* Fila 1: barras del mes + evolución anual. Layout dinámico basado en estado */}
-      <div className={`grid grid-cols-1 ${hayMuchosAsesores ? "" : "xl:grid-cols-2"} gap-5`}>
+      <div
+        className={`grid grid-cols-1 ${hayMuchosAsesores ? "" : "xl:grid-cols-2"} gap-5`}
+      >
+        {/* Aquí tus componentes de barras y evolución asumiendo que ya soportan el anio */}
         <BarrasRendimientoMes />
         <EvolucionMensualAsesores onMuchosAsesores={setHayMuchosAsesores} />
       </div>
 
-      {/* Fila 2: tendencia diaria comparativa, ancho completo */}
       <TendenciaDiariaComparativa />
 
-      {/* Fila 3: matriz pivote, ancho completo (tabla scrolleable) */}
-      <MatrizPivote />
+      {/* AQUÍ VA EL NUEVO GRÁFICO DE RETENCIÓN */}
+      <RetencionPagos anioGlobal={anio} />
 
-      {/* Fila 4: árbol jerárquico, ancho completo */}
+      <MatrizPivote />
       <ArbolJerarquico />
     </div>
   );

@@ -27,7 +27,7 @@ const MESES_CORTOS = [
   "Dic",
 ];
 
-export const ResumenAsesorMensual = () => {
+export const ResumenAsesorMensual = ({ anio }: { anio: number }) => {
   const { data, isLoading } = useMisMetricas();
 
   if (isLoading) {

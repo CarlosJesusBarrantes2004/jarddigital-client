@@ -81,3 +81,15 @@ export const useNivelJerarquico = (params: NivelJerarquicoParams) => {
     meta: { onError: manejarError("distribución jerárquica") },
   });
 };
+
+export const useRetencionPagos = (
+  params: import("../types/analytics.types").RetencionPagosParams,
+) => {
+  return useQuery({
+    queryKey: ["analytics", "retencion", params],
+    queryFn: () => analyticsService.getRetencionPagos(params),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 2,
+    meta: { onError: manejarError("retención de pagos") },
+  });
+};

@@ -66,4 +66,13 @@ export const analyticsService = {
     );
     return data;
   },
+
+  getRetencionPagos: async (
+    params: import("../types/analytics.types").RetencionPagosParams,
+  ): Promise<import("../types/analytics.types").RetencionPagosResponse> => {
+    const { data } = await api.get<
+      import("../types/analytics.types").RetencionPagosResponse
+    >(`${BASE_URL}/retencion-pagos/`, { params });
+    return data;
+  },
 };

@@ -156,3 +156,24 @@ export interface MisMetricasAsesorResponse {
   top_productos: TopProductoAsesor[];
   proyeccion_motivacional: ProyeccionMotivacional | null;
 }
+
+export interface RetencionMes {
+  mes_cobro: number;
+  etiqueta: string;
+  pagaron: number;
+  porcentaje: number;
+}
+
+export interface RetencionPagosResponse {
+  anio: number;
+  mes_instalacion: number | null;
+  total_instaladas: number;
+  retencion: RetencionMes[];
+}
+
+export interface RetencionPagosParams {
+  anio: number;
+  mes?: number;
+  modalidad?: Modalidad;
+  id_sede?: number;
+}
