@@ -6,7 +6,7 @@ import { TendenciaDiariaComparativa } from "../components/TendenciaDiariaCompara
 import { ArbolJerarquico } from "../components/ArbolJerarquico";
 import { RetencionPagos } from "../components/RetencionPagos";
 
-export const AnalyticsDashboardPage = ({ anio }: { anio: number }) => {
+export const AnalyticsDashboardPage = () => {
   const [hayMuchosAsesores, setHayMuchosAsesores] = useState(false);
 
   return (
@@ -31,7 +31,7 @@ export const AnalyticsDashboardPage = ({ anio }: { anio: number }) => {
       <TendenciaDiariaComparativa />
 
       {/* AQUÍ VA EL NUEVO GRÁFICO DE RETENCIÓN */}
-      <RetencionPagos anioGlobal={anio} />
+      <RetencionPagos />
 
       <MatrizPivote />
       <ArbolJerarquico />
