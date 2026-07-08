@@ -176,3 +176,13 @@ export interface RetencionPagosParams {
   mes?: number;
   id_modalidad_sede?: number;
 }
+
+export interface RetencionAsesorFila {
+  asesor_id: number;
+  asesor_nombre: string;
+  sede_modalidad: string;
+  total_instaladas: number;
+  retencion: RetencionMes[];
+}
+
+export type RetencionPagosPorAsesorResponse = RetencionAsesorFila[];

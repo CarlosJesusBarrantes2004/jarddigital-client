@@ -8,6 +8,9 @@ import type {
   TendenciaDiariaParams,
   NivelJerarquicoResponse,
   NivelJerarquicoParams,
+  RetencionPagosPorAsesorResponse,
+  RetencionPagosParams,
+  RetencionPagosResponse,
 } from "../types/analytics.types";
 
 const BASE_URL = "/analytics";
@@ -68,11 +71,22 @@ export const analyticsService = {
   },
 
   getRetencionPagos: async (
-    params: import("../types/analytics.types").RetencionPagosParams,
-  ): Promise<import("../types/analytics.types").RetencionPagosResponse> => {
-    const { data } = await api.get<
-      import("../types/analytics.types").RetencionPagosResponse
-    >(`${BASE_URL}/retencion-pagos/`, { params });
+    params: RetencionPagosParams,
+  ): Promise<RetencionPagosResponse> => {
+    const { data } = await api.get<RetencionPagosResponse>(
+      `${BASE_URL}/retencion-pagos/`,
+      { params },
+    );
+    return data;
+  },
+
+  getRetencionPagosPorAsesor: async (
+    params: RetencionPagosParams,
+  ): Promise<RetencionPagosPorAsesorResponse> => {
+    const { data } = await api.get<RetencionPagosPorAsesorResponse>(
+      `${BASE_URL}/retencion-pagos-por-asesor/`,
+      { params },
+    );
     return data;
   },
 };

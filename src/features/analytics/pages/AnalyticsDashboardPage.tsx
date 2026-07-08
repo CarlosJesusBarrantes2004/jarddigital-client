@@ -5,6 +5,7 @@ import { EvolucionMensualAsesores } from "../components/EvolucionMensualAsesores
 import { TendenciaDiariaComparativa } from "../components/TendenciaDiariaComparativa";
 import { ArbolJerarquico } from "../components/ArbolJerarquico";
 import { RetencionPagos } from "../components/RetencionPagos";
+import { RetencionPagosPorAsesor } from "../components/RetencionPagosPorAsesor";
 
 export const AnalyticsDashboardPage = () => {
   const [hayMuchosAsesores, setHayMuchosAsesores] = useState(false);
@@ -31,6 +32,8 @@ export const AnalyticsDashboardPage = () => {
       <TendenciaDiariaComparativa />
 
       <RetencionPagos />
+
+      <RetencionPagosPorAsesor></RetencionPagosPorAsesor>
 
       <MatrizPivote />
       <ArbolJerarquico />

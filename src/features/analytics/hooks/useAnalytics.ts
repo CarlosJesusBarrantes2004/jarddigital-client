@@ -6,6 +6,7 @@ import type {
   BarrasRendimientoParams,
   TendenciaDiariaParams,
   NivelJerarquicoParams,
+  RetencionPagosParams,
 } from "../types/analytics.types";
 
 // Mensaje de error consistente con el resto del proyecto (ver useFinances)
@@ -82,14 +83,22 @@ export const useNivelJerarquico = (params: NivelJerarquicoParams) => {
   });
 };
 
-export const useRetencionPagos = (
-  params: import("../types/analytics.types").RetencionPagosParams,
-) => {
+export const useRetencionPagos = (params: RetencionPagosParams) => {
   return useQuery({
     queryKey: ["analytics", "retencion", params],
     queryFn: () => analyticsService.getRetencionPagos(params),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 2,
     meta: { onError: manejarError("retención de pagos") },
+  });
+};
+
+export const useRetencionPagosPorAsesor = (params: RetencionPagosParams) => {
+  return useQuery({
+    queryKey: ["analytics", "retencion-asesor", params],
+    queryFn: () => analyticsService.getRetencionPagosPorAsesor(params),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 2,
+    meta: { onError: manejarError("retención por asesor") },
   });
 };
