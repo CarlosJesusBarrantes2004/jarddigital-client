@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRetencionPagos } from "../hooks/useAnalytics";
 import { RefreshCw, Filter, Activity, Calendar } from "lucide-react";
+import { api } from "@/api/axios";
 import {
   ComposedChart,
   Bar,
@@ -52,24 +53,42 @@ const CustomTooltip = ({ active, payload, label, totalInstaladas }: any) => {
 };
 
 export const RetencionPagos = () => {
-  // Lógica para que por defecto seleccione el MES ANTERIOR (donde ya hay datos validados)
   const hoy = new Date();
   const anioActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
   const mesPorDefecto = mesActual === 1 ? 12 : mesActual - 1;
   const anioPorDefecto = mesActual === 1 ? anioActual - 1 : anioActual;
 
-  // Estados locales independientes
   const [anio, setAnio] = useState<number>(anioPorDefecto);
   const [mes, setMes] = useState<number>(mesPorDefecto);
-  const [modalidad, setModalidad] = useState<"CALL" | "CAMPO" | "TODAS">(
+
+  // --- NUEVO ESTADO PARA LAS SEDES ---
+  const [idModalidadSede, setIdModalidadSede] = useState<number | "TODAS">(
     "TODAS",
   );
+  const [sedesOpciones, setSedesOpciones] = useState<
+    { id: number; etiqueta: string }[]
+  >([]);
+
+  // Efecto para cargar las sedes del backend
+  useEffect(() => {
+    const fetchSedes = async () => {
+      try {
+        const { data } = await api.get("/core/modalidades-sede/");
+        // DRF con paginación devuelve data.results
+        setSedesOpciones(data.results || data);
+      } catch (error) {
+        console.error("Error al cargar sedes:", error);
+      }
+    };
+    fetchSedes();
+  }, []);
 
   const { data, isLoading } = useRetencionPagos({
     anio: anio,
     mes: mes,
-    modalidad: modalidad === "TODAS" ? undefined : modalidad,
+    id_modalidad_sede:
+      idModalidadSede === "TODAS" ? undefined : idModalidadSede,
   });
 
   return (
@@ -86,23 +105,28 @@ export const RetencionPagos = () => {
           </p>
         </div>
 
-        {/* --- FILTROS ESPECÍFICOS DEL GRÁFICO --- */}
         <div className="flex flex-wrap gap-2 items-center">
-          {/* Filtro Canal */}
-          <div className="flex items-center gap-1.5 bg-background border border-input rounded-lg px-2 h-8">
-            <Filter size={12} className="text-muted-foreground" />
+          {/* NUEVO: Dropdown dinámico con las sedes de la base de datos */}
+          <div className="flex items-center gap-1.5 bg-background border border-input rounded-lg px-2 h-8 max-w-[200px]">
+            <Filter size={12} className="text-muted-foreground shrink-0" />
             <select
-              value={modalidad}
-              onChange={(e) => setModalidad(e.target.value as any)}
-              className="text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground cursor-pointer"
+              value={idModalidadSede}
+              onChange={(e) =>
+                setIdModalidadSede(
+                  e.target.value === "TODAS" ? "TODAS" : Number(e.target.value),
+                )
+              }
+              className="text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground cursor-pointer truncate w-full"
             >
-              <option value="TODAS">Todo Canal</option>
-              <option value="CALL">Call Center</option>
-              <option value="CAMPO">Campo</option>
+              <option value="TODAS">Todas las Sedes</option>
+              {sedesOpciones.map((sede) => (
+                <option key={sede.id} value={sede.id}>
+                  {sede.etiqueta}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* Filtro Mes */}
           <div className="flex items-center gap-1.5 bg-background border border-input rounded-lg px-2 h-8">
             <Calendar size={12} className="text-muted-foreground" />
             <select
@@ -118,7 +142,6 @@ export const RetencionPagos = () => {
             </select>
           </div>
 
-          {/* Filtro Año */}
           <div className="flex items-center gap-1.5 bg-background border border-input rounded-lg px-2 h-8">
             <select
               value={anio}
@@ -143,8 +166,8 @@ export const RetencionPagos = () => {
           </div>
         ) : !data || data.total_instaladas === 0 ? (
           <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border-2 border-dashed border-border rounded-xl">
-            No hay instalaciones registradas en este periodo para calcular
-            retención.
+            No hay instalaciones registradas en{" "}
+            {MESES.find((m) => m.v === mes)?.n} para calcular la retención.
           </div>
         ) : (
           <div className="relative w-full h-full">
@@ -190,7 +213,6 @@ export const RetencionPagos = () => {
                   cursor={{ fill: "transparent" }}
                 />
 
-                {/* Barras de volumen absolutas */}
                 <Bar
                   yAxisId="left"
                   dataKey="pagaron"
@@ -202,16 +224,15 @@ export const RetencionPagos = () => {
                       key={`cell-${index}`}
                       fill={
                         entry.porcentaje < 50
-                          ? "#ef4444" // Rojo si es menor a 50%
+                          ? "#ef4444"
                           : entry.porcentaje < 80
-                            ? "#f59e0b" // Naranja si es menor a 80%
-                            : "#10b981" // Verde si la retención es sana (80%+)
+                            ? "#f59e0b"
+                            : "#10b981"
                       }
                     />
                   ))}
                 </Bar>
 
-                {/* Línea de porcentaje de retención */}
                 <Line
                   yAxisId="right"
                   type="monotone"

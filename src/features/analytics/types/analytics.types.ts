@@ -174,6 +174,5 @@ export interface RetencionPagosResponse {
 export interface RetencionPagosParams {
   anio: number;
   mes?: number;
-  modalidad?: Modalidad;
-  id_sede?: number;
+  id_modalidad_sede?: number;
 }
