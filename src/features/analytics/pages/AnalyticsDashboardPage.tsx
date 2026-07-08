@@ -30,7 +30,6 @@ export const AnalyticsDashboardPage = () => {
 
       <TendenciaDiariaComparativa />
 
-      {/* AQUÍ VA EL NUEVO GRÁFICO DE RETENCIÓN */}
       <RetencionPagos />
 
       <MatrizPivote />
