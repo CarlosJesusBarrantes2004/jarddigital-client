@@ -86,8 +86,7 @@ const SECTIONS: RouteSection[] = [
       {
         label: "Mi Pago",
         href: "/finances/me",
-        // roles: ["ASESOR"],
-        roles: [],
+        roles: ["ASESOR"],
       },
       {
         label: "Gestión de Planillas",
