@@ -72,7 +72,7 @@ export const ArbolJerarquico = () => {
     );
 
     const totalNorte = itemsNorte.reduce((acc, item) => acc + item.total, 0);
-    const porcentaje = Math.round((totalNorte / totalGeneral) * 100);
+    const porcentaje = ((totalNorte / totalGeneral) * 100).toFixed(2);
 
     return { totalNorte, totalGeneral, porcentaje };
   }, [data, dimension, nivelActual]);
