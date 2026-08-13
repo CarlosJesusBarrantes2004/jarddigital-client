@@ -209,6 +209,33 @@ export function SeguimientoFilterBar({
           )}
         </div>
 
+        {/* Filtro por nombre de asesor — solo para encargados */}
+        {role === "encargado" && (
+          <div className="relative flex-1 max-w-[260px]">
+            <Search
+              size={13}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              value={filters.nombre_asesor ?? ""}
+              onChange={(e) =>
+                update({ nombre_asesor: e.target.value || undefined })
+              }
+              placeholder="Filtrar por asesor..."
+              className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+            {filters.nombre_asesor && (
+              <button
+                type="button"
+                onClick={() => update({ nombre_asesor: undefined })}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}

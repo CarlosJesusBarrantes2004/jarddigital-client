@@ -22,8 +22,9 @@ export interface FilaMatrizPivote {
   asesor_nombre: string;
   sede_modalidad: string;
   total_asesor: number;
+  asesor_activo: boolean;
   // m1..m12 llegan dinámicos desde el backend
-  [key: `m${number}`]: number | string | undefined;
+  [key: `m${number}`]: number | string | boolean | undefined;
 }
 
 export interface TotalesColumnasMatriz {
@@ -39,6 +40,7 @@ export interface MatrizPivoteResponse {
 export interface MatrizPivoteParams {
   anio: number;
   estado_sot: EstadoSOT;
+  filtro_activo?: "activos" | "inactivos" | "todos";
 }
 
 // ==========================================

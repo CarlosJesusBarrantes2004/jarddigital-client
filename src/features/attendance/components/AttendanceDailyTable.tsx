@@ -24,6 +24,25 @@ interface Props {
   onFiltersChange: (filters: AttendanceFilters) => void;
 }
 
+/**
+ * Calcula el valor visual por defecto para una celda sin registro en BD:
+ * - Domingo → true (asistió, da por hecho que no trabajan)
+ * - Mañana en adelante → false (no asistió por defecto)
+ * - Hoy / pasado → null (sin marcar)
+ */
+function getValorPorDefecto(fechaISO: string): boolean | null {
+  const fecha = new Date(fechaISO + "T12:00:00"); // noon evita problemas de TZ
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const manana = new Date(hoy);
+  manana.setDate(hoy.getDate() + 1);
+
+  const esDomingo = fecha.getDay() === 0;
+  if (esDomingo) return true;
+  if (fecha >= manana) return false;
+  return null;
+}
+
 export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
   const { user } = useAuth();
   const isDueno = user?.rol?.codigo === "DUENO";
@@ -251,9 +270,13 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
                       );
                       const currentDBValue = recordDB ? recordDB.asistio : null;
                       const isModified = deltas[u.id] !== undefined;
+                      // Si no hay registro en BD y no hay delta: usamos valor por defecto
+                      const valorPorDefecto = currentDBValue === null ? getValorPorDefecto(selectedDate) : null;
                       const status = isModified
                         ? deltas[u.id].asistio
-                        : currentDBValue;
+                        : currentDBValue !== null
+                        ? currentDBValue
+                        : valorPorDefecto;
 
                       return (
                         <tr

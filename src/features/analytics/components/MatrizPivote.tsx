@@ -30,10 +30,12 @@ export const MatrizPivote = () => {
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
   const [filtroSede, setFiltroSede] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<"activos" | "inactivos" | "todos">("activos");
 
   const { data, isLoading, isFetching } = useMatrizPivote({
     anio,
     estado_sot: estadoSot,
+    filtro_activo: filtroActivo,
   });
 
   // Extraer opciones únicas de sede_modalidad
@@ -99,6 +101,24 @@ export const MatrizPivote = () => {
             estadoSot={estadoSot}
             onEstadoSotChange={setEstadoSot}
           />
+          {/* Segmented control: Activos / Inactivos / Todos */}
+          <div className="flex rounded-lg border border-border overflow-hidden text-[11px] font-medium">
+            {(["activos", "inactivos", "todos"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setFiltroActivo(opt)}
+                className={cn(
+                  "px-3 py-1.5 capitalize transition-colors",
+                  filtroActivo === opt
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -185,9 +205,16 @@ const FragmentoGrupoSede = ({
       </td>
     </tr>
     {filas.map((fila) => (
-      <tr key={fila.asesor_id} className="hover:bg-muted/20 transition-colors">
+      <tr key={fila.asesor_id} className={cn("hover:bg-muted/20 transition-colors", !fila.asesor_activo && "opacity-60")}>
         <td className="sticky left-0 bg-card px-3 py-1.5 text-foreground whitespace-nowrap">
-          {fila.asesor_nombre}
+          <span className="flex items-center gap-1.5">
+            {fila.asesor_nombre}
+            {!fila.asesor_activo && (
+              <span className="text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full leading-none">
+                INACTIVO
+              </span>
+            )}
+          </span>
         </td>
         {Array.from({ length: 12 }, (_, i) => i + 1).map((mes) => {
           const valor = (fila[`m${mes}`] as number) ?? 0;

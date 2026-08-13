@@ -84,6 +84,7 @@ export interface SeguimientoFilters {
   fecha_seguimiento_hasta?: string;
 
   modalidad_sede?: number;
+  nombre_asesor?: string;
   page?: number;
   page_size?: number;
 }
