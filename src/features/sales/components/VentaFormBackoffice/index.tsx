@@ -581,7 +581,7 @@ export function VentaFormBackoffice({
   const ventaEstaRechazada = codigoEstadoActual === "RECHAZADO";
 
   const estadosSotPermitidos = (() => {
-    if (codigoEstadoActual === "ATENDIDO" || codigoEstadoActual === "ATENDIDA")
+    if ((codigoEstadoActual === "ATENDIDO" || codigoEstadoActual === "ATENDIDA") && !venta.permiso_edicion_backoffice)
       return estadosSOT.filter((e) => ["ATENDIDO", "ATENDIDA"].includes(e.codigo.toUpperCase()));
     if (esPrimeraGestion || esReingreso)
       return estadosSOT.filter((e) => e.codigo.toUpperCase() === "EJECUCION");
@@ -1004,7 +1004,7 @@ export function VentaFormBackoffice({
                           }
                         }}
                         placeholder="Seleccionar"
-                        disabled={["ATENDIDO", "ATENDIDA"].includes(codigoEstadoActual)}
+                        disabled={["ATENDIDO", "ATENDIDA"].includes(codigoEstadoActual) && !venta.permiso_edicion_backoffice}
                       >
                         {estadosSotPermitidos.map((e) => (
                           <option key={e.id} value={e.id}>

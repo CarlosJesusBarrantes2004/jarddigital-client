@@ -44,6 +44,7 @@ export const BarrasRendimientoMes = () => {
     anio,
     mes,
     estado_sot: estadoSot,
+    filtro_activo: "todos",
   });
 
   // Extraer opciones únicas de sede_modalidad de los datos
