@@ -120,6 +120,8 @@ function ExcelPanel({
   const [estadoExcel, setEstadoExcel] = useState<EstadoExcel>("todas");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  const [fechaInstDesde, setFechaInstDesde] = useState("");
+  const [fechaInstHasta, setFechaInstHasta] = useState("");
   const [exportando, setExportando] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -137,6 +139,8 @@ function ExcelPanel({
       await salesService.exportarExcel(
         fechaDesde || filtros.fecha_inicio || undefined,
         fechaHasta || filtros.fecha_fin || undefined,
+        fechaInstDesde || undefined,
+        fechaInstHasta || undefined,
         estadoExcel === "todas" ? undefined : estadoExcel,
         filtros.id_sucursal,
         filtros.id_modalidad,
@@ -211,7 +215,7 @@ function ExcelPanel({
 
         <div>
           <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-bold mb-2">
-            Rango de fechas{" "}
+            Por Fecha Creación Venta{" "}
             <span className="normal-case font-normal">(opcional)</span>
           </p>
           <div className="flex flex-col gap-2">
@@ -241,7 +245,45 @@ function ExcelPanel({
                 }}
                 className="text-[11px] text-muted-foreground hover:text-destructive text-left transition-colors"
               >
-                ✕ Limpiar fechas
+                ✕ Limpiar fechas creación
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-bold mb-2">
+            Por Fecha Instalación{" "}
+            <span className="normal-case font-normal">(opcional)</span>
+          </p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-border bg-background">
+              <Calendar size={12} className="text-muted-foreground shrink-0" />
+              <input
+                type="date"
+                value={fechaInstDesde}
+                onChange={(e) => setFechaInstDesde(e.target.value)}
+                className="flex-1 text-sm bg-transparent outline-none text-foreground cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-border bg-background">
+              <Calendar size={12} className="text-muted-foreground shrink-0" />
+              <input
+                type="date"
+                value={fechaInstHasta}
+                onChange={(e) => setFechaInstHasta(e.target.value)}
+                className="flex-1 text-sm bg-transparent outline-none text-foreground cursor-pointer"
+              />
+            </div>
+            {(fechaInstDesde || fechaInstHasta) && (
+              <button
+                onClick={() => {
+                  setFechaInstDesde("");
+                  setFechaInstHasta("");
+                }}
+                className="text-[11px] text-muted-foreground hover:text-destructive text-left transition-colors"
+              >
+                ✕ Limpiar fechas instalación
               </button>
             )}
           </div>
@@ -320,7 +362,7 @@ function useFiltrosBackoffice(estadosSOT: EstadoSOT[]) {
         return e ? { ...base, id_estado_sot: e.id } : base;
       }
       case "atendidas": {
-        const e = estadosSOT.find((s) => s.codigo.toUpperCase() === "ATENDIDO");
+        const e = estadosSOT.find((s) => s.codigo.toUpperCase() === "ATENDIDO" || s.codigo.toUpperCase() === "ATENDIDA");
         return e ? { ...base, id_estado_sot: e.id } : base;
       }
       case "rechazadas": {
@@ -386,6 +428,16 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   );
   const { mutateAsync: eliminarVenta, isPending: eliminando } =
     useDeleteVentaAsesor();
+
+  const handleAutorizar = async (v: Venta) => {
+    try {
+      await salesService.autorizarEdicion(v.id);
+      toast.success("Permiso concedido exitosamente. El BackOffice ahora puede editar la venta.");
+      refetch();
+    } catch {
+      toast.error("Error al autorizar la edición.");
+    }
+  };
 
   const handleEliminar = (v: Venta) => setVentaParaEliminar(v);
 
@@ -467,6 +519,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
         setVentaDetalle,
         puedeEditar ? handleEditar : null,
         esDueno ? handleEliminar : null,
+        esDueno || rol === "ADMIN" ? handleAutorizar : null,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [

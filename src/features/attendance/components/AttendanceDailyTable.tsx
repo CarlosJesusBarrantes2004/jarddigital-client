@@ -32,15 +32,12 @@ interface Props {
  */
 function getValorPorDefecto(fechaISO: string): boolean | null {
   const fecha = new Date(fechaISO + "T12:00:00"); // noon evita problemas de TZ
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const manana = new Date(hoy);
-  manana.setDate(hoy.getDate() + 1);
 
   const esDomingo = fecha.getDay() === 0;
   if (esDomingo) return true;
-  if (fecha >= manana) return false;
-  return null;
+  
+  // Por defecto, cualquier día sin marcar se considera "Falta" (false)
+  return false;
 }
 
 export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
@@ -102,16 +99,6 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
     );
   }, [users]);
 
-  // ─── Estado de deltas (solo celdas modificadas) ───
-  const [deltas, setDeltas] = useState<
-    Record<number, { asistio: boolean | null; id_sucursal: number }>
-  >({});
-
-  // Limpiamos deltas al cambiar fecha, mes o año
-  useEffect(() => {
-    setDeltas({});
-  }, [selectedDate, filters.mes, filters.anio]);
-
   const asistenciasDelDia = asistencias.filter((a) => a.fecha === selectedDate);
 
   const handleToggle = (
@@ -121,59 +108,31 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
     currentDBValue: boolean | null,
   ) => {
     if (isDueno) return;
+    if (newValue === currentDBValue) return;
+    if (sucursalId === 0) {
+      toast.error("El colaborador no tiene sede asignada. No se puede guardar su asistencia.");
+      return;
+    }
 
-    setDeltas((prev) => {
-      const newDeltas = { ...prev };
-      if (newValue === currentDBValue) {
-        delete newDeltas[userId];
-      } else {
-        newDeltas[userId] = { asistio: newValue, id_sucursal: sucursalId };
-      }
-      return newDeltas;
-    });
+    // Si newValue es nulo, significa que queremos "Limpiar",
+    // pero el backend actualmente procesa los booleanos. 
+    // Por seguridad enviamos el newValue aunque sea null si el backend lo soporta,
+    // o sino enviamos la solicitud.
+    const payloads = [
+      {
+        id_sucursal: sucursalId,
+        asistencias: [
+          {
+            id_usuario: userId,
+            fecha: selectedDate,
+            asistio: newValue,
+          },
+        ],
+      },
+    ];
+
+    multiSaveMutation.mutate(payloads);
   };
-
-  const handleSave = () => {
-    const groupedBySucursal: Record<number, AsistenciaItemPayload[]> = {};
-    let hasErrors = false;
-
-    Object.entries(deltas).forEach(([userIdStr, data]) => {
-      const sucId = data.id_sucursal;
-
-      if (sucId === 0) {
-        toast.error(
-          "Un colaborador no tiene sede asignada. No se puede guardar su asistencia.",
-        );
-        hasErrors = true;
-        return;
-      }
-
-      if (!groupedBySucursal[sucId]) groupedBySucursal[sucId] = [];
-
-      groupedBySucursal[sucId].push({
-        id_usuario: Number(userIdStr),
-        fecha: selectedDate,
-        asistio: data.asistio,
-      });
-    });
-
-    if (hasErrors) return;
-
-    const payloads = Object.entries(groupedBySucursal).map(
-      ([sucIdStr, items]) => ({
-        id_sucursal: Number(sucIdStr),
-        asistencias: items,
-      }),
-    );
-
-    if (payloads.length === 0) return;
-
-    multiSaveMutation.mutate(payloads, {
-      onSuccess: () => setDeltas({}),
-    });
-  };
-
-  const hasChanges = Object.keys(deltas).length > 0;
 
   // ─── Render ───
   if (isLoading) {
@@ -269,22 +228,17 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
                         (a) => a.id_usuario === u.id,
                       );
                       const currentDBValue = recordDB ? recordDB.asistio : null;
-                      const isModified = deltas[u.id] !== undefined;
-                      // Si no hay registro en BD y no hay delta: usamos valor por defecto
-                      const valorPorDefecto = currentDBValue === null ? getValorPorDefecto(selectedDate) : null;
-                      const status = isModified
-                        ? deltas[u.id].asistio
-                        : currentDBValue !== null
-                        ? currentDBValue
-                        : valorPorDefecto;
+                      
+                      // Si no hay registro en BD: usamos valor por defecto
+                      const status =
+                        currentDBValue !== null
+                          ? currentDBValue
+                          : getValorPorDefecto(selectedDate);
 
                       return (
                         <tr
                           key={u.id}
-                          className={cn(
-                            "transition-colors hover:bg-muted/20",
-                            isModified && "bg-primary/5",
-                          )}
+                          className="transition-colors hover:bg-muted/20"
                         >
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
@@ -357,7 +311,7 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
                                     "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all border",
                                     status === false
                                       ? "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-500/20"
-                                      : "bg-transparent border-border text-muted-foreground hover:bg-muted hover:border-rose-500/30 hover:text-rose-500",
+                                      : "bg-transparent border-border text-muted-foreground hover:bg-muted hover:border-rose-500/30 hover:text-rose-600",
                                   )}
                                 >
                                   <XCircle size={13} /> Falta
@@ -397,53 +351,7 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
         )}
       </div>
 
-      {/* ─── Panel flotante de guardado ─── */}
-      {!isDueno && (
-        <div
-          className={cn(
-            "absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[600px] bg-popover border border-primary/20 shadow-2xl shadow-primary/10 rounded-2xl p-4 flex items-center justify-between transition-all duration-500 z-40",
-            hasChanges
-              ? "translate-y-0 opacity-100"
-              : "translate-y-12 opacity-0 pointer-events-none",
-          )}
-        >
-          <div className="flex flex-col">
-            <span className="text-[14px] font-bold text-foreground">
-              Guardar Asistencia
-            </span>
-            <span className="text-[11px] font-mono text-muted-foreground">
-              Has modificado {Object.keys(deltas).length} trabajador(es)
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setDeltas({})}
-              disabled={multiSaveMutation.isPending}
-              className="h-9 px-4 flex items-center justify-center rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-            >
-              Descartar
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={multiSaveMutation.isPending}
-              className="h-10 px-5 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl text-[13px] font-bold hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 transition-all active:scale-95 disabled:opacity-50"
-            >
-              {multiSaveMutation.isPending ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Save size={16} />
-              )}
-              {multiSaveMutation.isPending
-                ? "Procesando..."
-                : "Confirmar Cambios"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ─── El Panel flotante de guardado masivo ha sido removido ─── */}
     </>
   );
 }

@@ -18,6 +18,7 @@ export interface User {
   email: string;
   rol: Role;
   sucursales: Workspace[];
+  modulos_permitidos?: string[];
   activo: boolean;
 }
 

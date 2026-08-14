@@ -141,6 +141,14 @@ export const salesService = {
     return normalizeList<Venta>(data);
   },
 
+  eliminarVentaDefinitiva: async (id: number): Promise<void> => {
+    await api.delete(`/sales/ventas/${id}/hard-delete/`);
+  },
+
+  autorizarEdicion: async (id: number): Promise<void> => {
+    await api.post(`/sales/ventas/${id}/autorizar-edicion/`);
+  },
+
   getVenta: async (id: number): Promise<Venta> => {
     const { data } = await api.get<Venta>(`/sales/ventas/${id}/`);
     return data;
@@ -177,6 +185,8 @@ export const salesService = {
   exportarExcel: async (
     fechaInicio?: string,
     fechaFin?: string,
+    fechaInstInicio?: string,
+    fechaInstFin?: string,
     estadoSot?: string,
     idSucursal?: number | string,
     idModalidad?: number | string,
@@ -184,6 +194,8 @@ export const salesService = {
     const params = new URLSearchParams();
     if (fechaInicio) params.append("fecha_inicio", fechaInicio);
     if (fechaFin) params.append("fecha_fin", fechaFin);
+    if (fechaInstInicio) params.append("fecha_inst_inicio", fechaInstInicio);
+    if (fechaInstFin) params.append("fecha_inst_fin", fechaInstFin);
     if (estadoSot) params.append("estado_sot", estadoSot);
     if (idSucursal) params.append("id_sucursal", String(idSucursal));
     if (idModalidad) params.append("id_modalidad", String(idModalidad));

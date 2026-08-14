@@ -230,8 +230,7 @@ export const UserForm = ({
   };
 
   const isRestrictedUser =
-    currentUser?.rol?.codigo === "SUPERVISOR" ||
-    currentUser?.rol?.codigo === "RRHH";
+    currentUser?.rol?.codigo === "SUPERVISOR";
 
   const activeSessionSede = useMemo(() => {
     try {
@@ -245,7 +244,7 @@ export const UserForm = ({
   const activeWsId = activeSessionSede?.id_modalidad_sede;
 
   const workspaceOptions = useMemo(() => {
-    if (currentUser?.rol?.codigo === "DUENO") return rawWorkspaceOptions;
+    if (currentUser?.rol?.codigo === "DUENO" || currentUser?.rol?.codigo === "RRHH") return rawWorkspaceOptions;
     const sedesPermitidasIds =
       currentUser?.sucursales?.map((s) => s.id_modalidad_sede) || [];
     return rawWorkspaceOptions.filter((ws) =>

@@ -192,6 +192,7 @@ export interface Venta {
   score_crediticio: string;
 
   solicitud_correccion: boolean;
+  permiso_edicion_backoffice: boolean;
   permitir_reingreso: boolean;
 
   // Operativo

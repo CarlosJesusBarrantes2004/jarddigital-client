@@ -7,16 +7,18 @@ import { BranchesManager } from "../components/branches/BranchesManager";
 import { ModalitiesManager } from "../components/modalities/ModalitiesManager";
 import { RolesManager } from "../components/roles/RolesManager";
 import { ProductosPage } from "@/features/products";
+import { ModulesManager } from "../components/modules/ModulesManager";
 
 // 👇 Importamos la página/componente de productos que armamos previamente
 
-// Agregamos "productos" a los tipos válidos
-type ConfigTab = "sucursales" | "modalidades" | "roles" | "productos";
+// Agregamos "productos" y "modulos" a los tipos válidos
+type ConfigTab = "sucursales" | "modalidades" | "roles" | "productos" | "modulos";
 const VALID_TABS: ConfigTab[] = [
   "sucursales",
   "modalidades",
   "roles",
   "productos",
+  "modulos",
 ];
 
 export const CorporativeConfigPage = () => {
@@ -43,7 +45,7 @@ export const CorporativeConfigPage = () => {
         </h1>
         <p className="text-sm text-muted-foreground font-light max-w-2xl">
           Arquitectura del sistema. Gestiona las sucursales operativas,
-          modalidades de atención, roles de seguridad y el catálogo de
+          modalidades de atención, roles de seguridad, módulos por rol y el catálogo de
           productos.
         </p>
       </div>
@@ -80,6 +82,15 @@ export const CorporativeConfigPage = () => {
             <span className="hidden sm:inline">Roles</span>
           </TabsTrigger>
 
+          {/* 👇 NUEVO TAB: MODULOS */}
+          <TabsTrigger
+            value="modulos"
+            className="flex-1 md:flex-none gap-2.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none transition-all duration-300"
+          >
+            <Shield size={16} />
+            <span className="hidden sm:inline">Módulos</span>
+          </TabsTrigger>
+
           {/* 👇 NUEVO TAB: PRODUCTOS */}
           <TabsTrigger
             value="productos"
@@ -111,6 +122,13 @@ export const CorporativeConfigPage = () => {
             className="m-0 border-none outline-none data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 duration-300"
           >
             <RolesManager />
+          </TabsContent>
+
+          <TabsContent
+            value="modulos"
+            className="m-0 border-none outline-none data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:slide-in-from-bottom-2 duration-300"
+          >
+            <ModulesManager />
           </TabsContent>
 
           {/* 👇 NUEVO CONTENIDO: PRODUCTOS */}

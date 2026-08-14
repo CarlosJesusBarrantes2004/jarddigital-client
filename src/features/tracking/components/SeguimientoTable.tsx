@@ -51,6 +51,7 @@ function SeguimientoRow({
   seg: Seguimiento;
   onView: () => void;
 }) {
+  const [hoveredMes, setHoveredMes] = useState<number | null>(null);
   const meses =
     seg.meses_evaluados?.slice().sort((a, b) => a.mes_numero - b.mes_numero) ??
     [];
@@ -164,6 +165,7 @@ function SeguimientoRow({
 
       {Array.from({ length: 6 }, (_, i) => {
         const mes = meses.find((m) => m.mes_numero === i + 1);
+        const mesIdx = i + 1;
         return (
           <td key={i} className="px-2 py-3 text-center relative">
             {mes ? (
@@ -171,7 +173,7 @@ function SeguimientoRow({
                 <PagoBadge paid={mes.pago_cliente_realizado} />
 
                 {(mes.conformidad || mes.observacion) && (
-                  <div className="group relative flex justify-center">
+                  <div className="relative flex justify-center">
                     <span
                       className={cn(
                         "text-[9px] font-mono font-bold",
@@ -182,14 +184,18 @@ function SeguimientoRow({
                             ? "text-orange-500"
                             : "text-zinc-500",
                       )}
+                      onMouseEnter={() =>
+                        mes.observacion && setHoveredMes(mesIdx)
+                      }
+                      onMouseLeave={() => setHoveredMes(null)}
                     >
                       {mes.conformidad
                         ? mes.conformidad.substring(0, 3)
                         : "SIN"}
                     </span>
 
-                    {mes.observacion && (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-popover/95 backdrop-blur text-popover-foreground text-[10px] font-medium leading-relaxed rounded-lg shadow-xl border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none text-left">
+                    {mes.observacion && hoveredMes === mesIdx && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-popover/95 backdrop-blur text-popover-foreground text-[10px] font-medium leading-relaxed rounded-lg shadow-xl border border-border z-[100] pointer-events-none text-left animate-in fade-in duration-150">
                         {mes.observacion}
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-b border-r border-border rotate-45" />
                       </div>

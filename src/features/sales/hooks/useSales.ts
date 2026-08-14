@@ -80,7 +80,7 @@ export function useEstadisticasAsesor(filtrosFecha?: {
     (s) => s.codigo.toUpperCase() === "EJECUCION",
   )?.id;
   const idAtendido = estadosSOT.find(
-    (s) => s.codigo.toUpperCase() === "ATENDIDO",
+    (s) => s.codigo.toUpperCase() === "ATENDIDO" || s.codigo.toUpperCase() === "ATENDIDA",
   )?.id;
   const idRechazado = estadosSOT.find(
     (s) => s.codigo.toUpperCase() === "RECHAZADO",

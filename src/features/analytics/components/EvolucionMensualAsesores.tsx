@@ -104,6 +104,7 @@ export const EvolucionMensualAsesores = ({
   const [estadoSot, setEstadoSot] = useState<EstadoSOT>("ATENDIDO");
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroAsesor, setFiltroAsesor] = useState("");
+  const [filtroActivo, setFiltroActivo] = useState<"activos" | "inactivos" | "todos">("activos");
   const [asesorSeleccionadoPanel, setAsesorSeleccionadoPanel] = useState<string | null>(null);
   const [pinnedMonth, setPinnedMonth] = useState<{
     label: string;
@@ -113,6 +114,7 @@ export const EvolucionMensualAsesores = ({
   const { data, isLoading, isFetching } = useEvolucionMensual({
     anio,
     estado_sot: estadoSot,
+    filtro_activo: filtroActivo,
   });
 
   // Extraer opciones únicas de sede_modalidad
@@ -235,6 +237,25 @@ export const EvolucionMensualAsesores = ({
             estadoSot={estadoSot}
             onEstadoSotChange={setEstadoSot}
           />
+
+          {/* Segmented control: Activos / Inactivos / Todos */}
+          <div className="flex rounded-lg border border-border overflow-hidden text-[11px] font-medium">
+            {(["activos", "inactivos", "todos"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setFiltroActivo(opt)}
+                className={cn(
+                  "px-3 py-1.5 capitalize transition-colors",
+                  filtroActivo === opt
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

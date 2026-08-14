@@ -102,7 +102,7 @@ function useFiltrosAsesor(estadosSOT: EstadoSOT[]) {
         return e ? { ...base, id_estado_sot: e.id } : base;
       }
       case "atendidas": {
-        const e = estadosSOT.find((s) => s.codigo.toUpperCase() === "ATENDIDO");
+        const e = estadosSOT.find((s) => s.codigo.toUpperCase() === "ATENDIDO" || s.codigo.toUpperCase() === "ATENDIDA");
         return e ? { ...base, id_estado_sot: e.id } : base;
       }
       case "rechazadas": {

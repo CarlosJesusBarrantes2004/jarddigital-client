@@ -581,12 +581,12 @@ export function VentaFormBackoffice({
   const ventaEstaRechazada = codigoEstadoActual === "RECHAZADO";
 
   const estadosSotPermitidos = (() => {
-    if (codigoEstadoActual === "ATENDIDO")
-      return estadosSOT.filter((e) => e.codigo.toUpperCase() === "ATENDIDO");
+    if (codigoEstadoActual === "ATENDIDO" || codigoEstadoActual === "ATENDIDA")
+      return estadosSOT.filter((e) => ["ATENDIDO", "ATENDIDA"].includes(e.codigo.toUpperCase()));
     if (esPrimeraGestion || esReingreso)
       return estadosSOT.filter((e) => e.codigo.toUpperCase() === "EJECUCION");
     return estadosSOT.filter((e) =>
-      ["EJECUCION", "ATENDIDO", "RECHAZADO"].includes(e.codigo.toUpperCase()),
+      ["EJECUCION", "ATENDIDO", "ATENDIDA", "RECHAZADO"].includes(e.codigo.toUpperCase()),
     );
   })();
 
@@ -602,7 +602,7 @@ export function VentaFormBackoffice({
 
   const esRechazado = estadoSeleccionado?.codigo.toUpperCase() === "RECHAZADO";
   const esEjecucion = estadoSeleccionado?.codigo.toUpperCase() === "EJECUCION";
-  const esAtendido = estadoSeleccionado?.codigo.toUpperCase() === "ATENDIDO";
+  const esAtendido = ["ATENDIDO", "ATENDIDA"].includes(estadoSeleccionado?.codigo.toUpperCase() ?? "");
   const audioEsRechazado =
     estadoAudioSeleccionado?.codigo.toUpperCase() === "RECHAZADO";
 
@@ -696,7 +696,7 @@ export function VentaFormBackoffice({
     // sub-estado en SOT, lo limpiamos enviando null para que no quede esa validación.
     const estadoDestinoCode = estadoSeleccionado?.codigo?.toUpperCase();
     const subEstadoFinal =
-      estadoDestinoCode === "RECHAZADO" || estadoDestinoCode === "ATENDIDO"
+      estadoDestinoCode === "RECHAZADO" || ["ATENDIDO", "ATENDIDA"].includes(estadoDestinoCode)
         ? null
         : (values.id_sub_estado_sot ?? null);
 
@@ -998,13 +998,13 @@ export function VentaFormBackoffice({
                             nuevoEstado?.codigo?.toUpperCase() ?? "";
                           if (
                             nuevoCode === "RECHAZADO" ||
-                            nuevoCode === "ATENDIDO"
+                            ["ATENDIDO", "ATENDIDA"].includes(nuevoCode)
                           ) {
                             form.setValue("id_sub_estado_sot", null);
                           }
                         }}
                         placeholder="Seleccionar"
-                        disabled={codigoEstadoActual === "ATENDIDO"}
+                        disabled={["ATENDIDO", "ATENDIDA"].includes(codigoEstadoActual)}
                       >
                         {estadosSotPermitidos.map((e) => (
                           <option key={e.id} value={e.id}>

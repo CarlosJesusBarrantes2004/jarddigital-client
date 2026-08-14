@@ -17,6 +17,7 @@ import {
   Clock,
   Pencil,
   Trash2,
+  Unlock,
 } from "lucide-react";
 import { EstadoBadge } from "../EstadoBadge";
 import type { Venta, EstadoSOT, EstadoAudio } from "../../types/sales.types";
@@ -184,6 +185,7 @@ export function buildColumnsBackoffice(
   onVerDetalle?: (v: Venta) => void,
   onEditar?: ((v: Venta) => void) | null,
   onEliminar?: ((v: Venta) => void) | null,
+  onAutorizarEdicion?: ((v: Venta) => void) | null,
 ): ColumnDef<Venta>[] {
   return [
     {
@@ -496,8 +498,9 @@ export function buildColumnsBackoffice(
       header: "",
       cell: ({ row }) => {
         const v = row.original;
-        const esAtendida = v.codigo_estado?.toUpperCase() === "ATENDIDO";
-        const esRechazada = v.codigo_estado?.toUpperCase() === "RECHAZADO";
+        const codigoUpper = v.codigo_estado?.toUpperCase();
+        const esAtendida = codigoUpper === "ATENDIDO" || codigoUpper === "ATENDIDA";
+        const esRechazada = codigoUpper === "RECHAZADO" || codigoUpper === "RECHAZADA";
         const esRUC = v.codigo_tipo_documento?.toUpperCase() === "RUC";
 
         return (
@@ -555,13 +558,25 @@ export function buildColumnsBackoffice(
               </button>
             )}
 
-            {onGestionar === null ? (
+            {esAtendida && !v.permiso_edicion_backoffice ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">
+                  <CheckCircle2 size={12} /> Finalizada
+                </div>
+                {onAutorizarEdicion && (
+                  <button
+                    type="button"
+                    onClick={() => onAutorizarEdicion(v)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center border border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all"
+                    title="Autorizar edición por BackOffice"
+                  >
+                    <Unlock size={14} />
+                  </button>
+                )}
+              </div>
+            ) : onGestionar === null ? (
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest">
                 <Eye size={12} /> Solo lectura
-              </div>
-            ) : esAtendida ? (
-              <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">
-                <CheckCircle2 size={12} /> Finalizada
               </div>
             ) : esRechazada && v.ya_reingresada ? (
               <span className="inline-flex items-center gap-1 text-[9px] font-mono text-primary/60 bg-primary/5 px-2 py-1 rounded-full border border-primary/15 uppercase tracking-widest whitespace-nowrap">

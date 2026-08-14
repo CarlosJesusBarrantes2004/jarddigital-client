@@ -34,7 +34,7 @@ interface RouteSection {
   items: RouteItem[];
 }
 
-const SECTIONS: RouteSection[] = [
+export const SECTIONS: RouteSection[] = [
   {
     title: "Operaciones",
     Icon: LayoutDashboard,
@@ -207,9 +207,7 @@ const NavSection = ({
   onClickItem?: () => void;
 }) => {
   const [open, setOpen] = useState(true);
-  const visibleItems = section.items.filter((item) =>
-    item.roles.includes(roleCode),
-  );
+  const visibleItems = section.items;
   if (visibleItems.length === 0) return null;
 
   return (
@@ -396,6 +394,30 @@ export const Sidebar = ({
   const { theme, setTheme } = useTheme();
   const roleCode = (user?.rol?.codigo ?? "ASESOR") as RoleCode;
 
+  // Filtrar SECTIONS por módulo y luego por roles en items
+  const visibleSections = SECTIONS.map((section) => {
+    const hasExplicitModules = user?.modulos_permitidos && user.modulos_permitidos.length > 0;
+    
+    // Si el usuario tiene modulos_permitidos configurados (> 0), usamos la base de datos
+    // Si no tiene ninguno (array vacío o undefined), usamos la configuración por defecto del código
+    const hasModuleAccess = hasExplicitModules
+      ? user.modulos_permitidos.includes(section.title) || section.items.some((i) => user.modulos_permitidos!.includes(i.label))
+      : section.items.some((item) => item.roles.length === 0 || item.roles.includes(roleCode));
+
+    if (!hasModuleAccess) return null;
+
+    // Si tiene acceso explícito, filtramos las sub-páginas evaluando si fueron seleccionadas.
+    // (Si el padre está explícitamente seleccionado, le mostramos todas las sub-páginas, o solo las marcadas).
+    // Caso contrario (fallback por defecto), filtramos por item.roles
+    const visibleItems = hasExplicitModules 
+      ? section.items.filter((i) => user.modulos_permitidos.includes(i.label) || user.modulos_permitidos.includes(section.title))
+      : section.items.filter((item) => item.roles.length === 0 || item.roles.includes(roleCode));
+
+    if (visibleItems.length === 0) return null;
+
+    return { ...section, items: visibleItems };
+  }).filter(Boolean) as RouteSection[];
+
   const cycleTheme = () => {
     if (theme === "light") setTheme("dark");
     else if (theme === "dark") setTheme("system");
@@ -480,7 +502,7 @@ export const Sidebar = ({
           )}
 
           <nav className="flex-1 p-3 flex flex-col gap-1">
-            {SECTIONS.map((section) => (
+            {visibleSections.map((section) => (
               <NavSection
                 key={section.title}
                 section={section}

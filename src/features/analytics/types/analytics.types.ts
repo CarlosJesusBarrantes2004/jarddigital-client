@@ -60,6 +60,7 @@ export interface BarrasRendimientoParams {
   estado_sot?: EstadoSOT;
   mes?: number; // si se manda -> Gráfico 2 (snapshot de un mes)
   id_asesor?: number; // si se manda -> Gráfico 4 filtrado a 1 asesor
+  filtro_activo?: "activos" | "inactivos" | "todos";
 }
 
 // ==========================================
@@ -177,6 +178,7 @@ export interface RetencionPagosParams {
   anio: number;
   mes?: number;
   id_modalidad_sede?: number;
+  filtro_activo?: "activos" | "inactivos" | "todos";
 }
 
 export interface RetencionAsesorFila {

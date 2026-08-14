@@ -48,6 +48,7 @@ export const RetencionPagosPorAsesor = () => {
   const [idModalidadSede, setIdModalidadSede] = useState<number | "TODAS">(
     "TODAS",
   );
+  const [filtroActivo, setFiltroActivo] = useState<"activos" | "inactivos" | "todos">("activos");
   const [sedesOpciones, setSedesOpciones] = useState<
     { id: number; etiqueta: string }[]
   >([]);
@@ -69,6 +70,7 @@ export const RetencionPagosPorAsesor = () => {
     mes,
     id_modalidad_sede:
       idModalidadSede === "TODAS" ? undefined : idModalidadSede,
+    filtro_activo: filtroActivo,
   });
 
   // Agrupamos por sede_modalidad para renderizar bloques, igual que MatrizPivote
@@ -154,6 +156,25 @@ export const RetencionPagosPorAsesor = () => {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Segmented control: Activos / Inactivos / Todos */}
+          <div className="flex rounded-lg border border-border overflow-hidden text-[11px] font-medium">
+            {(["activos", "inactivos", "todos"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setFiltroActivo(opt)}
+                className={cn(
+                  "px-3 py-1.5 capitalize transition-colors h-9",
+                  filtroActivo === opt
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {opt}
+              </button>
+            ))}
           </div>
         </div>
       </div>

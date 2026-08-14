@@ -65,17 +65,24 @@ export const BarrasRendimientoMes = () => {
   }, [dataFiltrada]);
 
   // Datos con porcentaje calculado
-  const dataConPorcentaje = useMemo(() => {
-    return dataFiltrada.map((f) => ({
-      ...f,
-      porcentaje: f.total_ventas > 0 ? Math.round((f.total_pagadas / f.total_ventas) * 100) : 0,
-    }));
+  const dataChart = useMemo(() => {
+    return dataFiltrada
+      .filter((f) => f.total_ventas > 0)
+      .map((f) => ({
+        ...f,
+        porcentaje: f.total_ventas > 0 ? Math.round((f.total_pagadas / f.total_ventas) * 100) : 0,
+      }));
+  }, [dataFiltrada]);
+
+  // Asesores con cero ventas
+  const dataCero = useMemo(() => {
+    return dataFiltrada.filter((f) => f.total_ventas === 0);
   }, [dataFiltrada]);
 
   // Custom label para mostrar instaladas / pagadas al lado de cada barra
   const renderBarLabel = (props: any) => {
     const { x, y, width, height, value, index } = props;
-    const item = dataConPorcentaje[index] as any;
+    const item = dataChart[index] as any;
     if (!item) return null;
     return (
       <text
@@ -184,10 +191,10 @@ export const BarrasRendimientoMes = () => {
       ) : (
         <ResponsiveContainer
           width="100%"
-          height={Math.max(280, dataConPorcentaje.length * 36)}
+          height={Math.max(280, dataChart.length * 36)}
         >
           <BarChart
-            data={dataConPorcentaje}
+            data={dataChart}
             layout="vertical"
             margin={{ left: 8, right: 72 }}
           >
@@ -221,6 +228,26 @@ export const BarrasRendimientoMes = () => {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      )}
+
+      {/* Footer de asesores con 0 ventas */}
+      {!isLoading && dataCero.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-border">
+          <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest mb-2 font-semibold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive/60" />
+            Asesores con 0 ventas ({dataCero.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {dataCero.map((f, i) => (
+              <span
+                key={i}
+                className="text-[11px] bg-muted/50 text-foreground/70 px-2 py-1 rounded-md border border-border"
+              >
+                {f.asesor_nombre}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
