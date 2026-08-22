@@ -26,16 +26,10 @@ interface Props {
 
 /**
  * Calcula el valor visual por defecto para una celda sin registro en BD:
- * - Domingo → true (asistió, da por hecho que no trabajan)
- * - Mañana en adelante → false (no asistió por defecto)
- * - Hoy / pasado → null (sin marcar)
+ * - TODOS los días (incluyendo domingos) → false (no asistió por defecto)
+ * - RRHH debe marcar explícitamente "Asistió" para reducir el descuento
  */
-function getValorPorDefecto(fechaISO: string): boolean | null {
-  const fecha = new Date(fechaISO + "T12:00:00"); // noon evita problemas de TZ
-
-  const esDomingo = fecha.getDay() === 0;
-  if (esDomingo) return true;
-  
+function getValorPorDefecto(_fechaISO: string): boolean | null {
   // Por defecto, cualquier día sin marcar se considera "Falta" (false)
   return false;
 }
