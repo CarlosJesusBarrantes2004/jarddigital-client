@@ -202,11 +202,6 @@ export const PromocionesGestionPage = () => {
                     })()}
 
                     <span className="text-[10px] text-muted-foreground ml-2">{fecha}</span>
-                    {!p.activo && (
-                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-amber-500 border-amber-500/30">
-                        Inactivo
-                      </Badge>
-                    )}
                   </div>
                 </div>
 

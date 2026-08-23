@@ -54,9 +54,6 @@ export const PromocionDetailModal = ({ promocion, open, onOpenChange }: Promocio
                 <Badge variant="secondary" className="bg-primary/20 text-primary hover:bg-primary/30 text-xs font-semibold px-2.5 py-0.5">
                   Promoción
                 </Badge>
-                {!promocion.activo && (
-                  <Badge variant="destructive" className="text-xs px-2.5 py-0.5">Inactivo</Badge>
-                )}
               </div>
               <h1 className="text-2xl sm:text-4xl font-serif font-bold text-foreground leading-tight tracking-tight">
                 {promocion.titulo || (promocion.id_producto ? promocion.producto_nombre_campana : "Promoción sin título")}

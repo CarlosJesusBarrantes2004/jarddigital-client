@@ -59,6 +59,15 @@ export const PromocionForm = ({
   ]);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Sincronizar estado cuando cambia la promoción (al editar diferentes)
+  useEffect(() => {
+    setTitulo(promocion?.titulo ?? "");
+    setDescripcion(promocion?.descripcion ?? "");
+    setImagenUrl(promocion?.imagen_url ?? "");
+    setFechaVencimiento(promocion?.fecha_vencimiento ?? "");
+    setIdProducto(promocion?.id_producto?.toString() ?? "");
+  }, [promocion]);
+
   // Cargar departamentos y productos al montar
   useEffect(() => {
     promotionsService.getDepartamentos().then(setDepartamentos);

@@ -1,19 +1,27 @@
 import { Calendar, User } from "lucide-react";
 import type { Noticia } from "../types/news.types";
+import { useState } from "react";
+import { NoticiaDetailModal } from "./NoticiaDetailModal";
 
 interface NoticiaCardProps {
   noticia: Noticia;
 }
 
 export const NoticiaCard = ({ noticia }: NoticiaCardProps) => {
+  const [open, setOpen] = useState(false);
+
   const fechaFormateada = new Date(noticia.creado_en).toLocaleDateString(
     "es-PE",
     { day: "numeric", month: "long", year: "numeric" }
   );
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
-      {/* Imagen */}
+    <>
+      <article 
+        className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 cursor-pointer"
+        onClick={() => setOpen(true)}
+      >
+        {/* Imagen */}
       {noticia.imagen_url && (
         <div className="relative h-48 w-full overflow-hidden">
           <img
@@ -45,7 +53,13 @@ export const NoticiaCard = ({ noticia }: NoticiaCardProps) => {
             {fechaFormateada}
           </span>
         </div>
-      </div>
-    </article>
+      </article>
+
+      <NoticiaDetailModal 
+        noticia={noticia}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
   );
 };
