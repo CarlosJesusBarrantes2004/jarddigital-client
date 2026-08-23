@@ -244,7 +244,7 @@ export const UserForm = ({
   const activeWsId = activeSessionSede?.id_modalidad_sede;
 
   const workspaceOptions = useMemo(() => {
-    if (currentUser?.rol?.codigo === "DUENO" || currentUser?.rol?.codigo === "RRHH") return rawWorkspaceOptions;
+    if (currentUser?.rol?.codigo === "DUENO") return rawWorkspaceOptions;
     const sedesPermitidasIds =
       currentUser?.sucursales?.map((s) => s.id_modalidad_sede) || [];
     return rawWorkspaceOptions.filter((ws) =>
