@@ -6,6 +6,7 @@ import {
   Trash2,
   MapPin,
   Loader2,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -153,8 +154,21 @@ export const PromocionesGestionPage = () => {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm text-foreground truncate">{p.titulo}</h3>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{p.descripcion}</p>
+                  <h3 className="font-medium text-sm text-foreground truncate">
+                    {p.titulo || p.producto_nombre_paquete || "Promoción sin título"}
+                  </h3>
+                  
+                  {p.id_producto && (
+                    <div className="flex items-center gap-1 mt-0.5 text-[11px] font-medium text-primary">
+                      <Package size={10} />
+                      {p.producto_nombre_paquete} - S/ {p.producto_costo_fijo}
+                    </div>
+                  )}
+
+                  {p.descripcion && (
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{p.descripcion}</p>
+                  )}
+                  
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                     {p.territorios?.slice(0, 3).map((t, idx) => {
                       const label = t.nombre_distrito || t.nombre_provincia || t.nombre_departamento || "—";

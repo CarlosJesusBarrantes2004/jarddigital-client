@@ -10,9 +10,13 @@ export interface PromocionTerritorio {
 
 export interface Promocion {
   id: number;
-  titulo: string;
+  titulo: string | null;
   descripcion: string | null;
   imagen_url: string | null;
+  id_producto: number | null;
+  producto_nombre_paquete?: string | null;
+  producto_costo_fijo?: string | null;
+  producto_tipo_solucion?: string | null;
   id_autor: number | null;
   nombre_autor: string;
   activo: boolean;
@@ -22,9 +26,10 @@ export interface Promocion {
 }
 
 export interface CreatePromocionPayload {
-  titulo: string;
+  titulo?: string | null;
   descripcion?: string | null;
   imagen_url?: string | null;
+  id_producto?: number | null;
   territorios?: Omit<PromocionTerritorio, "id" | "nombre_departamento" | "nombre_provincia" | "nombre_distrito">[];
 }
 

@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { uploadImagenToCloudinary } from "@/lib/cloudinary.utils";
 import { promotionsService } from "../services/promotions.service";
+import { salesService } from "@/features/sales/services/sales.service";
+import type { Producto } from "@/features/sales/types/sales.types";
 import type {
   Promocion,
   CreatePromocionPayload,
@@ -46,16 +48,19 @@ export const PromocionForm = ({
   const [titulo, setTitulo] = useState(promocion?.titulo ?? "");
   const [descripcion, setDescripcion] = useState(promocion?.descripcion ?? "");
   const [imagenUrl, setImagenUrl] = useState(promocion?.imagen_url ?? "");
+  const [idProducto, setIdProducto] = useState<string>(promocion?.id_producto?.toString() ?? "");
   const [uploading, setUploading] = useState(false);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [territorios, setTerritorios] = useState<TerritorioRow[]>([
     { id_departamento: null, id_provincia: null, id_distrito: null, provincias: [], distritos: [] },
   ]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Cargar departamentos al montar
+  // Cargar departamentos y productos al montar
   useEffect(() => {
     promotionsService.getDepartamentos().then(setDepartamentos);
+    salesService.getProductos().then(setProductos);
   }, []);
 
   // Pre-cargar territorios existentes al editar
@@ -138,7 +143,10 @@ export const PromocionForm = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!titulo.trim()) return;
+    if (!titulo.trim() && !idProducto) {
+      alert("Debe ingresar un título o seleccionar un producto.");
+      return;
+    }
 
     const terrPayload = territorios
       .filter((t) => t.id_departamento || t.id_provincia || t.id_distrito)
@@ -149,25 +157,45 @@ export const PromocionForm = ({
       }));
 
     onSubmit({
-      titulo: titulo.trim(),
+      titulo: titulo.trim() || null,
       descripcion: descripcion.trim() || null,
       imagen_url: imagenUrl || null,
+      id_producto: idProducto ? parseInt(idProducto) : null,
       territorios: terrPayload,
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+      
+      {/* Producto vinculado */}
+      <div className="space-y-2">
+        <Label htmlFor="promo-producto">Producto Vinculado (Opcional)</Label>
+        <Select value={idProducto} onValueChange={setIdProducto}>
+          <SelectTrigger className="h-11">
+            <SelectValue placeholder="Seleccionar producto..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="null" className="text-muted-foreground italic">Ninguno (Crear promoción independiente)</SelectItem>
+            {productos.map((p) => (
+              <SelectItem key={p.id} value={p.id.toString()}>
+                {p.nombre_campana} - {p.nombre_paquete} (S/ {p.costo_fijo_plan})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Título */}
       <div className="space-y-2">
-        <Label htmlFor="promo-titulo">Título</Label>
+        <Label htmlFor="promo-titulo">Título {idProducto ? "(Opcional si usas el del producto)" : ""}</Label>
         <Input
           id="promo-titulo"
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           placeholder="Ej: Internet 200 Mbps por S/59.90..."
           className="h-11"
-          required
+          required={!idProducto}
         />
       </div>
 

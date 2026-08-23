@@ -1,4 +1,4 @@
-import { Tag, MapPin } from "lucide-react";
+import { Tag, MapPin, Package } from "lucide-react";
 import type { Promocion } from "../types/promotions.types";
 import { Badge } from "@/components/ui/badge";
 
@@ -28,8 +28,16 @@ export const PromocionCard = ({ promocion }: PromocionCardProps) => {
       {/* Body */}
       <div className="p-5">
         <h3 className="font-serif text-lg font-bold text-foreground leading-snug mb-2 line-clamp-2">
-          {promocion.titulo}
+          {promocion.titulo || promocion.producto_nombre_paquete || "Promoción sin título"}
         </h3>
+        
+        {promocion.id_producto && (
+          <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
+            <Package size={12} />
+            {promocion.producto_nombre_paquete} - S/ {promocion.producto_costo_fijo}
+          </div>
+        )}
+
         {promocion.descripcion && (
           <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-4">
             {promocion.descripcion}
