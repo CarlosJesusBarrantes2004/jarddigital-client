@@ -64,6 +64,7 @@ export const PromocionesSearchPage = () => {
     setMostrarDropdown(false);
     setPromociones([]);
     setHasSearched(false);
+    handleSearch(d.id);
   };
 
   const limpiar = () => {
@@ -73,12 +74,13 @@ export const PromocionesSearchPage = () => {
     setHasSearched(false);
   };
 
-  const handleSearch = async () => {
-    if (!distritoSeleccionado) return;
+  const handleSearch = async (overrideId?: number) => {
+    const searchId = overrideId || distritoSeleccionado?.id;
+    if (!searchId) return;
     setLoadingPromos(true);
     setHasSearched(true);
     try {
-      const data = await promotionsService.buscarPorDistrito(distritoSeleccionado.id);
+      const data = await promotionsService.buscarPorDistrito(searchId);
       setPromociones(data);
     } catch {
       toast.error("Error al buscar promociones");
@@ -163,7 +165,7 @@ export const PromocionesSearchPage = () => {
           </div>
 
           <Button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             disabled={!distritoSeleccionado || loadingPromos}
             className="h-12 px-8 shadow-md hover:shadow-lg transition-all font-medium text-sm w-full md:w-auto"
           >
