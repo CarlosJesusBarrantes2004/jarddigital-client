@@ -194,7 +194,7 @@ const NavItem = ({
 
   if (disabled) {
     return (
-      <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed">
+      <div className={cn("flex items-center rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed", expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-1.5")}>
         <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-50" />
         {expanded && (
           <>
@@ -212,17 +212,25 @@ const NavItem = ({
       to={href}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "flex items-center rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-2",
         isActive &&
           "bg-primary/10 text-primary font-medium hover:text-primary hover:bg-primary/15",
       )}
+      title={!expanded ? label : undefined}
     >
-      <span
-        className={cn(
-          "w-1.5 h-1.5 rounded-full shrink-0 transition-colors",
-          isActive ? "bg-primary" : "bg-current opacity-50",
-        )}
-      />
+      {!expanded ? (
+        <span className="font-semibold text-[10px] uppercase">
+          {label.substring(0, 1)}
+        </span>
+      ) : (
+        <span
+          className={cn(
+            "w-1.5 h-1.5 rounded-full shrink-0 transition-colors",
+            isActive ? "bg-primary" : "bg-current opacity-50",
+          )}
+        />
+      )}
       {expanded && <span className="flex-1 truncate">{label}</span>}
     </Link>
   );
@@ -248,8 +256,12 @@ const NavSection = ({
       {section.collapsible ? (
         <button
           type="button"
-          className="flex items-center gap-2.5 px-2.5 py-2 w-full rounded-lg bg-transparent hover:bg-sidebar-accent transition-colors text-muted-foreground hover:text-sidebar-accent-foreground cursor-pointer"
+          className={cn(
+            "flex items-center w-full rounded-lg bg-transparent hover:bg-sidebar-accent transition-colors text-muted-foreground hover:text-sidebar-accent-foreground cursor-pointer",
+            expanded ? "gap-2.5 px-2.5 py-2" : "justify-center py-2"
+          )}
           onClick={() => setOpen((v) => !v)}
+          title={!expanded ? section.title : undefined}
         >
           <section.Icon size={16} className="shrink-0" />
           {expanded && (
@@ -278,7 +290,7 @@ const NavSection = ({
         </div>
       )}
       {open && (
-        <div className="pl-2 mt-0.5 flex flex-col gap-[1px]">
+        <div className={cn("mt-0.5 flex flex-col gap-[1px]", expanded ? "pl-2" : "px-1")}>
           {visibleItems.map((item) => (
             <NavItem
               key={item.href + item.label}

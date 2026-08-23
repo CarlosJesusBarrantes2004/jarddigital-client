@@ -43,10 +43,10 @@ export function DataTable<TData>({
   });
 
   return (
-    <div className="rounded-2xl border border-border bg-card/50 shadow-sm flex flex-col">
-      <div className="overflow-auto max-h-[calc(100vh-280px)] relative custom-scrollbar">
-        <table className="w-full border-collapse min-w-max">
-          <thead className="bg-muted/95 backdrop-blur border-b border-border sticky top-0 z-20 shadow-sm">
+    <div className="rounded-2xl overflow-hidden border border-border bg-card/50 shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead className="bg-muted/30 border-b border-border">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((h) => (
