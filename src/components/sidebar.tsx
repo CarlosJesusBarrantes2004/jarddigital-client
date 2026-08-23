@@ -130,6 +130,11 @@ export const SECTIONS: RouteSection[] = [
       },
       { label: "Roles", href: "/configuracion/roles", roles: ["DUENO"] },
       {
+        label: "Módulos",
+        href: "/configuracion/modulos",
+        roles: ["DUENO"],
+      },
+      {
         label: "Productos",
         href: "/configuracion/productos",
         roles: ["DUENO"],
