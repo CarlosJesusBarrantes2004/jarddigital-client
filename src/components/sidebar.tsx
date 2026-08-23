@@ -14,6 +14,8 @@ import {
   Sun,
   Laptop,
   Wallet,
+  Newspaper,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +54,28 @@ export const SECTIONS: RouteSection[] = [
           "ASESOR",
           "SEGUIMIENTO",
         ],
+      },
+    ],
+  },
+  {
+    title: "Actualidad",
+    Icon: Newspaper,
+    collapsible: true,
+    items: [
+      {
+        label: "Noticias",
+        href: "/noticias",
+        roles: ["ASESOR", "SUPERVISOR", "COORDINADOR", "RRHH", "BACKOFFICE", "DUENO"],
+      },
+      {
+        label: "Gestión de Noticias",
+        href: "/noticias/admin",
+        roles: ["DUENO", "COORDINADOR", "RRHH"],
+      },
+      {
+        label: "Promociones",
+        href: "/promociones/admin",
+        roles: ["DUENO", "COORDINADOR", "BACKOFFICE"],
       },
     ],
   },
