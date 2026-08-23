@@ -53,13 +53,14 @@ export const NoticiaCard = ({ noticia }: NoticiaCardProps) => {
             {fechaFormateada}
           </span>
         </div>
-      </article>
+      </div>
+    </article>
 
-      <NoticiaDetailModal 
-        noticia={noticia}
-        open={open}
-        onOpenChange={setOpen}
-      />
-    </>
-  );
+    <NoticiaDetailModal 
+      noticia={noticia}
+      open={open}
+      onOpenChange={setOpen}
+    />
+  </>
+);
 };
