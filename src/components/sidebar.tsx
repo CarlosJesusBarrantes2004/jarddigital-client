@@ -489,11 +489,11 @@ export const Sidebar = ({
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className="h-[64px] flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
+        <div className={cn("h-[64px] flex items-center border-b border-sidebar-border shrink-0 transition-all duration-300", expanded ? "justify-between px-4" : "justify-center")}>
           <div
             className={cn(
               "flex items-center gap-3 overflow-hidden transition-all duration-300",
-              !expanded && "mx-auto",
+              !expanded && "hidden",
             )}
           >
             <div className="w-[32px] h-[32px] rounded-lg bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center font-serif font-bold text-[15px] text-primary-foreground shadow-sm shrink-0">

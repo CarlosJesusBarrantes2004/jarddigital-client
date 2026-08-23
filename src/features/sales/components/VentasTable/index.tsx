@@ -43,19 +43,16 @@ export function DataTable<TData>({
   });
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-border bg-card/50 shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead className="bg-muted/30 border-b border-border">
+    <div className="rounded-2xl border border-border bg-card/50 shadow-sm flex flex-col">
+      <div className="overflow-auto max-h-[calc(100vh-280px)] relative custom-scrollbar">
+        <table className="w-full border-collapse min-w-max">
+          <thead className="bg-muted/95 backdrop-blur border-b border-border sticky top-0 z-20 shadow-sm">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((h) => (
                   <th
                     key={h.id}
-                    className={cn(
-                      "px-5 py-3.5 text-left text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap",
-                      (h.column.columnDef.meta as any)?.stickyRight && "sticky right-0 bg-muted/95 backdrop-blur z-20 border-l border-border shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)]"
-                    )}
+                    className="px-5 py-3.5 text-left text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap"
                   >
                     {h.isPlaceholder
                       ? null
@@ -88,10 +85,7 @@ export function DataTable<TData>({
                   {row.getVisibleCells().map((cell) => (
                     <td 
                       key={cell.id} 
-                      className={cn(
-                        "px-5 py-3.5 align-middle",
-                        (cell.column.columnDef.meta as any)?.stickyRight && "sticky right-0 bg-card z-10 border-l border-border group-hover:bg-muted/40 transition-colors shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)]"
-                      )}
+                      className="px-5 py-3.5 align-middle"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
