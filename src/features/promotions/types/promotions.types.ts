@@ -13,6 +13,7 @@ export interface Promocion {
   titulo: string | null;
   descripcion: string | null;
   imagen_url: string | null;
+  fecha_vencimiento: string | null;
   id_producto: number | null;
   producto_nombre_campana?: string | null;
   producto_nombre_paquete?: string | null;
@@ -30,6 +31,7 @@ export interface CreatePromocionPayload {
   titulo?: string | null;
   descripcion?: string | null;
   imagen_url?: string | null;
+  fecha_vencimiento?: string | null;
   id_producto?: number | null;
   territorios?: Omit<PromocionTerritorio, "id" | "nombre_departamento" | "nombre_provincia" | "nombre_distrito">[];
 }

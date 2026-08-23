@@ -18,7 +18,7 @@ export const NoticiaDetailModal = ({ noticia, open, onOpenChange }: NoticiaDetai
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden gap-0 bg-background sm:rounded-2xl border-border/50 shadow-2xl h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
+      <DialogContent className="w-full max-w-full sm:max-w-3xl p-0 overflow-hidden gap-0 bg-background rounded-none sm:rounded-2xl border-0 sm:border border-border/50 shadow-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col">
         {/* Usamos sr-only para que shadcn no arroje warnings de accesibilidad */}
         <DialogHeader className="sr-only">
           <DialogTitle>{noticia.titulo}</DialogTitle>

@@ -7,6 +7,7 @@ import {
   MapPin,
   Loader2,
   Package,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -210,7 +211,7 @@ export const PromocionesGestionPage = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 ml-auto">
                   <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDetailTarget(p); }} className="h-8 w-8 p-0">
                     <Eye size={14} />
                   </Button>

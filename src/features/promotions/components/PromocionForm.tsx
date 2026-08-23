@@ -49,6 +49,7 @@ export const PromocionForm = ({
   const [titulo, setTitulo] = useState(promocion?.titulo ?? "");
   const [descripcion, setDescripcion] = useState(promocion?.descripcion ?? "");
   const [imagenUrl, setImagenUrl] = useState(promocion?.imagen_url ?? "");
+  const [fechaVencimiento, setFechaVencimiento] = useState(promocion?.fecha_vencimiento ?? "");
   const [idProducto, setIdProducto] = useState<string>(promocion?.id_producto?.toString() ?? "");
   const [uploading, setUploading] = useState(false);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
@@ -189,7 +190,8 @@ export const PromocionForm = ({
       titulo: titulo.trim() || null,
       descripcion: descripcion.trim() || null,
       imagen_url: imagenUrl || null,
-      id_producto: idProducto ? parseInt(idProducto) : null,
+      fecha_vencimiento: fechaVencimiento || null,
+      id_producto: idProducto && idProducto !== "null" ? parseInt(idProducto) : null,
       territorios: terrPayload,
     });
   };
@@ -217,14 +219,26 @@ export const PromocionForm = ({
 
       {/* Título */}
       <div className="space-y-2">
-        <Label htmlFor="promo-titulo">Título {idProducto ? "(Opcional si usas el del producto)" : ""}</Label>
+        <Label htmlFor="promo-titulo">Título {idProducto && idProducto !== "null" ? "(Opcional si usas el del producto)" : ""}</Label>
         <Input
           id="promo-titulo"
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           placeholder="Ej: Internet 200 Mbps por S/59.90..."
           className="h-11"
-          required={!idProducto}
+          required={!idProducto || idProducto === "null"}
+        />
+      </div>
+
+      {/* Fecha Vencimiento */}
+      <div className="space-y-2">
+        <Label htmlFor="promo-fecha-vencimiento">Fecha de Vencimiento (Informativo, opcional)</Label>
+        <Input
+          id="promo-fecha-vencimiento"
+          type="date"
+          value={fechaVencimiento}
+          onChange={(e) => setFechaVencimiento(e.target.value)}
+          className="h-11"
         />
       </div>
 
