@@ -74,6 +74,11 @@ export const SECTIONS: RouteSection[] = [
       },
       {
         label: "Promociones",
+        href: "/promociones",
+        roles: ["ASESOR", "SUPERVISOR", "COORDINADOR", "BACKOFFICE", "DUENO"],
+      },
+      {
+        label: "Gestión de Promos",
         href: "/promociones/admin",
         roles: ["DUENO", "COORDINADOR", "BACKOFFICE"],
       },
