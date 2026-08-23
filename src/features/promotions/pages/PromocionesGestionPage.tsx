@@ -157,7 +157,7 @@ export const PromocionesGestionPage = () => {
                   <h3 className="font-medium text-sm text-foreground truncate">
                     {p.titulo ||
                       (p.id_producto
-                        ? `${p.producto_nombre_campana} - ${p.producto_tipo_solucion} - ${p.producto_nombre_paquete}`
+                        ? p.producto_nombre_campana
                         : "Promoción sin título")}
                   </h3>
                   

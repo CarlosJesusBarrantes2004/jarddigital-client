@@ -30,7 +30,7 @@ export const PromocionCard = ({ promocion }: PromocionCardProps) => {
         <h3 className="font-serif text-lg font-bold text-foreground leading-snug mb-2 line-clamp-2">
           {promocion.titulo ||
             (promocion.id_producto
-              ? `${promocion.producto_nombre_campana} - ${promocion.producto_tipo_solucion} - ${promocion.producto_nombre_paquete}`
+              ? promocion.producto_nombre_campana
               : "Promoción sin título")}
         </h3>
         
