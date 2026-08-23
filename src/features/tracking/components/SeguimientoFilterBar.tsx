@@ -254,7 +254,7 @@ export function SeguimientoFilterBar({
       .then((data) => {
         if (!isMounted) return;
         const asesores = data
-          .filter((u) => u.id_rol?.codigo === "ASESOR")
+          .filter((u) => u.rol?.codigo === "ASESOR")
           .map((a) => ({ value: a.nombre_completo, label: a.nombre_completo }));
         setAsesoresOpciones(asesores);
       })
