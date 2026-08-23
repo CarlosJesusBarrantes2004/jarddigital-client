@@ -45,11 +45,14 @@ export const PromocionCard = ({ promocion }: PromocionCardProps) => {
         {promocion.territorios && promocion.territorios.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
             {promocion.territorios.map((t, idx) => {
-              const label =
-                t.nombre_distrito ||
-                t.nombre_provincia ||
-                t.nombre_departamento ||
-                "—";
+              let label = "—";
+              if (t.nombre_distrito) {
+                label = `${t.nombre_distrito} (Distrito)`;
+              } else if (t.nombre_provincia) {
+                label = `${t.nombre_provincia} (Provincia)`;
+              } else if (t.nombre_departamento) {
+                label = `${t.nombre_departamento} (Departamento)`;
+              }
               return (
                 <Badge
                   key={idx}

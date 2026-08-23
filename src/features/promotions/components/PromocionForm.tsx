@@ -71,16 +71,33 @@ export const PromocionForm = ({
 
   // Pre-cargar territorios existentes al editar
   useEffect(() => {
-    if (promocion?.territorios && promocion.territorios.length > 0) {
-      const rows: TerritorioRow[] = promocion.territorios.map((t) => ({
-        id_departamento: t.id_departamento,
-        id_provincia: t.id_provincia,
-        id_distrito: t.id_distrito,
-        provincias: [],
-        distritos: [],
-      }));
-      setTerritorios(rows);
-    }
+    const loadTerritorios = async () => {
+      if (promocion?.territorios && promocion.territorios.length > 0) {
+        const rows: TerritorioRow[] = await Promise.all(
+          promocion.territorios.map(async (t) => {
+            let provincias = [];
+            let distritos = [];
+            if (t.id_departamento) {
+              provincias = await promotionsService.getProvincias(t.id_departamento).catch(() => []);
+            }
+            if (t.id_provincia) {
+              distritos = await promotionsService.getDistritos(t.id_provincia).catch(() => []);
+            }
+            return {
+              id_departamento: t.id_departamento,
+              id_provincia: t.id_provincia,
+              id_distrito: t.id_distrito,
+              provincias,
+              distritos,
+            };
+          })
+        );
+        setTerritorios(rows);
+      } else {
+        setTerritorios([{ id_departamento: null, id_provincia: null, id_distrito: null, provincias: [], distritos: [] }]);
+      }
+    };
+    loadTerritorios();
   }, [promocion]);
 
   const handleDepChange = async (index: number, depId: string) => {
