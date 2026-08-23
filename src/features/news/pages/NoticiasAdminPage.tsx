@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { NoticiaForm } from "../components/NoticiaForm";
+import { NoticiaDetailModal } from "../components/NoticiaDetailModal";
 import { newsService } from "../services/news.service";
 import type { Noticia, CreateNoticiaPayload } from "../types/news.types";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ export const NoticiasAdminPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNoticia, setEditingNoticia] = useState<Noticia | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Noticia | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Noticia | null>(null);
 
   const cargar = async () => {
     setLoading(true);
@@ -146,7 +148,8 @@ export const NoticiasAdminPage = () => {
             return (
               <div
                 key={n.id}
-                className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors group"
+                className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors group cursor-pointer"
+                onClick={() => setDetailTarget(n)}
               >
                 {/* Thumbnail */}
                 {n.imagen_url ? (
@@ -187,11 +190,19 @@ export const NoticiasAdminPage = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleEdit(n)}
+                    onClick={(e) => { e.stopPropagation(); setDetailTarget(n); }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Eye size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); handleEdit(n); }}
                     className="h-8 w-8 p-0"
                   >
                     <Pencil size={14} />
@@ -199,7 +210,7 @@ export const NoticiasAdminPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setDeleteTarget(n)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(n); }}
                     className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                   >
                     <Trash2 size={14} />
@@ -210,6 +221,13 @@ export const NoticiasAdminPage = () => {
           })}
         </div>
       )}
+
+      {/* Detail Dialog */}
+      <NoticiaDetailModal 
+        noticia={detailTarget}
+        open={!!detailTarget}
+        onOpenChange={(open) => !open && setDetailTarget(null)}
+      />
 
       {/* Dialog: Crear / Editar */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

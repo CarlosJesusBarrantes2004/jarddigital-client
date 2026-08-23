@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { PromocionForm } from "../components/PromocionForm";
+import { PromocionDetailModal } from "../components/PromocionDetailModal";
 import { promotionsService } from "../services/promotions.service";
 import type { Promocion, CreatePromocionPayload } from "../types/promotions.types";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ export const PromocionesGestionPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Promocion | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Promocion | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Promocion | null>(null);
 
   const cargar = async () => {
     setLoading(true);
@@ -141,7 +143,8 @@ export const PromocionesGestionPage = () => {
             return (
               <div
                 key={p.id}
-                className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors group"
+                className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors group cursor-pointer"
+                onClick={() => setDetailTarget(p)}
               >
                 {/* Thumbnail */}
                 {p.imagen_url ? (
@@ -168,27 +171,35 @@ export const PromocionesGestionPage = () => {
                   )}
                   
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    {p.territorios?.slice(0, 3).map((t, idx) => {
-                      let label = "—";
-                      if (t.nombre_distrito) {
-                        label = `${t.nombre_distrito} (Distrito)`;
-                      } else if (t.nombre_provincia) {
-                        label = `${t.nombre_provincia} (Provincia)`;
-                      } else if (t.nombre_departamento) {
-                        label = `${t.nombre_departamento} (Departamento)`;
-                      }
+                    {(() => {
+                      const deptos = p.territorios?.filter(t => t.id_departamento && !t.id_provincia && !t.id_distrito) || [];
+                      const provs = p.territorios?.filter(t => t.id_provincia && !t.id_distrito) || [];
+                      const dists = p.territorios?.filter(t => t.id_distrito) || [];
+                      
                       return (
-                        <Badge key={idx} variant="outline" className="text-[10px] gap-1 py-0 px-1.5">
-                          <MapPin size={8} />
-                          {label}
-                        </Badge>
+                        <>
+                          {deptos.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] gap-1 py-0 px-1.5" title={deptos.map(d => d.nombre_departamento).join(", ")}>
+                              <MapPin size={8} /> {deptos.length} {deptos.length === 1 ? 'Departamento' : 'Departamentos'}
+                            </Badge>
+                          )}
+                          {provs.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] gap-1 py-0 px-1.5" title={provs.map(pr => pr.nombre_provincia).join(", ")}>
+                              <MapPin size={8} /> {provs.length} {provs.length === 1 ? 'Provincia' : 'Provincias'}
+                            </Badge>
+                          )}
+                          {dists.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] gap-1 py-0 px-1.5" title={dists.map(d => d.nombre_distrito).join(", ")}>
+                              <MapPin size={8} /> {dists.length} {dists.length === 1 ? 'Distrito' : 'Distritos'}
+                            </Badge>
+                          )}
+                          {(!p.territorios || p.territorios.length === 0) && (
+                            <span className="text-[10px] text-muted-foreground italic">Sin territorios asignados</span>
+                          )}
+                        </>
                       );
-                    })}
-                    {(p.territorios?.length || 0) > 3 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        +{p.territorios.length - 3} más
-                      </span>
-                    )}
+                    })()}
+
                     <span className="text-[10px] text-muted-foreground ml-2">{fecha}</span>
                     {!p.activo && (
                       <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-amber-500 border-amber-500/30">
@@ -200,13 +211,16 @@ export const PromocionesGestionPage = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(p)} className="h-8 w-8 p-0">
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDetailTarget(p); }} className="h-8 w-8 p-0">
+                    <Eye size={14} />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(p); }} className="h-8 w-8 p-0">
                     <Pencil size={14} />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setDeleteTarget(p)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
                     className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                   >
                     <Trash2 size={14} />
@@ -217,6 +231,13 @@ export const PromocionesGestionPage = () => {
           })}
         </div>
       )}
+
+      {/* Detail Dialog */}
+      <PromocionDetailModal 
+        promocion={detailTarget}
+        open={!!detailTarget}
+        onOpenChange={(open) => !open && setDetailTarget(null)}
+      />
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

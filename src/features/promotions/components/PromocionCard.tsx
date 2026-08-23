@@ -1,15 +1,23 @@
-import { Tag, MapPin, Package } from "lucide-react";
+import { Tag, MapPin } from "lucide-react";
 import type { Promocion } from "../types/promotions.types";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { PromocionDetailModal } from "./PromocionDetailModal";
 
 interface PromocionCardProps {
   promocion: Promocion;
 }
 
 export const PromocionCard = ({ promocion }: PromocionCardProps) => {
+  const [open, setOpen] = useState(false);
+
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
-      {/* Imagen */}
+    <>
+      <article 
+        className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 cursor-pointer"
+        onClick={() => setOpen(true)}
+      >
+        {/* Imagen */}
       {promocion.imagen_url ? (
         <div className="relative h-44 w-full overflow-hidden">
           <img
@@ -68,5 +76,12 @@ export const PromocionCard = ({ promocion }: PromocionCardProps) => {
         )}
       </div>
     </article>
+
+      <PromocionDetailModal 
+        promocion={promocion}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
   );
 };
