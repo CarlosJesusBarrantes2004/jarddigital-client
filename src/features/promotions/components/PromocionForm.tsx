@@ -63,6 +63,11 @@ export const PromocionForm = ({
     catalogosService.getProductos().then(setProductos);
   }, []);
 
+  // Agrupar productos por nombre_campana para el dropdown
+  const uniqueCampaigns = Array.from(
+    new Map(productos.filter(p => p.nombre_campana).map(p => [p.nombre_campana, p])).values()
+  );
+
   // Pre-cargar territorios existentes al editar
   useEffect(() => {
     if (promocion?.territorios && promocion.territorios.length > 0) {
@@ -183,7 +188,7 @@ export const PromocionForm = ({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="null" className="text-muted-foreground italic">Ninguno (Crear promoción independiente)</SelectItem>
-            {productos.map((p) => (
+            {uniqueCampaigns.map((p) => (
               <SelectItem key={p.id} value={p.id.toString()}>
                 {p.nombre_campana}
               </SelectItem>

@@ -161,12 +161,7 @@ export const PromocionesGestionPage = () => {
                         : "Promoción sin título")}
                   </h3>
                   
-                  {p.id_producto && (
-                    <div className="flex items-center gap-1 mt-0.5 text-[11px] font-medium text-primary">
-                      <Package size={10} />
-                      S/ {p.producto_costo_fijo}
-                    </div>
-                  )}
+                  {/* Price removed because promotion is by campaign now */}
 
                   {p.descripcion && (
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{p.descripcion}</p>

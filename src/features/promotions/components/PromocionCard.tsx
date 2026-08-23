@@ -33,13 +33,7 @@ export const PromocionCard = ({ promocion }: PromocionCardProps) => {
               ? promocion.producto_nombre_campana
               : "Promoción sin título")}
         </h3>
-        
-        {promocion.id_producto && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
-            <Package size={12} />
-            S/ {promocion.producto_costo_fijo}
-          </div>
-        )}
+        {/* Price removed because promotion is by campaign now */}
 
         {promocion.descripcion && (
           <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-4">
