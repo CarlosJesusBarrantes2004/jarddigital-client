@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { uploadImagenToCloudinary } from "@/lib/cloudinary.utils";
 import { promotionsService } from "../services/promotions.service";
-import { salesService } from "@/features/sales/services/sales.service";
+import { catalogosService } from "@/features/sales/services/sales.service";
 import type { Producto } from "@/features/sales/types/sales.types";
 import type {
   Promocion,
@@ -60,7 +60,7 @@ export const PromocionForm = ({
   // Cargar departamentos y productos al montar
   useEffect(() => {
     promotionsService.getDepartamentos().then(setDepartamentos);
-    salesService.getProductos().then(setProductos);
+    catalogosService.getProductos().then(setProductos);
   }, []);
 
   // Pre-cargar territorios existentes al editar

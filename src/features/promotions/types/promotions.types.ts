@@ -14,6 +14,7 @@ export interface Promocion {
   descripcion: string | null;
   imagen_url: string | null;
   id_producto: number | null;
+  producto_nombre_campana?: string | null;
   producto_nombre_paquete?: string | null;
   producto_costo_fijo?: string | null;
   producto_tipo_solucion?: string | null;

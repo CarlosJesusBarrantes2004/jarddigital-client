@@ -155,13 +155,16 @@ export const PromocionesGestionPage = () => {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-sm text-foreground truncate">
-                    {p.titulo || p.producto_nombre_paquete || "Promoción sin título"}
+                    {p.titulo ||
+                      (p.id_producto
+                        ? `${p.producto_nombre_campana} - ${p.producto_tipo_solucion} - ${p.producto_nombre_paquete}`
+                        : "Promoción sin título")}
                   </h3>
                   
                   {p.id_producto && (
                     <div className="flex items-center gap-1 mt-0.5 text-[11px] font-medium text-primary">
                       <Package size={10} />
-                      {p.producto_nombre_paquete} - S/ {p.producto_costo_fijo}
+                      S/ {p.producto_costo_fijo}
                     </div>
                   )}
 

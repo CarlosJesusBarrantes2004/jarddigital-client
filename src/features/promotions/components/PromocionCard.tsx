@@ -28,13 +28,16 @@ export const PromocionCard = ({ promocion }: PromocionCardProps) => {
       {/* Body */}
       <div className="p-5">
         <h3 className="font-serif text-lg font-bold text-foreground leading-snug mb-2 line-clamp-2">
-          {promocion.titulo || promocion.producto_nombre_paquete || "Promoción sin título"}
+          {promocion.titulo ||
+            (promocion.id_producto
+              ? `${promocion.producto_nombre_campana} - ${promocion.producto_tipo_solucion} - ${promocion.producto_nombre_paquete}`
+              : "Promoción sin título")}
         </h3>
         
         {promocion.id_producto && (
           <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
             <Package size={12} />
-            {promocion.producto_nombre_paquete} - S/ {promocion.producto_costo_fijo}
+            S/ {promocion.producto_costo_fijo}
           </div>
         )}
 
