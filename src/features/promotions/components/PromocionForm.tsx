@@ -95,14 +95,20 @@ export const PromocionForm = ({
   };
 
   const handleProvChange = async (index: number, provId: string) => {
-    const id = parseInt(provId);
     const row = { ...territorios[index] };
-    row.id_provincia = id;
-    row.id_distrito = null;
-    try {
-      row.distritos = await promotionsService.getDistritos(id);
-    } catch {
+    if (provId === "all") {
+      row.id_provincia = null;
+      row.id_distrito = null;
       row.distritos = [];
+    } else {
+      const id = parseInt(provId);
+      row.id_provincia = id;
+      row.id_distrito = null;
+      try {
+        row.distritos = await promotionsService.getDistritos(id);
+      } catch {
+        row.distritos = [];
+      }
     }
     const updated = [...territorios];
     updated[index] = row;
@@ -111,7 +117,7 @@ export const PromocionForm = ({
 
   const handleDistChange = (index: number, distId: string) => {
     const updated = [...territorios];
-    updated[index] = { ...updated[index], id_distrito: parseInt(distId) };
+    updated[index] = { ...updated[index], id_distrito: distId === "all" ? null : parseInt(distId) };
     setTerritorios(updated);
   };
 
@@ -283,6 +289,7 @@ export const PromocionForm = ({
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all" className="text-muted-foreground italic">Todas las Provincias</SelectItem>
                   {row.provincias.map((p) => (
                     <SelectItem key={p.id} value={p.id.toString()}>
                       {p.nombre}
@@ -304,6 +311,7 @@ export const PromocionForm = ({
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all" className="text-muted-foreground italic">Todos los Distritos</SelectItem>
                   {row.distritos.map((d) => (
                     <SelectItem key={d.id} value={d.id.toString()}>
                       {d.nombre}

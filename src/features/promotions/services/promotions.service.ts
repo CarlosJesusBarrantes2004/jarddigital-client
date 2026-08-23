@@ -67,4 +67,9 @@ export const promotionsService = {
     if (data?.results) return data.results;
     return [];
   },
+
+  buscarDistritos: async (q: string): Promise<any[]> => {
+    const { data } = await api.get(`/ubigeo/distritos/buscar/?q=${encodeURIComponent(q)}`);
+    return data;
+  },
 };
