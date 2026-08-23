@@ -536,7 +536,7 @@ export function BackofficePage({ soloLectura = false }: BackofficePageProps) {
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 0;
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-[1400px] mx-auto">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 w-full">
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4">
         <div>

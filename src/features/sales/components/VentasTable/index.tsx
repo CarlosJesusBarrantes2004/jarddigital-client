@@ -52,7 +52,10 @@ export function DataTable<TData>({
                 {hg.headers.map((h) => (
                   <th
                     key={h.id}
-                    className="px-5 py-3.5 text-left text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap"
+                    className={cn(
+                      "px-5 py-3.5 text-left text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap",
+                      (h.column.columnDef.meta as any)?.stickyRight && "sticky right-0 bg-muted/95 backdrop-blur z-20 border-l border-border shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)]"
+                    )}
                   >
                     {h.isPlaceholder
                       ? null
@@ -83,7 +86,13 @@ export function DataTable<TData>({
                   className="transition-colors hover:bg-muted/40 group bg-card"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-5 py-3.5 align-middle">
+                    <td 
+                      key={cell.id} 
+                      className={cn(
+                        "px-5 py-3.5 align-middle",
+                        (cell.column.columnDef.meta as any)?.stickyRight && "sticky right-0 bg-card z-10 border-l border-border group-hover:bg-muted/40 transition-colors shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.1)]"
+                      )}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

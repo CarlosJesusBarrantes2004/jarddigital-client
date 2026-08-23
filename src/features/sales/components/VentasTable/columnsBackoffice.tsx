@@ -595,6 +595,7 @@ export function buildColumnsBackoffice(
         );
       },
       size: 150,
+      meta: { stickyRight: true } as any,
     },
   ];
 }

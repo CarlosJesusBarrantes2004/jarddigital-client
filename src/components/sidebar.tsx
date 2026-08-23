@@ -313,7 +313,10 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
   if (esVistaGlobal) {
     return (
       <div
-        className="w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground opacity-80 cursor-default"
+        className={cn(
+          "w-full rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground opacity-80 cursor-default",
+          expanded ? "h-11 justify-start px-3" : "h-9 justify-center"
+        )}
         title="Vista Global"
       >
         <Building2 size={14} className="shrink-0" />
@@ -343,7 +346,8 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
       <button
         type="button"
         className={cn(
-          "w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground transition-all duration-150 overflow-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "w-full rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground transition-all duration-150 overflow-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          expanded ? "h-11 justify-start px-3" : "h-9 justify-center",
           open &&
             "border-primary/30 bg-primary/5 text-primary hover:text-primary hover:bg-primary/5",
         )}
@@ -551,7 +555,10 @@ export const Sidebar = ({
 
             <button
               type="button"
-              className="group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap"
+              className={cn(
+                "group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center gap-2.5 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap",
+                expanded ? "justify-start px-3" : "justify-center"
+              )}
               onClick={cycleTheme}
             >
               {getThemeIcon()}
@@ -560,7 +567,10 @@ export const Sidebar = ({
 
             <button
               type="button"
-              className="group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap"
+              className={cn(
+                "group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap",
+                expanded ? "justify-start px-3" : "justify-center"
+              )}
               onClick={logout}
             >
               <LogOut
