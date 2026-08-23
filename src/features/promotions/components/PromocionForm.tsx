@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ComboboxLocal } from "@/components/ui/combobox-local";
 import { uploadImagenToCloudinary } from "@/lib/cloudinary.utils";
 import { promotionsService } from "../services/promotions.service";
 import { catalogosService } from "@/features/sales/services/sales.service";
@@ -262,68 +256,44 @@ export const PromocionForm = ({
 
         {territorios.map((row, idx) => (
           <div key={idx} className="flex items-start gap-2 p-3 rounded-lg border border-border bg-muted/20">
-            {/* Departamento */}
             <div className="flex-1 space-y-1">
               <span className="text-[10px] text-muted-foreground uppercase font-mono">Dpto.</span>
-              <Select
+              <ComboboxLocal
                 value={row.id_departamento?.toString() ?? ""}
                 onValueChange={(v) => handleDepChange(idx, v)}
-              >
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {departamentos.map((d) => (
-                    <SelectItem key={d.id} value={d.id.toString()}>
-                      {d.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={departamentos.map((d) => ({ value: d.id.toString(), label: d.nombre }))}
+                placeholder="Seleccionar..."
+              />
             </div>
 
             {/* Provincia */}
             <div className="flex-1 space-y-1">
               <span className="text-[10px] text-muted-foreground uppercase font-mono">Prov.</span>
-              <Select
+              <ComboboxLocal
                 value={row.id_provincia?.toString() ?? ""}
                 onValueChange={(v) => handleProvChange(idx, v)}
                 disabled={!row.id_departamento}
-              >
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="—" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-muted-foreground italic">Todas las Provincias</SelectItem>
-                  {row.provincias.map((p) => (
-                    <SelectItem key={p.id} value={p.id.toString()}>
-                      {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "all", label: "Todas las Provincias" },
+                  ...row.provincias.map((p) => ({ value: p.id.toString(), label: p.nombre }))
+                ]}
+                placeholder="—"
+              />
             </div>
 
             {/* Distrito */}
             <div className="flex-1 space-y-1">
               <span className="text-[10px] text-muted-foreground uppercase font-mono">Dist.</span>
-              <Select
+              <ComboboxLocal
                 value={row.id_distrito?.toString() ?? ""}
                 onValueChange={(v) => handleDistChange(idx, v)}
                 disabled={!row.id_provincia}
-              >
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="—" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-muted-foreground italic">Todos los Distritos</SelectItem>
-                  {row.distritos.map((d) => (
-                    <SelectItem key={d.id} value={d.id.toString()}>
-                      {d.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "all", label: "Todos los Distritos" },
+                  ...row.distritos.map((d) => ({ value: d.id.toString(), label: d.nombre }))
+                ]}
+                placeholder="—"
+              />
             </div>
 
             {/* Remove */}
