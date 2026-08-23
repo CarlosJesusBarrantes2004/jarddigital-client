@@ -80,7 +80,8 @@ export const PromocionesGestionPage = () => {
       }
       setDialogOpen(false);
       cargar();
-    } catch {
+    } catch (err) {
+      console.error("Error al guardar promoción:", err);
       toast.error("Error al guardar la promoción");
     } finally {
       setSaving(false);
@@ -202,6 +203,11 @@ export const PromocionesGestionPage = () => {
                     })()}
 
                     <span className="text-[10px] text-muted-foreground ml-2">{fecha}</span>
+                    {p.fecha_vencimiento && (
+                      <span className="text-[10px] text-amber-500/90 dark:text-amber-400 ml-1">
+                        · Vence {new Date(p.fecha_vencimiento + "T00:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    )}
                   </div>
                 </div>
 
