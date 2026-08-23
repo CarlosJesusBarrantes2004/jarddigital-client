@@ -179,7 +179,7 @@ export const PromocionForm = ({
             <SelectItem value="null" className="text-muted-foreground italic">Ninguno (Crear promoción independiente)</SelectItem>
             {productos.map((p) => (
               <SelectItem key={p.id} value={p.id.toString()}>
-                {p.nombre_campana} - {p.nombre_paquete} (S/ {p.costo_fijo_plan})
+                {p.nombre_campana}
               </SelectItem>
             ))}
           </SelectContent>
