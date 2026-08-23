@@ -243,7 +243,7 @@ export const PromocionesGestionPage = () => {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent aria-describedby={undefined} className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-serif">
               {editing ? "Editar promoción" : "Nueva promoción"}

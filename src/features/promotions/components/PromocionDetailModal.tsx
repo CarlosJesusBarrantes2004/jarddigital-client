@@ -27,7 +27,7 @@ export const PromocionDetailModal = ({ promocion, open, onOpenChange }: Promocio
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full max-w-full sm:max-w-3xl p-0 overflow-hidden gap-0 bg-background rounded-none sm:rounded-2xl border-0 sm:border border-border/50 shadow-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col">
+        <DialogContent aria-describedby={undefined} className="w-full max-w-full sm:max-w-3xl p-0 overflow-hidden gap-0 bg-background rounded-none sm:rounded-2xl border-0 sm:border border-border/50 shadow-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col">
           <DialogHeader className="sr-only">
             <DialogTitle>{promocion.titulo}</DialogTitle>
           </DialogHeader>
@@ -134,29 +134,28 @@ export const PromocionDetailModal = ({ promocion, open, onOpenChange }: Promocio
               )}
             </div>
           </ScrollArea>
+          {/* Lightbox para ver la imagen completa */}
+          {lightboxOpen && promocion.imagen_url && (
+            <div 
+              className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
+              onClick={() => setLightboxOpen(false)}
+            >
+              <button 
+                className="absolute top-4 right-4 z-[101] text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+                onClick={() => setLightboxOpen(false)}
+              >
+                <X size={24} />
+              </button>
+              <img 
+                src={promocion.imagen_url} 
+                alt={promocion.titulo || "Promoción"} 
+                className="max-w-full max-h-full object-contain"
+                onClick={(e) => { e.stopPropagation(); setLightboxOpen(false); }}
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
-
-      {/* Lightbox para ver la imagen completa */}
-      {lightboxOpen && promocion.imagen_url && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setLightboxOpen(false)}
-        >
-          <button 
-            className="absolute top-4 right-4 z-[101] text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
-            onClick={() => setLightboxOpen(false)}
-          >
-            <X size={24} />
-          </button>
-          <img 
-            src={promocion.imagen_url} 
-            alt={promocion.titulo || "Promoción"} 
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
     </>
   );
 };

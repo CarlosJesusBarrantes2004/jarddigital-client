@@ -232,7 +232,7 @@ export const NoticiasAdminPage = () => {
 
       {/* Dialog: Crear / Editar */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent aria-describedby={undefined} className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-serif">
               {editingNoticia ? "Editar noticia" : "Nueva noticia"}
