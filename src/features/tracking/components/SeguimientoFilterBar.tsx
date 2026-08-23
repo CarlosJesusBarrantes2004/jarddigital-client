@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, Filter, X, ChevronDown, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MESES_ES } from "../utils";
 import { exportarExcelPendientes } from "../api";
 import type { SeguimientoFilters, EstadoSeguimientoType } from "../types";
 import { useAuth } from "@/features/auth/context/useAuth";
+import { userService } from "@/features/users/services/userService";
 
 interface FilterBarProps {
   filters: SeguimientoFilters;
@@ -183,6 +184,72 @@ export function SeguimientoFilterBar({
     }
   };
 
+  // --- Filtros dinámicos de Asesores por Sede/Modalidad ---
+  const [filtroSede, setFiltroSede] = useState<string>("");
+  const [filtroModalidad, setFiltroModalidad] = useState<string>("");
+  const [asesoresOpciones, setAsesoresOpciones] = useState<{ value: string; label: string }[]>([]);
+  const [cargandoAsesores, setCargandoAsesores] = useState(false);
+
+  const opcionesSede = useMemo(() => {
+    return [...new Set(workspaces.map((w) => w.nombre_sucursal))].sort().map((s) => ({ value: s, label: s }));
+  }, [workspaces]);
+
+  const opcionesModalidad = useMemo(() => {
+    if (!filtroSede) return [];
+    return [
+      ...new Set(
+        workspaces
+          .filter((w) => w.nombre_sucursal === filtroSede)
+          .map((w) => w.nombre_modalidad)
+      ),
+    ]
+      .sort()
+      .map((m) => ({ value: m, label: m }));
+  }, [workspaces, filtroSede]);
+
+  const selectedModalidadSede = useMemo(() => {
+    if (!filtroSede || !filtroModalidad) return undefined;
+    return workspaces.find(
+      (w) =>
+        w.nombre_sucursal === filtroSede &&
+        w.nombre_modalidad === filtroModalidad
+    )?.id_modalidad_sede;
+  }, [workspaces, filtroSede, filtroModalidad]);
+
+  useEffect(() => {
+    if (!selectedModalidadSede) {
+      setAsesoresOpciones([]);
+      if (filters.nombre_asesor) {
+        update({ nombre_asesor: undefined });
+      }
+      return;
+    }
+
+    let isMounted = true;
+    setCargandoAsesores(true);
+    userService
+      .getAll({ id_modalidad_sede: selectedModalidadSede, activo: true })
+      .then((data) => {
+        if (!isMounted) return;
+        const asesores = data
+          .filter((u) => u.id_rol?.codigo === "ASESOR")
+          .map((a) => ({ value: a.nombre_completo, label: a.nombre_completo }));
+        setAsesoresOpciones(asesores);
+      })
+      .catch((err) => console.error("Error cargando asesores:", err))
+      .finally(() => {
+        if (isMounted) setCargandoAsesores(false);
+      });
+    return () => { isMounted = false; };
+  }, [selectedModalidadSede]);
+
+  // Si cambia la sede o modalidad, limpiamos el filtro de asesor si ya no es válido
+  useEffect(() => {
+    if (!selectedModalidadSede && filters.nombre_asesor) {
+      update({ nombre_asesor: undefined });
+    }
+  }, [filtroSede, filtroModalidad]);
+
   return (
     <div className="space-y-3">
       {/* Row 1: Search + toggles + Export */}
@@ -209,29 +276,36 @@ export function SeguimientoFilterBar({
           )}
         </div>
 
-        {/* Filtro por nombre de asesor — solo para encargados */}
+        {/* Filtro por Sede, Modalidad y nombre de asesor — solo para encargados */}
         {role === "encargado" && (
-          <div className="relative flex-1 max-w-[260px]">
-            <Search
-              size={13}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          <div className="flex items-center gap-2 flex-1">
+            <Select
+              value={filtroSede}
+              onChange={(val) => {
+                setFiltroSede(val);
+                setFiltroModalidad("");
+              }}
+              options={opcionesSede}
+              placeholder="Todas las sedes"
+              className="w-[140px]"
             />
-            <input
-              value={filters.nombre_asesor ?? ""}
-              onChange={(e) =>
-                update({ nombre_asesor: e.target.value || undefined })
-              }
-              placeholder="Filtrar por asesor..."
-              className="w-full h-8 pl-8 pr-3 rounded-lg border border-border bg-background text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-            />
-            {filters.nombre_asesor && (
-              <button
-                type="button"
-                onClick={() => update({ nombre_asesor: undefined })}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X size={12} />
-              </button>
+            {filtroSede && (
+              <Select
+                value={filtroModalidad}
+                onChange={setFiltroModalidad}
+                options={opcionesModalidad}
+                placeholder="Modalidad"
+                className="w-[120px]"
+              />
+            )}
+            {filtroSede && filtroModalidad && (
+              <Select
+                value={filters.nombre_asesor ?? ""}
+                onChange={(val) => update({ nombre_asesor: val || undefined })}
+                options={asesoresOpciones}
+                placeholder={cargandoAsesores ? "Cargando..." : "Todos los asesores"}
+                className="w-[160px]"
+              />
             )}
           </div>
         )}
