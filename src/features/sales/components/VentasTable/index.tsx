@@ -83,7 +83,10 @@ export function DataTable<TData>({
                   className="transition-colors hover:bg-muted/40 group bg-card"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-5 py-3.5 align-middle">
+                    <td 
+                      key={cell.id} 
+                      className="px-5 py-3.5 align-middle"
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

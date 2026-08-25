@@ -59,7 +59,9 @@ export const ModulesManager = () => {
                 (item) => item.roles.length === 0 || item.roles.includes(roleCode)
               );
               if (visibleItems.length > 0) {
-                modulesWithFallback.push(section.title);
+                if (visibleItems.length === section.items.length) {
+                  modulesWithFallback.push(section.title);
+                }
                 visibleItems.forEach(item => modulesWithFallback.push(item.label));
               }
             });

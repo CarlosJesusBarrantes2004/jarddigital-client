@@ -14,6 +14,8 @@ import {
   Sun,
   Laptop,
   Wallet,
+  Newspaper,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +54,33 @@ export const SECTIONS: RouteSection[] = [
           "ASESOR",
           "SEGUIMIENTO",
         ],
+      },
+    ],
+  },
+  {
+    title: "Actualidad",
+    Icon: Newspaper,
+    collapsible: true,
+    items: [
+      {
+        label: "Noticias",
+        href: "/noticias",
+        roles: ["ASESOR", "SUPERVISOR", "COORDINADOR", "RRHH", "BACKOFFICE", "DUENO"],
+      },
+      {
+        label: "Gestión de Noticias",
+        href: "/noticias/admin",
+        roles: ["DUENO", "COORDINADOR", "RRHH"],
+      },
+      {
+        label: "Promociones",
+        href: "/promociones",
+        roles: ["ASESOR", "SUPERVISOR", "COORDINADOR", "BACKOFFICE", "DUENO"],
+      },
+      {
+        label: "Gestión de Promos",
+        href: "/promociones/admin",
+        roles: ["DUENO", "COORDINADOR", "BACKOFFICE"],
       },
     ],
   },
@@ -129,6 +158,11 @@ export const SECTIONS: RouteSection[] = [
       },
       { label: "Roles", href: "/configuracion/roles", roles: ["DUENO"] },
       {
+        label: "Módulos",
+        href: "/configuracion/modulos",
+        roles: ["DUENO"],
+      },
+      {
         label: "Productos",
         href: "/configuracion/productos",
         roles: ["DUENO"],
@@ -160,7 +194,7 @@ const NavItem = ({
 
   if (disabled) {
     return (
-      <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed">
+      <div className={cn("flex items-center rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed", expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-1.5")}>
         <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-50" />
         {expanded && (
           <>
@@ -178,17 +212,25 @@ const NavItem = ({
       to={href}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "flex items-center rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-2",
         isActive &&
           "bg-primary/10 text-primary font-medium hover:text-primary hover:bg-primary/15",
       )}
+      title={!expanded ? label : undefined}
     >
-      <span
-        className={cn(
-          "w-1.5 h-1.5 rounded-full shrink-0 transition-colors",
-          isActive ? "bg-primary" : "bg-current opacity-50",
-        )}
-      />
+      {!expanded ? (
+        <span className="font-semibold text-[10px] uppercase">
+          {label.substring(0, 1)}
+        </span>
+      ) : (
+        <span
+          className={cn(
+            "w-1.5 h-1.5 rounded-full shrink-0 transition-colors",
+            isActive ? "bg-primary" : "bg-current opacity-50",
+          )}
+        />
+      )}
       {expanded && <span className="flex-1 truncate">{label}</span>}
     </Link>
   );
@@ -214,8 +256,12 @@ const NavSection = ({
       {section.collapsible ? (
         <button
           type="button"
-          className="flex items-center gap-2.5 px-2.5 py-2 w-full rounded-lg bg-transparent hover:bg-sidebar-accent transition-colors text-muted-foreground hover:text-sidebar-accent-foreground cursor-pointer"
+          className={cn(
+            "flex items-center w-full rounded-lg bg-transparent hover:bg-sidebar-accent transition-colors text-muted-foreground hover:text-sidebar-accent-foreground cursor-pointer",
+            expanded ? "gap-2.5 px-2.5 py-2" : "justify-center py-2"
+          )}
           onClick={() => setOpen((v) => !v)}
+          title={!expanded ? section.title : undefined}
         >
           <section.Icon size={16} className="shrink-0" />
           {expanded && (
@@ -244,7 +290,7 @@ const NavSection = ({
         </div>
       )}
       {open && (
-        <div className="pl-2 mt-0.5 flex flex-col gap-[1px]">
+        <div className={cn("mt-0.5 flex flex-col gap-[1px]", expanded ? "pl-2" : "px-1")}>
           {visibleItems.map((item) => (
             <NavItem
               key={item.href + item.label}
@@ -279,7 +325,10 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
   if (esVistaGlobal) {
     return (
       <div
-        className="w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground opacity-80 cursor-default"
+        className={cn(
+          "w-full rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground opacity-80 cursor-default",
+          expanded ? "h-11 justify-start px-3" : "h-9 justify-center"
+        )}
         title="Vista Global"
       >
         <Building2 size={14} className="shrink-0" />
@@ -309,7 +358,8 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
       <button
         type="button"
         className={cn(
-          "w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground transition-all duration-150 overflow-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "w-full rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground transition-all duration-150 overflow-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          expanded ? "h-11 justify-start px-3" : "h-9 justify-center",
           open &&
             "border-primary/30 bg-primary/5 text-primary hover:text-primary hover:bg-primary/5",
         )}
@@ -451,11 +501,11 @@ export const Sidebar = ({
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className="h-[64px] flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
+        <div className={cn("h-[64px] flex items-center border-b border-sidebar-border shrink-0 transition-all duration-300", expanded ? "justify-between px-4" : "justify-center")}>
           <div
             className={cn(
               "flex items-center gap-3 overflow-hidden transition-all duration-300",
-              !expanded && "mx-auto",
+              !expanded && "hidden",
             )}
           >
             <div className="w-[32px] h-[32px] rounded-lg bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center font-serif font-bold text-[15px] text-primary-foreground shadow-sm shrink-0">
@@ -517,7 +567,10 @@ export const Sidebar = ({
 
             <button
               type="button"
-              className="group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap"
+              className={cn(
+                "group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center gap-2.5 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap",
+                expanded ? "justify-start px-3" : "justify-center"
+              )}
               onClick={cycleTheme}
             >
               {getThemeIcon()}
@@ -526,7 +579,10 @@ export const Sidebar = ({
 
             <button
               type="button"
-              className="group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center justify-center lg:justify-start gap-2.5 lg:px-3 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap"
+              className={cn(
+                "group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap",
+                expanded ? "justify-start px-3" : "justify-center"
+              )}
               onClick={logout}
             >
               <LogOut

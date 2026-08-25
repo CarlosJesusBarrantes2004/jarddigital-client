@@ -189,16 +189,6 @@ export function buildColumnsBackoffice(
 ): ColumnDef<Venta>[] {
   return [
     {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => (
-        <span className="font-mono text-[11px] text-muted-foreground/60">
-          #{row.original.id}
-        </span>
-      ),
-      size: 60,
-    },
-    {
       accessorKey: "nombre_asesor",
       header: "Asesor",
       cell: ({ row }) => (

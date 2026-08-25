@@ -96,4 +96,16 @@
       background-color 0.3s ease,
       color 0.3s ease;
   }
+  /* Fix native select options in dark mode */
+  option {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
 }
