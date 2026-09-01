@@ -16,6 +16,7 @@ import {
   Wallet,
   Newspaper,
   Tag,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,19 @@ export const SECTIONS: RouteSection[] = [
       {
         label: "Dashboard",
         href: "/dashboard",
+        roles: [
+          "DUENO",
+          "SUPERVISOR",
+          "COORDINADOR",
+          "RRHH",
+          "BACKOFFICE",
+          "ASESOR",
+          "SEGUIMIENTO",
+        ],
+      },
+      {
+        label: "Chat interno",
+        href: "/chat",
         roles: [
           "DUENO",
           "SUPERVISOR",

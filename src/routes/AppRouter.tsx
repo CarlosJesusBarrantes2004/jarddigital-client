@@ -16,7 +16,7 @@ import { AsesorFinancesPage } from "@/features/finances/pages/AsesorFinancesPage
 import { AdminFinancesPage } from "@/features/finances/pages/AdminFinancesPage";
 import { ReglasComisionPage } from "@/features/finances/pages/ReglasComisionPage";
 import { NoticiasFeedPage, NoticiasAdminPage } from "@/features/news";
-import { PromocionesGestionPage, PromocionesSearchPage } from "@/features/promotions";
+import { ChatPage } from "@/features/chat";
 
 export const AppRouter = () => {
   return (
@@ -57,7 +57,7 @@ export const AppRouter = () => {
           <Route path="/noticias" element={<NoticiasFeedPage />} />
           <Route path="/noticias/admin" element={<NoticiasAdminPage />} />
           <Route path="/promociones" element={<PromocionesSearchPage />} />
-          <Route path="/promociones/admin" element={<PromocionesGestionPage />} />
+          <Route path="/chat" element={<ChatPage />} />
 
           {/* Corporative Configuration */}
           <Route path="/configuracion">
