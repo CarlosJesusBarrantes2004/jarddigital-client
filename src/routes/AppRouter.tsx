@@ -17,6 +17,7 @@ import { AdminFinancesPage } from "@/features/finances/pages/AdminFinancesPage";
 import { ReglasComisionPage } from "@/features/finances/pages/ReglasComisionPage";
 import { NoticiasFeedPage, NoticiasAdminPage } from "@/features/news";
 import { ChatPage } from "@/features/chat";
+import { PromocionesSearchPage } from "@/features/promotions";
 
 export const AppRouter = () => {
   return (

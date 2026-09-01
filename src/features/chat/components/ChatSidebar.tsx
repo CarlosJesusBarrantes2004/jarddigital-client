@@ -8,6 +8,7 @@ import {
   initials,
   previewForMessage,
 } from "../lib/chat.utils";
+import { RoomAvatar } from "./RoomAvatar";
 
 interface ChatSidebarProps {
   userName: string;
@@ -17,6 +18,7 @@ interface ChatSidebarProps {
   filter: ChatFilter;
   canCreateGroups: boolean;
   canAudit: boolean;
+  canOpenSettings: boolean;
   people: { id: number; nombre_completo: string }[];
   onSearch: (value: string) => void;
   onFilter: (value: ChatFilter) => void;
@@ -34,6 +36,7 @@ export const ChatSidebar = ({
   filter,
   canCreateGroups,
   canAudit,
+  canOpenSettings,
   people,
   onSearch,
   onFilter,
@@ -74,12 +77,12 @@ export const ChatSidebar = ({
               <Users size={18} />
             </button>
           )}
-          {canAudit && (
+          {canOpenSettings && (
             <button
               type="button"
               onClick={onOpenPermissions}
               className="size-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
-              title="Permisos y auditoría"
+              title="Permisos y autorizaciones"
             >
               <Settings2 size={18} />
             </button>
@@ -144,17 +147,7 @@ export const ChatSidebar = ({
                 active ? "bg-sky-500/10" : "hover:bg-muted/50",
               )}
             >
-              <Avatar className="size-11">
-                <AvatarFallback
-                  className={cn("text-white text-xs", avatarTone(room.display_name))}
-                >
-                  {room.room_type === "GROUP" ? (
-                    <Users size={16} />
-                  ) : (
-                    initials(room.display_name)
-                  )}
-                </AvatarFallback>
-              </Avatar>
+              <RoomAvatar room={room} className="size-11" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-[14px] font-semibold truncate">

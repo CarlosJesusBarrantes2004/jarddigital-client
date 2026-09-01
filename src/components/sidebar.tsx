@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 
 import { useAuth } from "@/features/auth/context/useAuth";
 import { useTheme } from "@/components/ThemeProvider";
+import { useChatUnreadTotal } from "@/features/chat/context/useChatRealtime";
 import type { RoleCode, Workspace } from "@/features/auth/types";
 
 interface RouteItem {
@@ -196,15 +197,18 @@ const NavItem = ({
   disabled,
   expanded,
   onClick,
+  badgeCount = 0,
 }: {
   label: string;
   href: string;
   disabled?: boolean;
   expanded: boolean;
   onClick?: () => void;
+  badgeCount?: number;
 }) => {
   const { pathname } = useLocation();
   const isActive = pathname === href || pathname.startsWith(href + "/");
+  const badgeLabel = badgeCount > 99 ? "99+" : String(badgeCount);
 
   if (disabled) {
     return (
@@ -226,17 +230,15 @@ const NavItem = ({
       to={href}
       onClick={onClick}
       className={cn(
-        "flex items-center rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "relative flex items-center rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-2",
         isActive &&
           "bg-primary/10 text-primary font-medium hover:text-primary hover:bg-primary/15",
       )}
-      title={!expanded ? label : undefined}
+      title={!expanded ? (badgeCount > 0 ? `${label} (${badgeLabel})` : label) : undefined}
     >
       {!expanded ? (
-        <span className="font-semibold text-[10px] uppercase">
-          {label.substring(0, 1)}
-        </span>
+        <span className="font-semibold text-[10px] uppercase">{label.substring(0, 1)}</span>
       ) : (
         <span
           className={cn(
@@ -246,6 +248,16 @@ const NavItem = ({
         />
       )}
       {expanded && <span className="flex-1 truncate">{label}</span>}
+      {badgeCount > 0 && (
+        <span
+          className={cn(
+            "min-w-4 h-4 px-1 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center",
+            !expanded && "absolute top-0.5 right-0.5 min-w-3.5 h-3.5 px-0.5 text-[9px]",
+          )}
+        >
+          {badgeLabel}
+        </span>
+      )}
     </Link>
   );
 };
@@ -255,11 +267,13 @@ const NavSection = ({
   roleCode,
   expanded,
   onClickItem,
+  chatUnread = 0,
 }: {
   section: RouteSection;
   roleCode: RoleCode;
   expanded: boolean;
   onClickItem?: () => void;
+  chatUnread?: number;
 }) => {
   const [open, setOpen] = useState(true);
   const visibleItems = section.items;
@@ -311,6 +325,7 @@ const NavSection = ({
               {...item}
               expanded={expanded}
               onClick={onClickItem}
+              badgeCount={item.href === "/chat" ? chatUnread : 0}
             />
           ))}
         </div>
@@ -456,6 +471,7 @@ export const Sidebar = ({
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const roleCode = (user?.rol?.codigo ?? "ASESOR") as RoleCode;
+  const chatUnread = useChatUnreadTotal();
 
   // Filtrar SECTIONS por módulo y luego por roles en items
   const visibleSections = SECTIONS.map((section) => {
@@ -572,6 +588,7 @@ export const Sidebar = ({
                 roleCode={roleCode}
                 expanded={expanded}
                 onClickItem={() => setMobileOpen(false)}
+                chatUnread={chatUnread}
               />
             ))}
           </nav>

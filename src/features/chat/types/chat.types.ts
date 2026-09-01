@@ -4,7 +4,15 @@ export type ChatMessageType = "TEXT" | "IMAGE" | "AUDIO" | "DOCUMENT" | "PDF";
 
 export type ChatMemberRole = "ADMIN" | "MEMBER";
 
-export type ChatFilter = "todos" | "grupos" | "privados" | "auditoria";
+export type ChatDeliveryStatus = "sent" | "delivered" | "read";
+
+export interface ChatDirectoryUser {
+  id: number;
+  username: string;
+  nombre_completo: string;
+  activo: boolean;
+  rol: { codigo: string; nombre: string } | null;
+}
 
 export interface ChatMember {
   user: number;
@@ -28,6 +36,8 @@ export interface ChatLastMessage {
 export interface ChatRoom {
   id: number;
   name: string;
+  description?: string;
+  image_url?: string | null;
   display_name: string;
   room_type: ChatRoomType;
   created_by: number | null;
@@ -36,6 +46,7 @@ export interface ChatRoom {
   updated_at: string;
   is_active: boolean;
   is_readonly: boolean;
+  can_edit?: boolean;
   members: ChatMember[];
   last_message: ChatLastMessage | null;
   unread_count: number;
@@ -52,6 +63,7 @@ export interface ChatMessage {
   file_name: string | null;
   is_deleted: boolean;
   created_at: string;
+  delivery_status: ChatDeliveryStatus;
   is_read: boolean;
 }
 
@@ -61,6 +73,13 @@ export interface PaginatedMessages {
   previous: string | null;
   results: ChatMessage[];
 }
+
+export type ChatPermissionFlagKey =
+  | "can_create_groups"
+  | "can_delete_messages"
+  | "can_audit_all_chats"
+  | "can_allow_direct_messages"
+  | "can_edit_groups";
 
 export interface ChatPermissionFlags {
   user_id: number;
@@ -72,6 +91,7 @@ export interface ChatPermissionFlags {
   can_delete_messages: boolean;
   can_audit_all_chats: boolean;
   can_allow_direct_messages: boolean;
+  can_edit_groups: boolean;
 }
 
 export interface ChatPermissionsState {
@@ -83,6 +103,40 @@ export interface CreateRoomPayload {
   name?: string;
   room_type: ChatRoomType;
   member_ids: number[];
+}
+
+export interface UpdateRoomPayload {
+  name?: string;
+  description?: string;
+  image_url?: string | null;
+}
+
+export type GroupUpdatedAction =
+  | "updated"
+  | "members_added"
+  | "member_removed"
+  | "role_changed";
+
+export interface GroupUpdatedSnapshot {
+  id: number;
+  name: string;
+  display_name: string;
+  description: string;
+  image_url: string | null;
+  room_type: ChatRoomType;
+  created_by: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  is_active?: boolean;
+  members: ChatMember[];
+}
+
+export interface ChatGroupUpdated {
+  type: "group_updated";
+  action: GroupUpdatedAction;
+  room_id: number;
+  actor_id: number | null;
+  room: GroupUpdatedSnapshot;
 }
 
 export interface SendMessagePayload {
@@ -105,6 +159,32 @@ export interface ChatWsNotification {
   created_at: string | null;
 }
 
+export interface ChatDirectAllowance {
+  id: number;
+  user_a: number;
+  user_a_nombre: string;
+  user_b: number;
+  user_b_nombre: string;
+  created_by: number | null;
+  created_by_nombre: string | null;
+  authorized_by: number | null;
+  authorized_by_nombre: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ChatRoomStatusUpdated {
+  type: "room_status_updated";
+  room_id: number;
+  is_readonly: boolean;
+  is_read_only?: boolean;
+}
+
+export interface ChatReceiptUpdate {
+  id: number;
+  delivery_status: ChatDeliveryStatus;
+}
+
 export type ChatWsIncoming =
   | { type: "chat_message"; message: ChatMessage }
   | ChatWsNotification
@@ -115,10 +195,21 @@ export type ChatWsIncoming =
       deleted_by?: number;
     }
   | {
-      type: "chat_message_read";
+      type: "chat_message_delivered";
       room_id: number;
       user_id: number;
       message_ids: number[];
+      delivered_at?: string | null;
+      receipts?: ChatReceiptUpdate[];
+    }
+  | {
+      type: "chat_message_read";
+      room_id: number;
+      user_id: number;
+      read_by?: number;
+      message_ids: number[];
+      read_at?: string | null;
+      receipts?: ChatReceiptUpdate[];
     }
   | {
       type: "chat_typing";
@@ -126,4 +217,6 @@ export type ChatWsIncoming =
       user_id: number;
       user_name: string;
     }
+  | ChatGroupUpdated
+  | ChatRoomStatusUpdated
   | { type: "error"; detail: string };

@@ -9,11 +9,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { User } from "@/features/users/types";
+import type { ChatDirectoryUser } from "../types/chat.types";
 
 interface CreateGroupModalProps {
   open: boolean;
-  users: User[];
+  users: ChatDirectoryUser[];
   currentUserId: number;
   submitting: boolean;
   onOpenChange: (open: boolean) => void;

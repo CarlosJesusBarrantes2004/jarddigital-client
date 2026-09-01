@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -13,14 +14,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/features/auth/context/useAuth";
-import { userService } from "@/features/users/services/userService";
-import { chatApi } from "../services/chat.api";
-import { useChatSocket } from "../hooks/useChatSocket";
-import { playNotificationPop } from "../lib/chat.utils";
+import { useChatRealtime } from "../context/useChatRealtime";
+import { CHAT_ROOMS_QUERY_KEY, CHAT_ALLOWANCES_QUERY_KEY, chatApi } from "../services/chat.api";
+import { findDirectRoomWithUser, mergeDeliveryStatus } from "../lib/chat.utils";
 import type {
+  ChatDeliveryStatus,
   ChatFilter,
   ChatMessage,
+  ChatPermissionFlagKey,
   ChatPermissionFlags,
+  ChatReceiptUpdate,
   ChatRoom,
   ChatWsIncoming,
   SendMessagePayload,
@@ -30,11 +33,19 @@ import { ConversationPanel } from "../components/ConversationPanel";
 import { CreateGroupModal } from "../components/CreateGroupModal";
 import { PermissionsPanel } from "../components/PermissionsPanel";
 
-const ROOMS_KEY = ["chat", "rooms"] as const;
+const ROOMS_KEY = CHAT_ROOMS_QUERY_KEY;
 
 export const ChatPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    joinRoom,
+    sendTyping,
+    sendViaSocket,
+    setActiveRoomId: setGlobalActiveRoomId,
+    subscribe,
+  } = useChatRealtime();
   const currentUserId = user?.id ?? 0;
 
   const [filter, setFilter] = useState<ChatFilter>("todos");
@@ -48,9 +59,13 @@ export const ChatPage = () => {
   const [permsOpen, setPermsOpen] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatMessage | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
   const [typingName, setTypingName] = useState<string | null>(null);
   const activeRoomIdRef = useRef<number | null>(null);
   const typingTimer = useRef<number | undefined>(undefined);
+  const openingDirectRef = useRef<number | null>(null);
+  const visibleReadQueue = useRef<Set<number>>(new Set());
+  const visibleReadTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     activeRoomIdRef.current = activeRoomId;
@@ -69,7 +84,7 @@ export const ChatPage = () => {
 
   const usersQuery = useQuery({
     queryKey: ["chat", "people"],
-    queryFn: () => userService.getAll({ activo: true }),
+    queryFn: chatApi.getPeople,
     retry: 1,
   });
 
@@ -77,7 +92,14 @@ export const ChatPage = () => {
   const canCreateGroups = Boolean(own?.can_create_groups);
   const canDelete = Boolean(own?.can_delete_messages);
   const canAudit = Boolean(own?.can_audit_all_chats);
+  const canAllowDirect = Boolean(own?.can_allow_direct_messages);
   const isDueno = user?.rol?.codigo === "DUENO";
+
+  const allowancesQuery = useQuery({
+    queryKey: CHAT_ALLOWANCES_QUERY_KEY,
+    queryFn: chatApi.getAllowances,
+    enabled: permsOpen && (canAllowDirect || isDueno || canAudit),
+  });
 
   const rooms = roomsQuery.data ?? [];
   const filteredRooms = useMemo(() => {
@@ -134,6 +156,63 @@ export const ChatPage = () => {
     [queryClient],
   );
 
+  const closeConversation = useCallback(() => {
+    if (searchParams.has("room")) {
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    setActiveRoomId(null);
+    setGlobalActiveRoomId(null);
+    activeRoomIdRef.current = null;
+    setMessages((prev) => (prev.length === 0 ? prev : []));
+    setTypingName(null);
+  }, [searchParams, setGlobalActiveRoomId, setSearchParams]);
+
+  const applyReceipts = useCallback((receipts: ChatReceiptUpdate[] | undefined) => {
+    if (!receipts?.length) return;
+    const byId = new Map(receipts.map((item) => [item.id, item.delivery_status]));
+    setMessages((prev) =>
+      prev.map((item) => {
+        const next = byId.get(item.id);
+        if (!next) return item;
+        const merged = mergeDeliveryStatus(
+          (item.delivery_status as ChatDeliveryStatus) || (item.is_read ? "read" : "sent"),
+          next,
+        );
+        return {
+          ...item,
+          delivery_status: merged,
+          is_read: merged === "read",
+        };
+      }),
+    );
+  }, []);
+
+  const enqueueVisibleRead = useCallback(
+    (messageId: number) => {
+      const roomId = activeRoomIdRef.current;
+      if (!roomId) return;
+      visibleReadQueue.current.add(messageId);
+      if (visibleReadTimer.current) return;
+      visibleReadTimer.current = window.setTimeout(() => {
+        visibleReadTimer.current = undefined;
+        const ids = [...visibleReadQueue.current];
+        visibleReadQueue.current.clear();
+        const currentRoom = activeRoomIdRef.current;
+        if (!ids.length || !currentRoom) return;
+        const sent = sendViaSocket({
+          type: "mark_as_read",
+          room_id: currentRoom,
+          message_ids: ids,
+        });
+        if (!sent) {
+          void chatApi.markRead(currentRoom, ids);
+        }
+      }, 200);
+    },
+    [sendViaSocket],
+  );
+
   const upsertMessage = useCallback((incoming: ChatMessage) => {
     setMessages((prev) => {
       if (prev.some((item) => item.id === incoming.id)) {
@@ -145,52 +224,13 @@ export const ChatPage = () => {
 
   const handleWsEvent = useCallback(
     (event: ChatWsIncoming) => {
-      if (event.type === "error") {
-        toast.error(event.detail);
-        return;
-      }
-
       if (event.type === "chat_message") {
         const msg = event.message;
         if (msg.room === activeRoomIdRef.current) {
-          upsertMessage(msg);
-          void chatApi.markRead(msg.room, [msg.id]);
-        }
-        patchRooms((prev) =>
-          prev
-            .map((room) =>
-              room.id === msg.room
-                ? {
-                    ...room,
-                    last_message: {
-                      id: msg.id,
-                      sender: msg.sender,
-                      sender_nombre: msg.sender_nombre,
-                      content: msg.content,
-                      message_type: msg.message_type,
-                      is_deleted: msg.is_deleted,
-                      created_at: msg.created_at,
-                    },
-                    unread_count:
-                      msg.room === activeRoomIdRef.current ||
-                      msg.sender === currentUserId
-                        ? 0
-                        : room.unread_count + 1,
-                    updated_at: msg.created_at,
-                  }
-                : room,
-            )
-            .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
-        );
-        return;
-      }
-
-      if (event.type === "chat_notification") {
-        const inRoom = event.room_id === activeRoomIdRef.current;
-        const inBackground = document.hidden;
-        if ((!inRoom || inBackground) && event.sender_id !== currentUserId) {
-          playNotificationPop();
-          toast(`${event.sender_name}`, { description: event.preview });
+          upsertMessage({
+            ...msg,
+            delivery_status: msg.delivery_status ?? (msg.is_read ? "read" : "sent"),
+          });
         }
         return;
       }
@@ -208,12 +248,11 @@ export const ChatPage = () => {
         return;
       }
 
-      if (event.type === "chat_message_read" && event.room_id === activeRoomIdRef.current) {
-        setMessages((prev) =>
-          prev.map((item) =>
-            event.message_ids.includes(item.id) ? { ...item, is_read: true } : item,
-          ),
-        );
+      if (
+        (event.type === "chat_message_delivered" || event.type === "chat_message_read") &&
+        event.room_id === activeRoomIdRef.current
+      ) {
+        applyReceipts(event.receipts);
         return;
       }
 
@@ -221,15 +260,36 @@ export const ChatPage = () => {
         setTypingName(event.user_name);
         if (typingTimer.current) window.clearTimeout(typingTimer.current);
         typingTimer.current = window.setTimeout(() => setTypingName(null), 2500);
+        return;
+      }
+
+      if (event.type === "group_updated" && event.room_id === activeRoomIdRef.current) {
+        const stillMember = event.room.members.some(
+          (member) => member.user === currentUserId && member.is_active,
+        );
+        if (!stillMember && !canAudit && !isDueno) {
+          toast.info("Ya no formas parte de este grupo.");
+          closeConversation();
+        }
       }
     },
-    [currentUserId, patchRooms, upsertMessage],
+    [applyReceipts, canAudit, closeConversation, currentUserId, isDueno, upsertMessage],
   );
 
-  const { joinRoom, sendTyping, sendViaSocket } = useChatSocket({
-    enabled: Boolean(user),
-    onEvent: handleWsEvent,
-  });
+  useEffect(() => subscribe(handleWsEvent), [subscribe, handleWsEvent]);
+
+  useEffect(() => {
+    setGlobalActiveRoomId(activeRoomId);
+    visibleReadQueue.current.clear();
+    if (visibleReadTimer.current) {
+      window.clearTimeout(visibleReadTimer.current);
+      visibleReadTimer.current = undefined;
+    }
+  }, [activeRoomId, setGlobalActiveRoomId]);
+
+  useEffect(() => {
+    return () => setGlobalActiveRoomId(null);
+  }, [setGlobalActiveRoomId]);
 
   const loadMessages = useCallback(async (roomId: number, page = 1) => {
     setLoadingMessages(true);
@@ -251,6 +311,10 @@ export const ChatPage = () => {
   const selectRoom = useCallback(
     async (room: ChatRoom) => {
       setActiveRoomId(room.id);
+      setGlobalActiveRoomId(room.id);
+      activeRoomIdRef.current = room.id;
+      setMessages([]);
+      setHasMore(false);
       setTypingName(null);
       joinRoom(room.id);
       patchRooms((prev) =>
@@ -258,15 +322,33 @@ export const ChatPage = () => {
           item.id === room.id ? { ...item, unread_count: 0 } : item,
         ),
       );
-      await loadMessages(room.id, 1);
-      try {
-        await chatApi.markRead(room.id);
-      } catch {
-        // el marcado de leído no debe bloquear la conversación
+      if (searchParams.get("room") !== String(room.id)) {
+        setSearchParams(
+          { room: String(room.id) },
+          { replace: searchParams.has("room") },
+        );
       }
+      await loadMessages(room.id, 1);
     },
-    [joinRoom, loadMessages, patchRooms],
+    [joinRoom, loadMessages, patchRooms, searchParams, setSearchParams, setGlobalActiveRoomId],
   );
+
+  useEffect(() => {
+    const raw = searchParams.get("room");
+    if (!raw) {
+      if (activeRoomId === null) return;
+      setActiveRoomId(null);
+      setGlobalActiveRoomId(null);
+      activeRoomIdRef.current = null;
+      setMessages((prev) => (prev.length === 0 ? prev : []));
+      setTypingName(null);
+      return;
+    }
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0 || id === activeRoomId) return;
+    const room = rooms.find((item) => item.id === id);
+    if (room) void selectRoom(room);
+  }, [searchParams, rooms, activeRoomId, selectRoom, setGlobalActiveRoomId]);
 
   const handleSend = async (payload: SendMessagePayload) => {
     if (!activeRoomId) return;
@@ -304,7 +386,19 @@ export const ChatPage = () => {
   };
 
   const openDirect = async (userId: number) => {
+    if (!userId || userId === currentUserId) return;
+    if (openingDirectRef.current === userId) return;
+    openingDirectRef.current = userId;
     try {
+      if (filter === "grupos") setFilter("todos");
+      setSearch("");
+
+      const existing = findDirectRoomWithUser(rooms, userId);
+      if (existing) {
+        await selectRoom(existing);
+        return;
+      }
+
       const room = await chatApi.createRoom({
         room_type: "DIRECT",
         member_ids: [userId],
@@ -313,7 +407,6 @@ export const ChatPage = () => {
         const exists = prev.some((item) => item.id === room.id);
         return exists ? prev : [room, ...prev];
       });
-      setSearch("");
       await selectRoom(room);
     } catch (error) {
       toast.error(
@@ -322,6 +415,8 @@ export const ChatPage = () => {
           "No pueden iniciar un chat directo. Necesitan un grupo en común o una autorización.",
         ),
       );
+    } finally {
+      openingDirectRef.current = null;
     }
   };
 
@@ -345,13 +440,7 @@ export const ChatPage = () => {
 
   const togglePermission = async (
     row: ChatPermissionFlags,
-    flag: keyof Pick<
-      ChatPermissionFlags,
-      | "can_create_groups"
-      | "can_delete_messages"
-      | "can_audit_all_chats"
-      | "can_allow_direct_messages"
-    >,
+    flag: ChatPermissionFlagKey,
     value: boolean,
   ) => {
     try {
@@ -370,6 +459,49 @@ export const ChatPage = () => {
       });
     } catch (error) {
       toast.error(chatApi.extraerError(error, "No se pudo actualizar el permiso."));
+    }
+  };
+
+  const createAllowance = async (userAId: number, userBId: number) => {
+    try {
+      await chatApi.createAllowance(userAId, userBId);
+      await queryClient.invalidateQueries({ queryKey: CHAT_ALLOWANCES_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: ROOMS_KEY });
+      toast.success("Par autorizado. Ya pueden chatear en privado.");
+    } catch (error) {
+      toast.error(chatApi.extraerError(error, "No se pudo autorizar el par."));
+      throw error;
+    }
+  };
+
+  const revokeAllowance = async (id: number) => {
+    try {
+      await chatApi.revokeAllowance(id);
+      await queryClient.invalidateQueries({ queryKey: CHAT_ALLOWANCES_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: ROOMS_KEY });
+      toast.success("Excepción revocada.");
+    } catch (error) {
+      toast.error(chatApi.extraerError(error, "No se pudo revocar la excepción."));
+    }
+  };
+
+  const unlockDirect = async () => {
+    if (!activeRoomId) return;
+    setUnlocking(true);
+    try {
+      const updated = await chatApi.unlockRoom(activeRoomId);
+      patchRooms((prev) =>
+        prev.map((item) =>
+          item.id === updated.id
+            ? { ...item, ...updated, last_message: updated.last_message ?? item.last_message }
+            : item,
+        ),
+      );
+      toast.success("Chat directo habilitado para ambos usuarios.");
+    } catch (error) {
+      toast.error(chatApi.extraerError(error, "No se pudo habilitar el chat."));
+    } finally {
+      setUnlocking(false);
     }
   };
 
@@ -397,6 +529,7 @@ export const ChatPage = () => {
             filter={filter}
             canCreateGroups={canCreateGroups}
             canAudit={canAudit || isDueno}
+            canOpenSettings={canAudit || isDueno || canAllowDirect}
             people={people}
             onSearch={setSearch}
             onFilter={setFilter}
@@ -429,7 +562,41 @@ export const ChatPage = () => {
               onTyping={() => {
                 if (activeRoomId) sendTyping(activeRoomId);
               }}
-              onBack={() => setActiveRoomId(null)}
+              onBack={closeConversation}
+              onStartPrivateChat={(userId) => void openDirect(userId)}
+              onMessageVisible={enqueueVisibleRead}
+              users={usersQuery.data ?? []}
+              canUnlockDirect={canAllowDirect || isDueno}
+              unlocking={unlocking}
+              onUnlockDirect={() => void unlockDirect()}
+              onRoomUpdated={(updated) => {
+                patchRooms((prev) => {
+                  const stillMember = updated.members.some(
+                    (member) => member.user === currentUserId && member.is_active,
+                  );
+                  if (!stillMember && !canAudit && !isDueno) {
+                    return prev.filter((item) => item.id !== updated.id);
+                  }
+                  const exists = prev.some((item) => item.id === updated.id);
+                  if (!exists) return [updated, ...prev];
+                  return prev.map((item) =>
+                    item.id === updated.id
+                      ? {
+                          ...item,
+                          ...updated,
+                          last_message: updated.last_message ?? item.last_message,
+                          unread_count: updated.unread_count ?? item.unread_count,
+                        }
+                      : item,
+                  );
+                });
+                const stillMember = updated.members.some(
+                  (member) => member.user === currentUserId && member.is_active,
+                );
+                if (!stillMember && !canAudit && !isDueno) {
+                  closeConversation();
+                }
+              }}
             />
           )}
         </div>
@@ -448,8 +615,14 @@ export const ChatPage = () => {
         open={permsOpen}
         matrix={permissionsQuery.data?.matrix ?? []}
         canEdit={isDueno}
+        canManageAllowances={canAllowDirect || isDueno}
+        people={usersQuery.data ?? []}
+        allowances={allowancesQuery.data ?? []}
+        allowancesLoading={allowancesQuery.isFetching}
         onOpenChange={setPermsOpen}
         onToggle={(row, flag, value) => void togglePermission(row, flag, value)}
+        onCreateAllowance={createAllowance}
+        onRevokeAllowance={revokeAllowance}
       />
 
       <AlertDialog

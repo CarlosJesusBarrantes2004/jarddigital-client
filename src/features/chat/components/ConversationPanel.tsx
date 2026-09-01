@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Info, Loader2, MoreVertical, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ArrowLeft, Info, Loader2, MoreVertical, Unlock, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ChatMessage, ChatRoom } from "../types/chat.types";
-import { avatarTone, formatDaySeparator, initials, isSameDay } from "../lib/chat.utils";
+import type {
+  ChatDirectoryUser,
+  ChatMessage,
+  ChatRoom,
+  SendMessagePayload,
+} from "../types/chat.types";
+import { formatDaySeparator, isSameDay } from "../lib/chat.utils";
 import { MessageBubble } from "./MessageBubble";
 import { ChatComposer } from "./ChatComposer";
-import type { SendMessagePayload } from "../types/chat.types";
+import { GroupInfoDrawer } from "./GroupInfoDrawer";
+import { RoomAvatar } from "./RoomAvatar";
 
 interface ConversationPanelProps {
   room: ChatRoom | null;
@@ -27,6 +32,13 @@ interface ConversationPanelProps {
   onDelete: (message: ChatMessage) => void;
   onTyping: () => void;
   onBack?: () => void;
+  onStartPrivateChat?: (userId: number) => void;
+  onMessageVisible?: (messageId: number) => void;
+  users?: ChatDirectoryUser[];
+  onRoomUpdated?: (room: ChatRoom) => void;
+  canUnlockDirect?: boolean;
+  unlocking?: boolean;
+  onUnlockDirect?: () => void;
 }
 
 export const ConversationPanel = ({
@@ -42,6 +54,13 @@ export const ConversationPanel = ({
   onDelete,
   onTyping,
   onBack,
+  onStartPrivateChat,
+  onMessageVisible,
+  users = [],
+  onRoomUpdated,
+  canUnlockDirect,
+  unlocking,
+  onUnlockDirect,
 }: ConversationPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -50,6 +69,10 @@ export const ConversationPanel = ({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, room?.id]);
+
+  useEffect(() => {
+    setInfoOpen(false);
+  }, [room?.id]);
 
   if (!room) {
     return (
@@ -62,6 +85,30 @@ export const ConversationPanel = ({
       </div>
     );
   }
+
+  const isGroup = room.room_type === "GROUP";
+  const canStartPrivate = isGroup && Boolean(onStartPrivateChat);
+
+  const startPrivateWith = (userId: number) => {
+    setInfoOpen(false);
+    onStartPrivateChat?.(userId);
+  };
+
+  const roomIdentity = (
+    <>
+      <RoomAvatar room={room} className="size-10" />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold truncate">{room.display_name}</p>
+        <p className="text-[11px] text-muted-foreground truncate">
+          {typingName
+            ? `${typingName} está escribiendo…`
+            : isGroup
+              ? `${room.members.length} integrantes`
+              : "Chat privado"}
+        </p>
+      </div>
+    </>
+  );
 
   return (
     <section className="flex-1 flex flex-col min-w-0 h-full bg-[#efeae2] dark:bg-[#0b141a]">
@@ -77,21 +124,17 @@ export const ConversationPanel = ({
               <ArrowLeft size={18} />
             </button>
           )}
-          <Avatar className="size-10">
-            <AvatarFallback className={cn("text-white text-xs", avatarTone(room.display_name))}>
-              {room.room_type === "GROUP" ? <Users size={16} /> : initials(room.display_name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{room.display_name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {typingName
-                ? `${typingName} está escribiendo…`
-                : room.room_type === "GROUP"
-                  ? `${room.members.length} integrantes`
-                  : "Chat privado"}
-            </p>
-          </div>
+          {isGroup ? (
+            <button
+              type="button"
+              className="flex items-center gap-3 min-w-0 text-left rounded-lg hover:bg-muted/60 -ml-1 px-1 py-1"
+              onClick={() => setInfoOpen(true)}
+            >
+              {roomIdentity}
+            </button>
+          ) : (
+            <div className="flex items-center gap-3 min-w-0">{roomIdentity}</div>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -133,7 +176,7 @@ export const ConversationPanel = ({
           const prev = messages[index - 1];
           const showDay = !prev || !isSameDay(prev.created_at, message.created_at);
           const showSender =
-            room.room_type === "GROUP" &&
+            isGroup &&
             (!prev || prev.sender !== message.sender || showDay);
           return (
             <div key={message.id}>
@@ -151,6 +194,8 @@ export const ConversationPanel = ({
                 canDelete={canDelete}
                 onDelete={onDelete}
                 onOpenImage={setLightbox}
+                onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
+                onVisible={onMessageVisible}
               />
             </div>
           );
@@ -158,12 +203,30 @@ export const ConversationPanel = ({
         <div ref={bottomRef} />
       </div>
 
-      <ChatComposer
-        disabled={room.is_readonly}
-        disabledReason="Esta conversación está en solo lectura: ya no comparten un grupo activo ni una autorización vigente."
-        onSend={onSend}
-        onTyping={onTyping}
-      />
+      {room.is_readonly ? (
+        <div className="px-4 py-3 bg-muted/40 border-t border-border text-center space-y-2">
+          <p className="text-[13px] text-muted-foreground">
+            Esta conversación está en solo lectura: ya no comparten un grupo
+            activo ni una autorización vigente.
+          </p>
+          {canUnlockDirect && room.room_type === "DIRECT" && onUnlockDirect && (
+            <Button
+              size="sm"
+              onClick={onUnlockDirect}
+              disabled={unlocking}
+            >
+              {unlocking ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Unlock size={14} />
+              )}
+              Habilitar chat entre estos usuarios
+            </Button>
+          )}
+        </div>
+      ) : (
+        <ChatComposer onSend={onSend} onTyping={onTyping} />
+      )}
 
       {lightbox && (
         <button
@@ -179,28 +242,17 @@ export const ConversationPanel = ({
         </button>
       )}
 
-      {infoOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-[70] bg-black/40 flex items-end md:items-center justify-center"
-          onClick={() => setInfoOpen(false)}
-        >
-          <div
-            className="bg-card w-full max-w-md rounded-t-2xl md:rounded-2xl p-5 text-left shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p className="font-semibold mb-3">Integrantes</p>
-            <ul className="space-y-2 max-h-72 overflow-y-auto">
-              {room.members.map((member) => (
-                <li key={member.user} className="flex items-center justify-between text-sm">
-                  <span>{member.nombre_completo}</span>
-                  <span className="text-[11px] text-muted-foreground">{member.role}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </button>
-      )}
+      <GroupInfoDrawer
+        open={infoOpen}
+        room={room}
+        currentUserId={currentUserId}
+        users={users}
+        onOpenChange={setInfoOpen}
+        onRoomUpdated={(updated) => {
+          onRoomUpdated?.(updated);
+        }}
+        onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
+      />
     </section>
   );
 };

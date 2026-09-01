@@ -1,12 +1,17 @@
 import { api } from "@/api/axios";
 import type {
+  ChatMemberRole,
   ChatMessage,
+  ChatPermissionFlagKey,
   ChatPermissionFlags,
   ChatPermissionsState,
   ChatRoom,
   CreateRoomPayload,
   PaginatedMessages,
+  ChatDirectoryUser,
+  ChatDirectAllowance,
   SendMessagePayload,
+  UpdateRoomPayload,
 } from "../types/chat.types";
 
 function extraerError(error: unknown, fallback: string): string {
@@ -25,6 +30,17 @@ function extraerError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+const EMPTY_FLAGS = {
+  can_create_groups: false,
+  can_delete_messages: false,
+  can_audit_all_chats: false,
+  can_allow_direct_messages: false,
+  can_edit_groups: false,
+} as const;
+
+export const CHAT_ROOMS_QUERY_KEY = ["chat", "rooms"] as const;
+export const CHAT_ALLOWANCES_QUERY_KEY = ["chat", "allowances"] as const;
+
 export const chatApi = {
   extraerError,
 
@@ -40,6 +56,45 @@ export const chatApi = {
 
   getRoom: async (id: number): Promise<ChatRoom> => {
     const { data } = await api.get<ChatRoom>(`/chat/rooms/${id}/`);
+    return data;
+  },
+
+  updateRoom: async (
+    roomId: number,
+    payload: UpdateRoomPayload,
+  ): Promise<ChatRoom> => {
+    const { data } = await api.patch<ChatRoom>(`/chat/rooms/${roomId}/`, payload);
+    return data;
+  },
+
+  addMembers: async (roomId: number, memberIds: number[]): Promise<ChatRoom> => {
+    const { data } = await api.post<ChatRoom>(`/chat/rooms/${roomId}/members/`, {
+      member_ids: memberIds,
+    });
+    return data;
+  },
+
+  removeMember: async (roomId: number, userId: number): Promise<ChatRoom> => {
+    const { data } = await api.delete<ChatRoom>(
+      `/chat/rooms/${roomId}/members/${userId}/`,
+    );
+    return data;
+  },
+
+  updateMemberRole: async (
+    roomId: number,
+    userId: number,
+    role: ChatMemberRole,
+  ): Promise<ChatRoom> => {
+    const { data } = await api.patch<ChatRoom>(
+      `/chat/rooms/${roomId}/members/${userId}/`,
+      { role },
+    );
+    return data;
+  },
+
+  getPeople: async (): Promise<ChatDirectoryUser[]> => {
+    const { data } = await api.get<ChatDirectoryUser[]>("/chat/people/");
     return data;
   },
 
@@ -89,32 +144,51 @@ export const chatApi = {
           nombre_completo: "",
           rol: null,
           is_dueno_bypass: false,
-          can_create_groups: false,
-          can_delete_messages: false,
-          can_audit_all_chats: false,
-          can_allow_direct_messages: false,
+          ...EMPTY_FLAGS,
         };
-      return { own, matrix: data };
+      return {
+        own: { ...EMPTY_FLAGS, ...own },
+        matrix: data.map((row) => ({ ...EMPTY_FLAGS, ...row })),
+      };
     }
-    return { own: data, matrix: null };
+    return { own: { ...EMPTY_FLAGS, ...data }, matrix: null };
   },
 
   updatePermission: async (
     userId: number,
-    flags: Partial<
-      Pick<
-        ChatPermissionFlags,
-        | "can_create_groups"
-        | "can_delete_messages"
-        | "can_audit_all_chats"
-        | "can_allow_direct_messages"
-      >
-    >,
+    flags: Partial<Pick<ChatPermissionFlags, ChatPermissionFlagKey>>,
   ): Promise<ChatPermissionFlags> => {
     const { data } = await api.put<ChatPermissionFlags>("/chat/permissions/", {
       user_id: userId,
       ...flags,
     });
+    return data;
+  },
+
+  getAllowances: async (): Promise<ChatDirectAllowance[]> => {
+    const { data } = await api.get<ChatDirectAllowance[]>(
+      "/chat/direct-allowances/",
+    );
+    return data;
+  },
+
+  createAllowance: async (
+    userAId: number,
+    userBId: number,
+  ): Promise<ChatDirectAllowance> => {
+    const { data } = await api.post<ChatDirectAllowance>(
+      "/chat/direct-allowances/",
+      { user_a_id: userAId, user_b_id: userBId },
+    );
+    return data;
+  },
+
+  revokeAllowance: async (id: number): Promise<void> => {
+    await api.delete(`/chat/direct-allowances/${id}/`);
+  },
+
+  unlockRoom: async (roomId: number): Promise<ChatRoom> => {
+    const { data } = await api.post<ChatRoom>(`/chat/rooms/${roomId}/unlock/`);
     return data;
   },
 };
