@@ -55,6 +55,20 @@ export const SECTIONS: RouteSection[] = [
           "SEGUIMIENTO",
         ],
       },
+      {
+        label: "Chat interno",
+        href: "/chat",
+        roles: [
+          "DUENO",
+          "SUPERVISOR",
+          "COORDINADOR",
+          "RRHH",
+          "BACKOFFICE",
+          "ASESOR",
+          "SEGUIMIENTO",
+        ],
+        disabled: true,
+      },
     ],
   },
   {
@@ -65,7 +79,14 @@ export const SECTIONS: RouteSection[] = [
       {
         label: "Noticias",
         href: "/noticias",
-        roles: ["ASESOR", "SUPERVISOR", "COORDINADOR", "RRHH", "BACKOFFICE", "DUENO"],
+        roles: [
+          "ASESOR",
+          "SUPERVISOR",
+          "COORDINADOR",
+          "RRHH",
+          "BACKOFFICE",
+          "DUENO",
+        ],
       },
       {
         label: "Gestión de Noticias",
@@ -194,7 +215,12 @@ const NavItem = ({
 
   if (disabled) {
     return (
-      <div className={cn("flex items-center rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed", expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-1.5")}>
+      <div
+        className={cn(
+          "flex items-center rounded-lg text-[13px] text-muted-foreground/50 cursor-not-allowed",
+          expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-1.5",
+        )}
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-50" />
         {expanded && (
           <>
@@ -258,7 +284,7 @@ const NavSection = ({
           type="button"
           className={cn(
             "flex items-center w-full rounded-lg bg-transparent hover:bg-sidebar-accent transition-colors text-muted-foreground hover:text-sidebar-accent-foreground cursor-pointer",
-            expanded ? "gap-2.5 px-2.5 py-2" : "justify-center py-2"
+            expanded ? "gap-2.5 px-2.5 py-2" : "justify-center py-2",
           )}
           onClick={() => setOpen((v) => !v)}
           title={!expanded ? section.title : undefined}
@@ -290,7 +316,12 @@ const NavSection = ({
         </div>
       )}
       {open && (
-        <div className={cn("mt-0.5 flex flex-col gap-[1px]", expanded ? "pl-2" : "px-1")}>
+        <div
+          className={cn(
+            "mt-0.5 flex flex-col gap-[1px]",
+            expanded ? "pl-2" : "px-1",
+          )}
+        >
           {visibleItems.map((item) => (
             <NavItem
               key={item.href + item.label}
@@ -327,7 +358,7 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
       <div
         className={cn(
           "w-full rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground opacity-80 cursor-default",
-          expanded ? "h-11 justify-start px-3" : "h-9 justify-center"
+          expanded ? "h-11 justify-start px-3" : "h-9 justify-center",
         )}
         title="Vista Global"
       >
@@ -445,22 +476,32 @@ export const Sidebar = ({
 
   // Filtrar SECTIONS por módulo y luego por roles en items
   const visibleSections = SECTIONS.map((section) => {
-    const hasExplicitModules = user?.modulos_permitidos && user.modulos_permitidos.length > 0;
-    
+    const hasExplicitModules =
+      user?.modulos_permitidos && user.modulos_permitidos.length > 0;
+
     // Si el usuario tiene modulos_permitidos configurados (> 0), usamos la base de datos
     // Si no tiene ninguno (array vacío o undefined), usamos la configuración por defecto del código
     const hasModuleAccess = hasExplicitModules
-      ? user.modulos_permitidos.includes(section.title) || section.items.some((i) => user.modulos_permitidos!.includes(i.label))
-      : section.items.some((item) => item.roles.length === 0 || item.roles.includes(roleCode));
+      ? user.modulos_permitidos.includes(section.title) ||
+        section.items.some((i) => user.modulos_permitidos!.includes(i.label))
+      : section.items.some(
+          (item) => item.roles.length === 0 || item.roles.includes(roleCode),
+        );
 
     if (!hasModuleAccess) return null;
 
     // Si tiene acceso explícito, filtramos las sub-páginas evaluando si fueron seleccionadas.
     // (Si el padre está explícitamente seleccionado, le mostramos todas las sub-páginas, o solo las marcadas).
     // Caso contrario (fallback por defecto), filtramos por item.roles
-    const visibleItems = hasExplicitModules 
-      ? section.items.filter((i) => user.modulos_permitidos.includes(i.label) || user.modulos_permitidos.includes(section.title))
-      : section.items.filter((item) => item.roles.length === 0 || item.roles.includes(roleCode));
+    const visibleItems = hasExplicitModules
+      ? section.items.filter(
+          (i) =>
+            user.modulos_permitidos.includes(i.label) ||
+            user.modulos_permitidos.includes(section.title),
+        )
+      : section.items.filter(
+          (item) => item.roles.length === 0 || item.roles.includes(roleCode),
+        );
 
     if (visibleItems.length === 0) return null;
 
@@ -501,7 +542,12 @@ export const Sidebar = ({
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className={cn("h-[64px] flex items-center border-b border-sidebar-border shrink-0 transition-all duration-300", expanded ? "justify-between px-4" : "justify-center")}>
+        <div
+          className={cn(
+            "h-[64px] flex items-center border-b border-sidebar-border shrink-0 transition-all duration-300",
+            expanded ? "justify-between px-4" : "justify-center",
+          )}
+        >
           <div
             className={cn(
               "flex items-center gap-3 overflow-hidden transition-all duration-300",
@@ -569,7 +615,7 @@ export const Sidebar = ({
               type="button"
               className={cn(
                 "group w-full h-9 rounded-lg border border-transparent bg-transparent flex items-center gap-2.5 text-muted-foreground font-sans text-[13px] transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground overflow-hidden whitespace-nowrap",
-                expanded ? "justify-start px-3" : "justify-center"
+                expanded ? "justify-start px-3" : "justify-center",
               )}
               onClick={cycleTheme}
             >
@@ -581,7 +627,7 @@ export const Sidebar = ({
               type="button"
               className={cn(
                 "group w-full h-9 rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground font-sans text-[13px] transition-all hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive overflow-hidden whitespace-nowrap",
-                expanded ? "justify-start px-3" : "justify-center"
+                expanded ? "justify-start px-3" : "justify-center",
               )}
               onClick={logout}
             >
