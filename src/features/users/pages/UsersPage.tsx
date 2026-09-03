@@ -50,6 +50,7 @@ import { UserForm } from "../components/UserForm";
 import { UsersTable } from "../components/UsersTable";
 import type { CreateUserPayload, UpdateUserPayload, User } from "../types";
 import { cn } from "@/lib/utils";
+import { esUsuarioDueno } from "../utils";
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 type Tab = "activos" | "inactivos";
@@ -113,10 +114,14 @@ export const UsersPage = () => {
   };
 
   const confirmDelete = async () => {
-    if (userToDelete) {
-      await deactivateUser(userToDelete);
+    if (!userToDelete) return;
+    const objetivo = users.find((u) => u.id === userToDelete);
+    if (esUsuarioDueno(objetivo)) {
       setUserToDelete(null);
+      return;
     }
+    await deactivateUser(userToDelete);
+    setUserToDelete(null);
   };
 
   // FIX #7: Reactivar colaborador inactivo
@@ -398,9 +403,11 @@ export const UsersPage = () => {
               {editingUser ? "Editar colaborador" : "Nuevo colaborador"}
             </SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground">
-              {editingUser
-                ? "Actualiza los datos y permisos de acceso."
-                : "Completa los datos para crear el nuevo colaborador."}
+              {editingUser?.rol?.codigo === "DUENO"
+                ? "Actualiza el nombre, el correo y, si lo deseas, la contraseña del dueño."
+                : editingUser
+                  ? "Actualiza los datos y permisos de acceso."
+                  : "Completa los datos para crear el nuevo colaborador."}
             </SheetDescription>
           </SheetHeader>
           <div className="px-6 py-6">
@@ -539,7 +546,7 @@ function InactivosTable({
                 Editar
               </button>
 
-              {/* FIX #7: Botón Reactivar */}
+              {user.rol?.codigo !== "DUENO" && (
               <button
                 type="button"
                 onClick={() => !isReactivating && onReactivar(user)}
@@ -559,6 +566,7 @@ function InactivosTable({
                 )}
                 Reactivar
               </button>
+              )}
             </div>
           </div>
         );

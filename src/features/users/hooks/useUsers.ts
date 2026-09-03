@@ -14,7 +14,7 @@ import type {
 import { extractApiError } from "@/lib/api-errors";
 
 export const useUsers = () => {
-  const { user: currentUser, activeWorkspace } = useAuth();
+  const { user: currentUser, activeWorkspace, updateCurrentUser } = useAuth();
 
   // ── Estado ──────────────────────────────────────────────────────────────────
   const [users, setUsers] = useState<User[]>([]); // activos
@@ -222,7 +222,15 @@ export const useUsers = () => {
     selectedWorkspaces: number[],
   ): Promise<boolean> => {
     try {
-      await userService.update(id, payload);
+      const updatedUser = await userService.update(id, payload);
+
+      if (currentUser && currentUser.id === updatedUser.id) {
+        updateCurrentUser({
+          username: updatedUser.username,
+          nombre_completo: updatedUser.nombre_completo,
+          email: updatedUser.email,
+        });
+      }
 
       if (isSupervisor) {
         const today = new Date().toISOString().split("T")[0];
