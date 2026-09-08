@@ -69,6 +69,7 @@ export const SECTIONS: RouteSection[] = [
           "ASESOR",
           "SEGUIMIENTO",
         ],
+        disabled: true,
       },
     ],
   },
@@ -245,7 +246,7 @@ const NavItem = ({
         "relative flex items-center rounded-lg text-[13px] text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         expanded ? "gap-2.5 px-3 py-1.5" : "justify-center py-2",
         isActive &&
-          "bg-primary/10 text-primary font-medium hover:text-primary hover:bg-primary/15",
+        "bg-primary/10 text-primary font-medium hover:text-primary hover:bg-primary/15",
       )}
       title={
         !expanded
@@ -273,7 +274,7 @@ const NavItem = ({
           className={cn(
             "min-w-4 h-4 px-1 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center",
             !expanded &&
-              "absolute top-0.5 right-0.5 min-w-3.5 h-3.5 px-0.5 text-[9px]",
+            "absolute top-0.5 right-0.5 min-w-3.5 h-3.5 px-0.5 text-[9px]",
           )}
         >
           {badgeLabel}
@@ -416,7 +417,7 @@ const WorkspaceSwitcher = ({ expanded }: { expanded: boolean }) => {
           "w-full rounded-lg border border-sidebar-border bg-transparent flex items-center gap-2.5 text-muted-foreground transition-all duration-150 overflow-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           expanded ? "h-11 justify-start px-3" : "h-9 justify-center",
           open &&
-            "border-primary/30 bg-primary/5 text-primary hover:text-primary hover:bg-primary/5",
+          "border-primary/30 bg-primary/5 text-primary hover:text-primary hover:bg-primary/5",
         )}
         onClick={() => setOpen((v) => !v)}
         title={!expanded ? activeWorkspace?.nombre_sucursal : undefined}
@@ -508,10 +509,10 @@ export const Sidebar = ({
     // Si no tiene ninguno (array vacío o undefined), usamos la configuración por defecto del código
     const hasModuleAccess = hasExplicitModules
       ? user.modulos_permitidos.includes(section.title) ||
-        section.items.some((i) => user.modulos_permitidos!.includes(i.label))
+      section.items.some((i) => user.modulos_permitidos!.includes(i.label))
       : section.items.some(
-          (item) => item.roles.length === 0 || item.roles.includes(roleCode),
-        );
+        (item) => item.roles.length === 0 || item.roles.includes(roleCode),
+      );
 
     if (!hasModuleAccess) return null;
 
@@ -520,13 +521,13 @@ export const Sidebar = ({
     // Caso contrario (fallback por defecto), filtramos por item.roles
     const visibleItems = hasExplicitModules
       ? section.items.filter(
-          (i) =>
-            user.modulos_permitidos.includes(i.label) ||
-            user.modulos_permitidos.includes(section.title),
-        )
+        (i) =>
+          user.modulos_permitidos.includes(i.label) ||
+          user.modulos_permitidos.includes(section.title),
+      )
       : section.items.filter(
-          (item) => item.roles.length === 0 || item.roles.includes(roleCode),
-        );
+        (item) => item.roles.length === 0 || item.roles.includes(roleCode),
+      );
 
     if (visibleItems.length === 0) return null;
 

@@ -25,6 +25,7 @@ import type {
 import type { User as AuthUser } from "@/features/auth/types";
 import { Switch } from "@/components/ui/switch";
 import { SESSION_KEY_WORKSPACE } from "@/features/auth/context/AuthProvider";
+import { esUsuarioDueno } from "../utils";
 
 // Tipo que representa una asignación activa conflictiva
 interface ConflictingAssignment {
@@ -152,8 +153,9 @@ export const UserForm = ({
   const roleCode = selectedRole?.codigo ?? "";
   const isAdvisor = roleCode === "ASESOR";
   const isSupervisor = roleCode === "SUPERVISOR";
-  const isOwner = roleCode === "DUENO";
-  const needsWorkspace = !isOwner && watchedRolId !== 0;
+  const isEditingOwner = esUsuarioDueno(user);
+  const isOwner = isEditingOwner || roleCode === "DUENO";
+  const needsWorkspace = !isOwner && !isEditingOwner && watchedRolId !== 0;
 
   const originalRoleCode = useMemo(() => {
     if (!user || !roles.length) return "";
@@ -291,6 +293,19 @@ export const UserForm = ({
     if (needsWorkspace && selectedWsIds.length === 0) return;
 
     setIsSubmitting(true);
+
+    if (isEditingOwner) {
+      const payloadDueno: UpdateUserPayload = {
+        username: values.username,
+        nombre_completo: values.nombre_completo,
+        email: values.email,
+        ...(values.password ? { password: values.password } : {}),
+      };
+      const ok = await onSave(payloadDueno, false, []);
+      if (!ok) setIsSubmitting(false);
+      return;
+    }
+
     const celularFinal = values.celular?.trim() || null;
     const dniFinal = values.dni?.trim() || null;
 
@@ -420,6 +435,7 @@ export const UserForm = ({
             )}
           </div>
 
+          {!isEditingOwner && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono flex items-center gap-1">
@@ -474,6 +490,7 @@ export const UserForm = ({
               )}
             </div>
           </div>
+          )}
 
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
@@ -498,6 +515,7 @@ export const UserForm = ({
       </div>
 
       {/* ── NUEVA SECCIÓN: Perfil Laboral (Módulo Finanzas) ── */}
+      {!isEditingOwner && (
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm border-l-4 border-l-blue-500">
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-blue-600 dark:text-blue-400 mb-4">
           Perfil Laboral (Módulo Finanzas)
@@ -547,8 +565,10 @@ export const UserForm = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* ── Rol ── */}
+      {!isEditingOwner && (
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground mb-4">
           Rol en el sistema
@@ -593,9 +613,10 @@ export const UserForm = ({
           </p>
         )}
       </div>
+      )}
 
       {/* ── Workspaces ── */}
-      {needsWorkspace && (
+      {needsWorkspace && !isEditingOwner && (
         <div className="bg-card border-l-4 border-l-primary border-y border-r border-y-border border-r-border rounded-2xl p-5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -797,6 +818,7 @@ export const UserForm = ({
       )}
 
       {/* ── Estado ── */}
+      {!isEditingOwner && (
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground mb-4">
           Estado
@@ -816,6 +838,7 @@ export const UserForm = ({
           </span>
         </div>
       </div>
+      )}
 
       {/* ── Acciones ── */}
       <div className="flex gap-3 pt-2">

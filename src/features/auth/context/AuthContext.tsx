@@ -8,6 +8,7 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: User) => void;
+  updateCurrentUser: (updatedData: Partial<User>) => void;
   selectWorkspace: (workspace: Workspace) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<User | null>;

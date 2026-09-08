@@ -7,6 +7,11 @@ import { AuthContext } from "./AuthContext";
 import type { ActiveWorkspace, User, Workspace } from "../types";
 
 export const SESSION_KEY_WORKSPACE = "jard:activeWorkspace";
+export const SESSION_KEY_USER = "jard:currentUser";
+
+function persistCurrentUser(userData: User): void {
+  sessionStorage.setItem(SESSION_KEY_USER, JSON.stringify(userData));
+}
 
 function buildActiveWorkspace(workspace: Workspace): ActiveWorkspace {
   return {
@@ -42,6 +47,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const userData = await authService.getUserProfile();
       setUserState(userData);
+      persistCurrentUser(userData);
       return userData;
     } catch {
       setUserState(null);
@@ -66,7 +72,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [user, activeWorkspace]);
 
-  const setUser = (userData: User) => setUserState(userData);
+  const setUser = (userData: User) => {
+    setUserState(userData);
+    persistCurrentUser(userData);
+  };
+
+  const updateCurrentUser = (updatedData: Partial<User>) => {
+    setUserState((prev) => {
+      if (!prev) return prev;
+      const next: User = { ...prev, ...updatedData };
+      persistCurrentUser(next);
+      return next;
+    });
+  };
 
   const selectWorkspace = (workspace: Workspace) => {
     const built = buildActiveWorkspace(workspace);
@@ -93,6 +111,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         isAuthenticated: !!user,
         isLoading,
         setUser,
+        updateCurrentUser,
         selectWorkspace,
         logout,
         checkAuth,

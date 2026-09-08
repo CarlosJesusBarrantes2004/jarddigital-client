@@ -1,6 +1,7 @@
 import { Edit2, Trash2, Users as UsersIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role, User } from "../types";
+import { esUsuarioDueno } from "../utils";
 
 // ── Role pill metadata (Versión Tailwind Semántica) ──
 const ROLE_META: Record<string, { label: string; bg: string; color: string }> =
@@ -219,17 +220,17 @@ export const UsersTable = ({
                       </div>
                     </td>
 
-                    {user.id_rol !== 1 ? (
-                      <td className="px-4 py-3.5 align-middle">
-                        <div className="flex justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            onClick={() => onEdit(user)}
-                            title="Editar"
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-500/30 border border-transparent transition-all"
-                          >
-                            <Edit2 size={14} />
-                          </button>
+                    <td className="px-4 py-3.5 align-middle">
+                      <div className="flex justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(user)}
+                          title="Editar"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-500/30 border border-transparent transition-all"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        {!esUsuarioDueno(user) && (
                           <button
                             type="button"
                             onClick={() => onDelete(user.id)}
@@ -238,9 +239,9 @@ export const UsersTable = ({
                           >
                             <Trash2 size={14} />
                           </button>
-                        </div>
-                      </td>
-                    ) : null}
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })
@@ -350,13 +351,15 @@ export const UsersTable = ({
                     >
                       <Edit2 size={13} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(user.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {!esUsuarioDueno(user) && (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(user.id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted text-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
