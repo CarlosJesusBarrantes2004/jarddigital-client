@@ -36,17 +36,18 @@ export function ModalityForm({
 }: ModalityFormProps) {
   const form = useForm<ModalityFormData>({
     resolver: zodResolver(modalityFormSchema),
-    defaultValues: { nombre: "", activo: true },
+    defaultValues: { nombre: "", codigo: "", activo: true },
   });
 
   useEffect(() => {
     if (modality) {
       form.reset({
         nombre: modality.nombre,
+        codigo: modality.codigo,
         activo: modality.activo,
       });
     } else {
-      form.reset({ nombre: "", activo: true });
+      form.reset({ nombre: "", codigo: "", activo: true });
     }
   }, [modality, form]);
 
@@ -90,6 +91,46 @@ export function ModalityForm({
                     <>
                       <AlertCircle size={11} />{" "}
                       {form.formState.errors.nombre.message}
+                    </>
+                  )}
+                </FormMessage>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="codigo"
+            render={({ field }) => (
+              <FormItem className="flex flex-col gap-1.5 space-y-0 mt-4">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em] font-mono">
+                  Código Técnico
+                </label>
+                <FormControl>
+                  <input
+                    placeholder="Ej: CALL"
+                    disabled={!!modality}
+                    className={cn(
+                      "h-11 bg-background border rounded-xl px-3.5 font-mono text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
+                      !!modality ? "opacity-50 cursor-not-allowed bg-muted" : "",
+                      form.formState.errors.codigo
+                        ? "border-destructive focus:border-destructive focus:ring-destructive/10"
+                        : "border-border",
+                    )}
+                    {...field}
+                    onChange={(e) =>
+                      field.onChange(e.target.value.toUpperCase())
+                    }
+                  />
+                </FormControl>
+                <FormDescription className="text-[11px] text-muted-foreground/80 leading-snug">
+                  Identificador técnico inmutable. NO se puede cambiar una vez creado.
+                </FormDescription>
+                <FormMessage className="text-[11px] text-destructive flex items-center gap-1 mt-1">
+                  {form.formState.errors.codigo && (
+                    <>
+                      <AlertCircle size={11} />{" "}
+                      {form.formState.errors.codigo.message}
                     </>
                   )}
                 </FormMessage>
