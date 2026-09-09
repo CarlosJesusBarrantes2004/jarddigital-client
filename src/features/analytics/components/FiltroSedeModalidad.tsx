@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import type { Modalidad } from "../types/analytics.types";
-import { MODALIDAD_OPTIONS } from "../types/analytics.types";
+import { useQuery } from "@tanstack/react-query";
+import { coreService } from "@/features/core/services/coreService";
 
 interface FiltroSedeModalidadProps {
   /** Lista de strings "Sede - MODALIDAD" extraídas de los datos ya cargados */
@@ -31,6 +32,12 @@ export const FiltroSedeModalidad = ({
     if (!opcionesSede) return [];
     return [...new Set(opcionesSede)].sort();
   }, [opcionesSede]);
+
+  const { data: modalidades } = useQuery({
+    queryKey: ["core", "modalidades"],
+    queryFn: coreService.getModalities,
+    staleTime: 1000 * 60 * 10,
+  });
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -67,11 +74,13 @@ export const FiltroSedeModalidad = ({
             className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Todas</option>
-            {MODALIDAD_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
+            {modalidades
+              ?.filter((m) => m.activo)
+              .map((o) => (
+                <option key={o.codigo} value={o.codigo}>
+                  {o.nombre}
+                </option>
+              ))}
           </select>
           <ChevronDown
             size={13}
