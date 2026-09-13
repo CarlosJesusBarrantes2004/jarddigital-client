@@ -69,7 +69,6 @@ export const SECTIONS: RouteSection[] = [
           "ASESOR",
           "SEGUIMIENTO",
         ],
-        disabled: true,
       },
     ],
   },
