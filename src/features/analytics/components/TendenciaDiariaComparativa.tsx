@@ -12,7 +12,7 @@ import {
 import { ChevronDown, Loader2, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useTendenciaDiaria } from "../hooks/useAnalytics";
-import { MODALIDAD_OPTIONS, type Modalidad } from "../types/analytics.types";
+import { type Modalidad } from "../types/analytics.types";
 import { coreService } from "@/features/core/services/coreService";
 import { useAuth } from "@/features/auth/context/useAuth";
 
@@ -60,6 +60,13 @@ export const TendenciaDiariaComparativa = () => {
   const { data: sedes } = useQuery({
     queryKey: ["core", "sucursales"],
     queryFn: coreService.getBranches,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  // Fetch modalidades
+  const { data: modalidades } = useQuery({
+    queryKey: ["core", "modalidades"],
+    queryFn: coreService.getModalities,
     staleTime: 1000 * 60 * 10,
   });
 
@@ -190,11 +197,13 @@ export const TendenciaDiariaComparativa = () => {
               className="h-9 pl-3 pr-8 rounded-lg border border-border bg-background text-[13px] font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="">Todas</option>
-              {MODALIDAD_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
+              {modalidades
+                ?.filter((m) => m.activo)
+                .map((o) => (
+                  <option key={o.codigo} value={o.codigo}>
+                    {o.nombre}
+                  </option>
+                ))}
             </select>
             <ChevronDown
               size={13}

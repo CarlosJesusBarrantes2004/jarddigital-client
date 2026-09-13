@@ -1,6 +1,7 @@
 export interface Modality {
   id: number;
   nombre: string;
+  codigo: string;
   activo: boolean;
 }
 
@@ -33,6 +34,7 @@ export interface Role {
 
 export interface ModalityPayload {
   nombre: string;
+  codigo: string;
   activo: boolean;
 }
 

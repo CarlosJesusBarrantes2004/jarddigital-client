@@ -1,5 +1,5 @@
 export type EstadoSOT = "ATENDIDO" | "PENDIENTE" | "RECHAZADO" | "EN_EJECUCION";
-export type Modalidad = "CALL" | "CAMPO";
+export type Modalidad = string;
 export type DimensionJerarquica = "GEOGRAFIA" | "PRODUCTO";
 
 export const ESTADO_SOT_OPTIONS: { value: EstadoSOT; label: string }[] = [
@@ -7,11 +7,6 @@ export const ESTADO_SOT_OPTIONS: { value: EstadoSOT; label: string }[] = [
   { value: "PENDIENTE", label: "Pendiente" },
   { value: "RECHAZADO", label: "Rechazado" },
   { value: "EN_EJECUCION", label: "En Ejecución" },
-];
-
-export const MODALIDAD_OPTIONS: { value: Modalidad; label: string }[] = [
-  { value: "CALL", label: "Call" },
-  { value: "CAMPO", label: "Campo" },
 ];
 
 // ==========================================
