@@ -3,7 +3,7 @@ import { MapPin, Globe, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Select,
   SelectContent,
@@ -197,7 +197,9 @@ export const TerritorioSheet = ({
   }, [departamentos, entries, setEntries]);
 
   const addEntry = useCallback(() => {
-    setEntries([...entries, emptyEntry()]);
+    // Collapse all existing entries, only the new one is expanded
+    const collapsed = entries.map((e) => ({ ...e, expanded: false }));
+    setEntries([...collapsed, emptyEntry()]);
   }, [entries, setEntries]);
 
   const removeEntry = useCallback((index: number) => {
@@ -206,8 +208,13 @@ export const TerritorioSheet = ({
   }, [entries, setEntries]);
 
   const toggleEntryExpanded = useCallback((index: number) => {
-    updateEntry(index, { expanded: !entries[index].expanded });
-  }, [entries, updateEntry]);
+    // Accordion: collapse all others, toggle the clicked one
+    const isExpanding = !entries[index].expanded;
+    setEntries(entries.map((e, i) => ({
+      ...e,
+      expanded: i === index ? isExpanding : false,
+    })));
+  }, [entries, setEntries]);
 
   /* ─── Province-level handlers ─── */
 
@@ -329,7 +336,7 @@ export const TerritorioSheet = ({
         </SheetHeader>
 
         {/* Scrollable content */}
-        <ScrollArea className="flex-1 -mx-4">
+        <div className="flex-1 overflow-y-auto -mx-4">
           <div className="px-4 space-y-3 pb-4">
 
             {/* "Todos los departamentos" master checkbox */}
@@ -549,7 +556,7 @@ export const TerritorioSheet = ({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <SheetFooter>
           <Button onClick={() => onOpenChange(false)} className="w-full">
