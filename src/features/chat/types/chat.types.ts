@@ -79,7 +79,8 @@ export type ChatPermissionFlagKey =
   | "can_delete_messages"
   | "can_audit_all_chats"
   | "can_allow_direct_messages"
-  | "can_edit_groups";
+  | "can_edit_groups"
+  | "can_delete_rooms";
 
 export interface ChatPermissionFlags {
   user_id: number;
@@ -92,6 +93,7 @@ export interface ChatPermissionFlags {
   can_audit_all_chats: boolean;
   can_allow_direct_messages: boolean;
   can_edit_groups: boolean;
+  can_delete_rooms: boolean;
 }
 
 export interface ChatPermissionsState {
@@ -219,4 +221,5 @@ export type ChatWsIncoming =
     }
   | ChatGroupUpdated
   | ChatRoomStatusUpdated
+  | { type: "room_deleted"; room_id: number; deleted_by?: number | null }
   | { type: "error"; detail: string };

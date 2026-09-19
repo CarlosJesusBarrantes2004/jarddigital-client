@@ -191,4 +191,8 @@ export const chatApi = {
     const { data } = await api.post<ChatRoom>(`/chat/rooms/${roomId}/unlock/`);
     return data;
   },
+
+  deleteRoom: async (roomId: number): Promise<void> => {
+    await api.delete(`/chat/rooms/${roomId}/`);
+  },
 };

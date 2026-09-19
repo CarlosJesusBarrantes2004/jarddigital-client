@@ -59,6 +59,7 @@ export const ChatPage = () => {
   const [permsOpen, setPermsOpen] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatMessage | null>(null);
+  const [pendingDeleteRoom, setPendingDeleteRoom] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [typingName, setTypingName] = useState<string | null>(null);
   const activeRoomIdRef = useRef<number | null>(null);
@@ -93,6 +94,7 @@ export const ChatPage = () => {
   const canDelete = Boolean(own?.can_delete_messages);
   const canAudit = Boolean(own?.can_audit_all_chats);
   const canAllowDirect = Boolean(own?.can_allow_direct_messages);
+  const canDeleteRooms = Boolean(own?.can_delete_rooms);
   const isDueno = user?.rol?.codigo === "DUENO";
 
   const allowancesQuery = useQuery({
@@ -292,6 +294,14 @@ export const ChatPage = () => {
         if (!stillMember && !canAudit && !isDueno) {
           toast.info("Ya no formas parte de este grupo.");
           closeConversation();
+        }
+      }
+
+      if (event.type === "room_deleted") {
+        patchRooms((prev) => prev.filter((r) => r.id !== event.room_id));
+        if (activeRoomIdRef.current === event.room_id) {
+          closeConversation();
+          toast.info("Esta conversación fue eliminada.");
         }
       }
     },
@@ -527,6 +537,20 @@ export const ChatPage = () => {
     }
   };
 
+  const handleDeleteRoom = async () => {
+    if (!activeRoomId) return;
+    try {
+      await chatApi.deleteRoom(activeRoomId);
+      patchRooms((prev) => prev.filter((r) => r.id !== activeRoomId));
+      closeConversation();
+      toast.success("Conversación eliminada permanentemente.");
+    } catch (error) {
+      toast.error(chatApi.extraerError(error, "No se pudo eliminar la conversación."));
+    } finally {
+      setPendingDeleteRoom(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
@@ -592,6 +616,8 @@ export const ChatPage = () => {
               canUnlockDirect={canAllowDirect || isDueno}
               unlocking={unlocking}
               onUnlockDirect={() => void unlockDirect()}
+              canDeleteRoom={canDeleteRooms || isDueno}
+              onDeleteRoom={() => setPendingDeleteRoom(true)}
               onRoomUpdated={(updated) => {
                 patchRooms((prev) => {
                   const stillMember = updated.members.some(
@@ -663,6 +689,37 @@ export const ChatPage = () => {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => void confirmDelete()}>
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingDeleteRoom}
+        onOpenChange={(open) => !open && setPendingDeleteRoom(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta conversación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es <strong>permanente e irreversible</strong>. Se
+              eliminarán todos los mensajes, archivos e historial. Todos los
+              participantes perderán el acceso inmediatamente.
+              {activeRoom?.room_type === "GROUP" && (
+                <span className="block mt-1">
+                  Al eliminar el grupo, los chats privados entre sus miembros
+                  podrían bloquearse si no comparten otro grupo activo.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDeleteRoom()}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Eliminar permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

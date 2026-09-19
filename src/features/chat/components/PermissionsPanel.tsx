@@ -49,6 +49,11 @@ const COLUMNS: {
     label: "Gestionar autorizaciones 1 a 1",
     hint: "Permite al usuario autorizar excepciones de chats privados entre otros colaboradores",
   },
+  {
+    key: "can_delete_rooms",
+    label: "Eliminar conversaciones",
+    hint: "Permite eliminar permanentemente cualquier chat (grupo o privado), incluso aquellos en los que no participa",
+  },
 ];
 
 export const PermissionsPanel = ({

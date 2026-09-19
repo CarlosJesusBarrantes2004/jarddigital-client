@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Eye, Info, Loader2, MoreVertical, Unlock, Users } from "lucide-react";
+import { ArrowLeft, Eye, Info, Loader2, MoreVertical, Trash2, Unlock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,6 +40,8 @@ interface ConversationPanelProps {
   unlocking?: boolean;
   onUnlockDirect?: () => void;
   isAuditRoom?: boolean;
+  canDeleteRoom?: boolean;
+  onDeleteRoom?: () => void;
 }
 
 export const ConversationPanel = ({
@@ -63,6 +65,8 @@ export const ConversationPanel = ({
   unlocking,
   onUnlockDirect,
   isAuditRoom,
+  canDeleteRoom,
+  onDeleteRoom,
 }: ConversationPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -153,6 +157,15 @@ export const ConversationPanel = ({
               <Info size={14} />
               Info del chat
             </DropdownMenuItem>
+            {canDeleteRoom && onDeleteRoom && (
+              <DropdownMenuItem
+                onClick={onDeleteRoom}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 size={14} />
+                Eliminar conversación
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
