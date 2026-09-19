@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image as ImageIcon,
   Mic,
@@ -39,6 +39,8 @@ export const ChatComposer = ({
   const [sending, setSending] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [pastedImage, setPastedImage] = useState<File | null>(null);
+  const [pastedPreviewUrl, setPastedPreviewUrl] = useState<string | null>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
   const txtRef = useRef<HTMLInputElement>(null);
@@ -52,13 +54,53 @@ export const ChatComposer = ({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
 
+  // Cleanup ObjectURL on unmount or when preview changes
+  useEffect(() => {
+    return () => {
+      if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl);
+    };
+  }, [pastedPreviewUrl]);
+
+  const clearPastedImage = useCallback(() => {
+    if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl);
+    setPastedImage(null);
+    setPastedPreviewUrl(null);
+  }, [pastedPreviewUrl]);
+
   const canSend = useMemo(
-    () => text.trim().length > 0 && !sending && !disabled,
-    [text, sending, disabled],
+    () => (text.trim().length > 0 || pastedImage !== null) && !sending && !disabled,
+    [text, sending, disabled, pastedImage],
   );
 
   const submitText = async () => {
     if (!canSend) return;
+
+    // If there's a pasted image, send it (with optional text as content)
+    if (pastedImage) {
+      const content = text.trim() || undefined;
+      setText("");
+      const imageToSend = pastedImage;
+      clearPastedImage();
+      setSending(true);
+      try {
+        const uploaded = await uploadChatAssetToCloudinary(imageToSend, "chat");
+        await onSend({
+          message_type: "IMAGE",
+          content,
+          file_url: uploaded.url,
+          file_name: uploaded.name,
+        });
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "No se pudo subir la imagen.",
+        );
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Text-only send
     const content = text.trim();
     setText("");
     setSending(true);
@@ -77,6 +119,23 @@ export const ChatComposer = ({
       event.preventDefault();
       void submitText();
     }
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(event.clipboardData.items);
+    const imageItem = items.find((item) => item.type.startsWith("image/"));
+    if (!imageItem) return; // no image in clipboard → default paste
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    // Revoke previous preview URL if any
+    if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl);
+    // Generate a friendly name: captura-YYYYMMDD-HHmmss.png
+    const now = new Date();
+    const ts = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
+    const named = new File([file], `captura-${ts}.png`, { type: file.type });
+    setPastedImage(named);
+    setPastedPreviewUrl(URL.createObjectURL(named));
   };
 
   const uploadAndSend = async (file: File) => {
@@ -130,6 +189,28 @@ export const ChatComposer = ({
       <input ref={imageRef} type="file" accept="image/*" hidden onChange={onFile} />
       <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={onFile} />
       <input ref={txtRef} type="file" accept=".txt,text/plain" hidden onChange={onFile} />
+
+      {/* Pasted image preview */}
+      {pastedImage && pastedPreviewUrl && (
+        <div className="mb-2 flex items-center gap-3 bg-muted/60 border border-border rounded-xl px-3 py-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <img
+            src={pastedPreviewUrl}
+            alt="Vista previa"
+            className="max-h-20 max-w-[120px] rounded-lg object-contain border border-border/50"
+          />
+          <span className="text-xs text-muted-foreground flex-1 truncate">
+            {pastedImage.name}
+          </span>
+          <button
+            type="button"
+            onClick={clearPastedImage}
+            className="size-6 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
+            aria-label="Quitar imagen pegada"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {recorder.isRecording && (
         <div className="flex items-center gap-2 mb-2 px-2 text-sm text-red-600">
@@ -221,12 +302,13 @@ export const ChatComposer = ({
           ref={textareaRef}
           value={text}
           rows={1}
-          placeholder="Escribe un mensaje"
+          placeholder={pastedImage ? "Añade un mensaje (opcional)…" : "Escribe un mensaje"}
           onChange={(event) => {
             setText(event.target.value);
             onTyping?.();
           }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           className="flex-1 resize-none bg-muted/60 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-400/40 max-h-[120px]"
         />
 
