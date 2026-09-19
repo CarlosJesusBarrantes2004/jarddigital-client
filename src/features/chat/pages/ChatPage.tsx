@@ -102,19 +102,33 @@ export const ChatPage = () => {
   });
 
   const rooms = roomsQuery.data ?? [];
+
+  const isMember = useCallback(
+    (room: ChatRoom) =>
+      room.members.some((m) => m.user === currentUserId && m.is_active),
+    [currentUserId],
+  );
+
   const filteredRooms = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rooms.filter((room) => {
-      if (filter === "grupos" && room.room_type !== "GROUP") return false;
-      if (filter === "privados" && room.room_type !== "DIRECT") return false;
-      if (!q) return true;
-      const preview = room.last_message?.content ?? "";
-      return (
-        room.display_name.toLowerCase().includes(q) ||
-        preview.toLowerCase().includes(q)
-      );
-    });
-  }, [rooms, filter, search]);
+    return rooms
+      .filter((room) => {
+        const amMember = isMember(room);
+        if (filter === "todos") return amMember;
+        if (filter === "grupos") return amMember && room.room_type === "GROUP";
+        if (filter === "privados") return amMember && room.room_type === "DIRECT";
+        if (filter === "auditoria") return !amMember;
+        return amMember;
+      })
+      .filter((room) => {
+        if (!q) return true;
+        const preview = room.last_message?.content ?? "";
+        return (
+          room.display_name.toLowerCase().includes(q) ||
+          preview.toLowerCase().includes(q)
+        );
+      });
+  }, [rooms, filter, search, isMember]);
 
   const people = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -146,6 +160,14 @@ export const ChatPage = () => {
   }, [search, rooms, usersQuery.data, currentUserId]);
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null;
+
+  const isAuditRoom = useMemo(() => {
+    if (!activeRoom) return false;
+    if (!canAudit && !isDueno) return false;
+    return !activeRoom.members.some(
+      (m) => m.user === currentUserId && m.is_active,
+    );
+  }, [activeRoom, canAudit, isDueno, currentUserId]);
 
   const patchRooms = useCallback(
     (updater: (prev: ChatRoom[]) => ChatRoom[]) => {
@@ -554,6 +576,7 @@ export const ChatPage = () => {
               canDelete={canDelete}
               typingName={typingName}
               hasMore={hasMore}
+              isAuditRoom={isAuditRoom}
               onLoadMore={() => {
                 if (activeRoomId) void loadMessages(activeRoomId, messagesPage + 1);
               }}

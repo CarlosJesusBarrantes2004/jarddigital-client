@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Info, Loader2, MoreVertical, Unlock, Users } from "lucide-react";
+import { ArrowLeft, Eye, Info, Loader2, MoreVertical, Unlock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,6 +39,7 @@ interface ConversationPanelProps {
   canUnlockDirect?: boolean;
   unlocking?: boolean;
   onUnlockDirect?: () => void;
+  isAuditRoom?: boolean;
 }
 
 export const ConversationPanel = ({
@@ -61,6 +62,7 @@ export const ConversationPanel = ({
   canUnlockDirect,
   unlocking,
   onUnlockDirect,
+  isAuditRoom,
 }: ConversationPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -203,7 +205,12 @@ export const ConversationPanel = ({
         <div ref={bottomRef} />
       </div>
 
-      {room.is_readonly ? (
+      {isAuditRoom ? (
+        <div className="px-4 py-3 bg-amber-500/10 border-t border-amber-500/30 text-center text-[13px] text-amber-700 dark:text-amber-400 flex items-center justify-center gap-2">
+          <Eye size={14} />
+          Modo solo lectura — estás auditando esta conversación.
+        </div>
+      ) : room.is_readonly ? (
         <div className="px-4 py-3 bg-muted/40 border-t border-border text-center space-y-2">
           <p className="text-[13px] text-muted-foreground">
             Esta conversación está en solo lectura: ya no comparten un grupo

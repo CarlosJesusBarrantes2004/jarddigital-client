@@ -46,9 +46,9 @@ export const ChatSidebar = ({
   onOpenPermissions,
 }: ChatSidebarProps) => {
   const filters: { id: ChatFilter; label: string; hidden?: boolean }[] = [
-    { id: "todos", label: "Todos" },
-    { id: "grupos", label: "Grupos" },
-    { id: "privados", label: "Privados" },
+    { id: "todos", label: "Mis Chats" },
+    { id: "grupos", label: "Mis Grupos" },
+    { id: "privados", label: "Mis Privados" },
     { id: "auditoria", label: "Auditoría Total", hidden: !canAudit },
   ];
 
