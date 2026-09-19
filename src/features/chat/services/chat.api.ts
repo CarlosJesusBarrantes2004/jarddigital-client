@@ -36,6 +36,7 @@ const EMPTY_FLAGS = {
   can_audit_all_chats: false,
   can_allow_direct_messages: false,
   can_edit_groups: false,
+  can_delete_rooms: false,
 } as const;
 
 export const CHAT_ROOMS_QUERY_KEY = ["chat", "rooms"] as const;
