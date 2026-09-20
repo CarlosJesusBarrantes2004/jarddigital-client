@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
-import { Info, Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Info, Loader2, Plus, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import type {
   ChatDirectAllowance,
   ChatDirectoryUser,
@@ -25,6 +27,8 @@ interface PermissionsPanelProps {
   people: ChatDirectoryUser[];
   allowances: ChatDirectAllowance[];
   allowancesLoading?: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
   onOpenChange: (open: boolean) => void;
   onToggle: (
     row: ChatPermissionFlags,
@@ -64,6 +68,8 @@ export const PermissionsPanel = ({
   people,
   allowances,
   allowancesLoading,
+  isLoading,
+  isError,
   onOpenChange,
   onToggle,
   onCreateAllowance,
@@ -77,7 +83,31 @@ export const PermissionsPanel = ({
       <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Permisos y autorizaciones de chat</DialogTitle>
+          <DialogDescription>
+            Administra los permisos de cada colaborador y las excepciones de
+            chat directo entre usuarios.
+          </DialogDescription>
         </DialogHeader>
+
+        {/* Fallback: cargando */}
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+            <Loader2 className="animate-spin" size={28} />
+            <p className="text-sm">Cargando permisos…</p>
+          </div>
+        )}
+
+        {/* Fallback: error de red */}
+        {!isLoading && isError && (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-destructive">
+            <AlertCircle size={28} />
+            <p className="text-sm font-medium">No se pudieron cargar los permisos</p>
+            <p className="text-xs text-muted-foreground">
+              Verifica tu conexión e intenta cerrar y abrir este panel.
+            </p>
+          </div>
+        )}
+        {!isLoading && !isError && (
         <Tabs key={defaultTab} defaultValue={defaultTab} className="gap-3">
           <TabsList className="w-full">
             {showMatrix && (
@@ -163,6 +193,7 @@ export const PermissionsPanel = ({
             />
           </TabsContent>
         </Tabs>
+        )}
       </DialogContent>
     </Dialog>
   );

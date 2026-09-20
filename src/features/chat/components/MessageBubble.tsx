@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   Check,
   CheckCheck,
+  CornerUpRight,
   MoreVertical,
   Trash2,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
 } from "../lib/chat.utils";
 import { AudioMessage } from "./AudioMessage";
 import { DocumentCard } from "./DocumentCard";
+import { ForwardModal } from "./ForwardModal";
 import { PrivateChatMenuContent } from "./MemberPrivateChatMenu";
 
 interface MessageBubbleProps {
@@ -29,10 +31,15 @@ interface MessageBubbleProps {
   mine: boolean;
   showSender: boolean;
   canDelete: boolean;
+  highlight?: string;
+  matchIndex?: number; // índice de este mensaje entre los matches para scroll
+  isCurrentMatch?: boolean; // true si este es el match actualmente navegado
+  rooms?: import("../types/chat.types").ChatRoom[];
   onDelete: (message: ChatMessage) => void;
   onOpenImage: (url: string) => void;
   onStartPrivateChat?: (userId: number) => void;
   onVisible?: (messageId: number) => void;
+  onForward?: (message: ChatMessage, targetRoomId: number) => Promise<void>;
 }
 
 export const MessageBubble = ({
@@ -40,12 +47,17 @@ export const MessageBubble = ({
   mine,
   showSender,
   canDelete,
+  highlight,
+  isCurrentMatch,
+  rooms = [],
   onDelete,
   onOpenImage,
   onStartPrivateChat,
   onVisible,
+  onForward,
 }: MessageBubbleProps) => {
   const [privateMenuOpen, setPrivateMenuOpen] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const reportedRef = useRef(false);
   const senderName = message.sender_nombre || "Usuario";
@@ -102,6 +114,7 @@ export const MessageBubble = ({
   return (
     <div
       ref={rootRef}
+      id={`msg-${message.id}`}
       className={cn("flex w-full gap-2", mine ? "justify-end" : "justify-start")}
     >
       {canPrivate && (
@@ -154,6 +167,14 @@ export const MessageBubble = ({
           </button>
         )}
 
+        {/* Etiqueta de reenviado */}
+        {message.is_forwarded && (
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-0.5">
+            <CornerUpRight size={10} />
+            Reenviado
+          </p>
+        )}
+
         {message.is_deleted ? (
           <p className="text-[13px] italic text-muted-foreground">
             Este mensaje fue eliminado
@@ -162,6 +183,7 @@ export const MessageBubble = ({
           <MessageBody
             message={message}
             mine={mine}
+            highlight={highlight}
             onOpenImage={onOpenImage}
           />
         )}
@@ -173,7 +195,7 @@ export const MessageBubble = ({
           {mine && !message.is_deleted && (
             <DeliveryTicks status={resolveDeliveryStatus(message)} />
           )}
-          {canDelete && !message.is_deleted && (
+          {(canDelete || onForward) && !message.is_deleted && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -188,18 +210,39 @@ export const MessageBubble = ({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align={mine ? "end" : "start"}>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => onDelete(message)}
-                >
-                  <Trash2 size={14} />
-                  Eliminar mensaje
-                </DropdownMenuItem>
+                {onForward && (
+                  <DropdownMenuItem
+                    onClick={() => setForwardOpen(true)}
+                  >
+                    <CornerUpRight size={14} />
+                    Reenviar
+                  </DropdownMenuItem>
+                )}
+                {canDelete && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onDelete(message)}
+                  >
+                    <Trash2 size={14} />
+                    Eliminar mensaje
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
       </div>
+
+      {/* Modal de reenvío */}
+      {forwardOpen && onForward && (
+        <ForwardModal
+          message={message}
+          rooms={rooms}
+          open={forwardOpen}
+          onOpenChange={setForwardOpen}
+          onForward={onForward}
+        />
+      )}
     </div>
   );
 };
@@ -207,13 +250,16 @@ export const MessageBubble = ({
 const MessageBody = ({
   message,
   mine,
+  highlight,
   onOpenImage,
 }: {
   message: ChatMessage;
   mine: boolean;
+  highlight?: string;
   onOpenImage: (url: string) => void;
 }) => {
   if (message.message_type === "IMAGE" && message.file_url) {
+    const caption = message.caption || message.content;
     return (
       <button
         type="button"
@@ -229,8 +275,10 @@ const MessageBody = ({
           alt={message.file_name || "Imagen"}
           className="max-h-64 max-w-full object-cover hover:opacity-95 transition-opacity"
         />
-        {message.content && (
-          <p className="text-[13.5px] leading-snug mt-1 text-left">{message.content}</p>
+        {caption && (
+          <p className="text-[13.5px] leading-snug mt-1 text-left">
+            <HighlightedText text={caption} highlight={highlight} />
+          </p>
         )}
       </button>
     );
@@ -254,6 +302,7 @@ const MessageBody = ({
           url={message.file_url}
           name={message.file_name || "archivo"}
           kind={message.message_type === "PDF" ? "PDF" : "DOCUMENT"}
+          messageId={message.id}
         />
       </div>
     );
@@ -261,10 +310,42 @@ const MessageBody = ({
 
   return (
     <p className="text-[13.5px] leading-snug whitespace-pre-wrap break-words">
-      {message.content}
+      <HighlightedText text={message.content ?? ""} highlight={highlight} />
     </p>
   );
 };
+
+/** Resalta las ocurrencias de `highlight` en el texto con fondo amarillo. */
+const HighlightedText = ({
+  text,
+  highlight,
+}: {
+  text: string;
+  highlight?: string;
+}) => {
+  if (!highlight || !text) return <>{text}</>;
+
+  const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark
+            key={i}
+            className="bg-yellow-200 dark:bg-yellow-900/60 text-inherit rounded px-0.5"
+          >
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+};
+
 
 const DeliveryTicks = ({ status }: { status: ChatDeliveryStatus }) => {
   if (status === "read") {

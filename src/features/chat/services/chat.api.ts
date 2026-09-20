@@ -102,10 +102,13 @@ export const chatApi = {
   getMessages: async (
     roomId: number,
     page = 1,
+    search?: string,
   ): Promise<PaginatedMessages> => {
+    const params: Record<string, string | number> = { page, page_size: 50 };
+    if (search?.trim()) params.search = search.trim();
     const { data } = await api.get<PaginatedMessages>(
       `/chat/rooms/${roomId}/messages/`,
-      { params: { page, page_size: 50 } },
+      { params },
     );
     return data;
   },

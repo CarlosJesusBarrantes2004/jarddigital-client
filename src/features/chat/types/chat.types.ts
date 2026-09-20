@@ -58,10 +58,13 @@ export interface ChatMessage {
   sender: number | null;
   sender_nombre: string | null;
   content: string | null;
+  caption: string | null;
   message_type: ChatMessageType;
   file_url: string | null;
   file_name: string | null;
   is_deleted: boolean;
+  is_forwarded: boolean;
+  mentioned_user_ids: number[];
   created_at: string;
   delivery_status: ChatDeliveryStatus;
   is_read: boolean;
@@ -143,9 +146,12 @@ export interface ChatGroupUpdated {
 
 export interface SendMessagePayload {
   content?: string;
+  caption?: string;
   message_type: ChatMessageType;
   file_url?: string | null;
   file_name?: string;
+  is_forwarded?: boolean;
+  mentioned_user_ids?: number[];
 }
 
 export interface ChatWsNotification {

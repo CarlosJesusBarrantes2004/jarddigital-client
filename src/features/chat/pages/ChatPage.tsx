@@ -600,6 +600,7 @@ export const ChatPage = () => {
               canDelete={canDelete}
               typingName={typingName}
               hasMore={hasMore}
+              rooms={rooms}
               isAuditRoom={isAuditRoom}
               onLoadMore={() => {
                 if (activeRoomId) void loadMessages(activeRoomId, messagesPage + 1);
@@ -668,6 +669,8 @@ export const ChatPage = () => {
         people={usersQuery.data ?? []}
         allowances={allowancesQuery.data ?? []}
         allowancesLoading={allowancesQuery.isFetching}
+        isLoading={permissionsQuery.isLoading}
+        isError={permissionsQuery.isError}
         onOpenChange={setPermsOpen}
         onToggle={(row, flag, value) => void togglePermission(row, flag, value)}
         onCreateAllowance={createAllowance}

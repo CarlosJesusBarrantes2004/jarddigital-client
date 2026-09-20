@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  FileText,
   Image as ImageIcon,
   Mic,
   Paperclip,
   SendHorizontal,
   Smile,
   Square,
-  FileText,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +14,9 @@ import { cn } from "@/lib/utils";
 import { uploadChatAssetToCloudinary } from "@/lib/cloudinary.utils";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import { messageTypeFromFile } from "../lib/chat.utils";
-import type { SendMessagePayload } from "../types/chat.types";
+import type { ChatMember, SendMessagePayload } from "../types/chat.types";
+import { MentionDropdown } from "./MentionDropdown";
+import { PastePreviewModal } from "./PastePreviewModal";
 
 const EMOJIS = [
   "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎", "🤔", "😴",
@@ -22,9 +24,14 @@ const EMOJIS = [
   "✅", "❌", "🎉", "❤️", "💙", "💚", "💛", "💯", "📌", "📎",
 ];
 
+/** Regex para detectar un fragmento de mención activo: @ seguido de caracteres. */
+const MENTION_REGEX = /@([^\s]*)$/;
+
 interface ChatComposerProps {
   disabled?: boolean;
   disabledReason?: string;
+  /** Miembros de la sala activa para el dropdown de menciones. */
+  members?: ChatMember[];
   onSend: (payload: SendMessagePayload) => Promise<void>;
   onTyping?: () => void;
 }
@@ -32,6 +39,7 @@ interface ChatComposerProps {
 export const ChatComposer = ({
   disabled,
   disabledReason,
+  members = [],
   onSend,
   onTyping,
 }: ChatComposerProps) => {
@@ -39,14 +47,24 @@ export const ChatComposer = ({
   const [sending, setSending] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+
+  // ── Imagen pegada desde portapapeles ────────────────────────────────────
   const [pastedImage, setPastedImage] = useState<File | null>(null);
   const [pastedPreviewUrl, setPastedPreviewUrl] = useState<string | null>(null);
+  const [pasteModalOpen, setPasteModalOpen] = useState(false);
+
+  // ── Menciones @usuario ──────────────────────────────────────────────────
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  /** IDs de usuarios que fueron etiquetados con @ en el mensaje actual */
+  const mentionedIdsRef = useRef<Set<number>>(new Set());
+
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
   const txtRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
 
+  // Auto-resize del textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -54,7 +72,7 @@ export const ChatComposer = ({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
 
-  // Cleanup ObjectURL on unmount or when preview changes
+  // Liberar objectURL al desmontar o cambiar preview
   useEffect(() => {
     return () => {
       if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl);
@@ -65,6 +83,7 @@ export const ChatComposer = ({
     if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl);
     setPastedImage(null);
     setPastedPreviewUrl(null);
+    setPasteModalOpen(false);
   }, [pastedPreviewUrl]);
 
   const canSend = useMemo(
@@ -72,40 +91,44 @@ export const ChatComposer = ({
     [text, sending, disabled, pastedImage],
   );
 
+  // ── Extrae IDs mencionados del texto final (para el payload) ───────────
+  const extractMentionIds = (content: string): number[] => {
+    const mentioned: number[] = [];
+    const matches = content.match(/@(\S+)/g) ?? [];
+    for (const match of matches) {
+      const name = match.slice(1).toLowerCase();
+      for (const m of members) {
+        if (
+          m.nombre_completo.toLowerCase() === name ||
+          m.username.toLowerCase() === name
+        ) {
+          mentioned.push(m.user);
+          break;
+        }
+      }
+    }
+    // Combinar con IDs acumulados del dropdown (más preciso)
+    for (const id of mentionedIdsRef.current) {
+      if (!mentioned.includes(id)) mentioned.push(id);
+    }
+    return mentioned;
+  };
+
+  // ── Envío de texto (con menciones) ─────────────────────────────────────
   const submitText = async () => {
     if (!canSend) return;
 
-    // If there's a pasted image, send it (with optional text as content)
-    if (pastedImage) {
-      const content = text.trim() || undefined;
-      setText("");
-      const imageToSend = pastedImage;
-      clearPastedImage();
-      setSending(true);
-      try {
-        const uploaded = await uploadChatAssetToCloudinary(imageToSend, "chat");
-        await onSend({
-          message_type: "IMAGE",
-          content,
-          file_url: uploaded.url,
-          file_name: uploaded.name,
-        });
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "No se pudo subir la imagen.",
-        );
-      } finally {
-        setSending(false);
-      }
-      return;
-    }
-
-    // Text-only send
     const content = text.trim();
     setText("");
+    mentionedIdsRef.current.clear();
     setSending(true);
+
     try {
-      await onSend({ content, message_type: "TEXT" });
+      await onSend({
+        content,
+        message_type: "TEXT",
+        mentioned_user_ids: extractMentionIds(content),
+      });
     } catch (error) {
       setText(content);
       throw error;
@@ -114,28 +137,91 @@ export const ChatComposer = ({
     }
   };
 
+  // ── Envío de imagen pegada con caption ──────────────────────────────────
+  const submitPastedImage = async (caption: string) => {
+    if (!pastedImage) return;
+    const imageToSend = pastedImage;
+    clearPastedImage();
+    setSending(true);
+    try {
+      const uploaded = await uploadChatAssetToCloudinary(imageToSend, "chat");
+      await onSend({
+        message_type: "IMAGE",
+        content: text.trim() || undefined,
+        caption,
+        file_url: uploaded.url,
+        file_name: uploaded.name,
+      });
+      setText("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo subir la imagen.",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Si el dropdown de menciones está abierto, Escape lo cierra
+    if (mentionQuery !== null && event.key === "Escape") {
+      event.preventDefault();
+      setMentionQuery(null);
+      return;
+    }
+
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void submitText();
     }
   };
 
+  // ── Detección de mención activa al escribir ─────────────────────────────
+  const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value;
+    setText(value);
+    onTyping?.();
+
+    // Detectar patrón @query al final del cursor
+    const cursorPos = event.target.selectionStart ?? value.length;
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const match = MENTION_REGEX.exec(textBeforeCursor);
+    setMentionQuery(match ? match[1] : null);
+  };
+
+  // ── Selección de un miembro del dropdown de menciones ──────────────────
+  const handleMentionSelect = (member: ChatMember) => {
+    // Insertar @NombreCompleto en lugar del fragmento @query
+    const cursorPos = textareaRef.current?.selectionStart ?? text.length;
+    const textBeforeCursor = text.slice(0, cursorPos);
+    const textAfterCursor = text.slice(cursorPos);
+    const newText = textBeforeCursor.replace(MENTION_REGEX, `@${member.nombre_completo} `) + textAfterCursor;
+    setText(newText);
+    mentionedIdsRef.current.add(member.user);
+    setMentionQuery(null);
+
+    // Devolver foco al textarea después de la selección
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  // ── Interceptar pegado de imagen del portapapeles ───────────────────────
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(event.clipboardData.items);
     const imageItem = items.find((item) => item.type.startsWith("image/"));
-    if (!imageItem) return; // no image in clipboard → default paste
+    if (!imageItem) return; // no hay imagen → pegado normal
     event.preventDefault();
     const file = imageItem.getAsFile();
     if (!file) return;
-    // Revoke previous preview URL if any
+    // Revocar preview anterior si lo hay
     if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl);
-    // Generate a friendly name: captura-YYYYMMDD-HHmmss.png
+    // Nombre descriptivo: captura-YYYYMMDDHHMMSS.png
     const now = new Date();
     const ts = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
     const named = new File([file], `captura-${ts}.png`, { type: file.type });
     setPastedImage(named);
     setPastedPreviewUrl(URL.createObjectURL(named));
+    // Abrir modal de caption
+    setPasteModalOpen(true);
   };
 
   const uploadAndSend = async (file: File) => {
@@ -190,28 +276,6 @@ export const ChatComposer = ({
       <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={onFile} />
       <input ref={txtRef} type="file" accept=".txt,text/plain" hidden onChange={onFile} />
 
-      {/* Pasted image preview */}
-      {pastedImage && pastedPreviewUrl && (
-        <div className="mb-2 flex items-center gap-3 bg-muted/60 border border-border rounded-xl px-3 py-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <img
-            src={pastedPreviewUrl}
-            alt="Vista previa"
-            className="max-h-20 max-w-[120px] rounded-lg object-contain border border-border/50"
-          />
-          <span className="text-xs text-muted-foreground flex-1 truncate">
-            {pastedImage.name}
-          </span>
-          <button
-            type="button"
-            onClick={clearPastedImage}
-            className="size-6 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
-            aria-label="Quitar imagen pegada"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
       {recorder.isRecording && (
         <div className="flex items-center gap-2 mb-2 px-2 text-sm text-red-600">
           <span className="size-2 rounded-full bg-red-500 animate-pulse" />
@@ -227,7 +291,21 @@ export const ChatComposer = ({
         </div>
       )}
 
+      {/* Modal de previsualización de imagen pegada */}
+      {pastedImage && pastedPreviewUrl && (
+        <PastePreviewModal
+          file={pastedImage}
+          previewUrl={pastedPreviewUrl}
+          open={pasteModalOpen}
+          sending={sending}
+          onOpenChange={setPasteModalOpen}
+          onSend={(caption) => void submitPastedImage(caption)}
+          onCancel={clearPastedImage}
+        />
+      )}
+
       <div className="flex items-end gap-1.5">
+        {/* Emoji picker */}
         <div className="relative">
           <button
             type="button"
@@ -259,6 +337,7 @@ export const ChatComposer = ({
           )}
         </div>
 
+        {/* Adjuntar */}
         <div className="relative">
           <button
             type="button"
@@ -298,20 +377,31 @@ export const ChatComposer = ({
           )}
         </div>
 
-        <textarea
-          ref={textareaRef}
-          value={text}
-          rows={1}
-          placeholder={pastedImage ? "Añade un mensaje (opcional)…" : "Escribe un mensaje"}
-          onChange={(event) => {
-            setText(event.target.value);
-            onTyping?.();
-          }}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          className="flex-1 resize-none bg-muted/60 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-400/40 max-h-[120px]"
-        />
+        {/* Textarea con dropdown de menciones */}
+        <div className="relative flex-1">
+          {/* MentionDropdown: aparece cuando mentionQuery no es null */}
+          {mentionQuery !== null && (
+            <MentionDropdown
+              members={members}
+              query={mentionQuery}
+              onSelect={handleMentionSelect}
+              onClose={() => setMentionQuery(null)}
+            />
+          )}
 
+          <textarea
+            ref={textareaRef}
+            value={text}
+            rows={1}
+            placeholder="Escribe un mensaje"
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            className="w-full resize-none bg-muted/60 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-sky-400/40 max-h-[120px]"
+          />
+        </div>
+
+        {/* Enviar / Grabar audio */}
         {canSend ? (
           <button
             type="button"

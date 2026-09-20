@@ -1,5 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Eye, Info, Loader2, MoreVertical, Trash2, Unlock, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Eye,
+  Info,
+  Loader2,
+  MoreVertical,
+  Search,
+  Trash2,
+  Unlock,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,6 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { chatApi } from "../services/chat.api";
 import type {
   ChatDirectoryUser,
   ChatMessage,
@@ -16,6 +28,7 @@ import type {
 import { formatDaySeparator, isSameDay } from "../lib/chat.utils";
 import { MessageBubble } from "./MessageBubble";
 import { ChatComposer } from "./ChatComposer";
+import { ChatSearchBar } from "./ChatSearchBar";
 import { GroupInfoDrawer } from "./GroupInfoDrawer";
 import { RoomAvatar } from "./RoomAvatar";
 
@@ -27,6 +40,8 @@ interface ConversationPanelProps {
   canDelete: boolean;
   typingName: string | null;
   hasMore: boolean;
+  /** Todas las salas del usuario (para el ForwardModal) */
+  rooms?: ChatRoom[];
   onLoadMore: () => void;
   onSend: (payload: SendMessagePayload) => Promise<void>;
   onDelete: (message: ChatMessage) => void;
@@ -52,6 +67,7 @@ export const ConversationPanel = ({
   canDelete,
   typingName,
   hasMore,
+  rooms = [],
   onLoadMore,
   onSend,
   onDelete,
@@ -72,13 +88,74 @@ export const ConversationPanel = ({
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
 
+  // ── Búsqueda interna ────────────────────────────────────────────────────
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, room?.id]);
 
   useEffect(() => {
     setInfoOpen(false);
+    setShowSearch(false);
+    setSearchQuery("");
+    setCurrentMatchIndex(0);
   }, [room?.id]);
+
+  // ── Mensajes filtrados por búsqueda ─────────────────────────────────────
+  const matchingIds = useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase();
+    return messages
+      .filter((m) => !m.is_deleted && m.content?.toLowerCase().includes(q))
+      .map((m) => m.id);
+  }, [messages, searchQuery]);
+
+  const handleSearchNavigate = useCallback(
+    (direction: "prev" | "next") => {
+      if (matchingIds.length === 0) return;
+      setCurrentMatchIndex((prev) => {
+        const next =
+          direction === "next"
+            ? (prev + 1) % matchingIds.length
+            : (prev - 1 + matchingIds.length) % matchingIds.length;
+        // Scroll al match correspondiente
+        const el = document.getElementById(`msg-${matchingIds[next]}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return next;
+      });
+    },
+    [matchingIds],
+  );
+
+  const handleCloseSearch = () => {
+    setShowSearch(false);
+    setSearchQuery("");
+    setCurrentMatchIndex(0);
+  };
+
+  // ── Reenvío de mensajes ─────────────────────────────────────────────────
+  const handleForward = useCallback(
+    async (message: ChatMessage, targetRoomId: number) => {
+      try {
+        await chatApi.sendMessage(targetRoomId, {
+          content: message.content ?? "",
+          message_type: message.message_type,
+          file_url: message.file_url ?? undefined,
+          file_name: message.file_name ?? undefined,
+          caption: message.caption ?? undefined,
+          is_forwarded: true,
+        });
+        toast.success("Mensaje reenviado.");
+      } catch {
+        toast.error("No se pudo reenviar el mensaje.");
+        throw new Error("forward failed");
+      }
+    },
+    [],
+  );
 
   if (!room) {
     return (
@@ -94,6 +171,7 @@ export const ConversationPanel = ({
 
   const isGroup = room.room_type === "GROUP";
   const canStartPrivate = isGroup && Boolean(onStartPrivateChat);
+  const activeMembers = room.members.filter((m) => m.is_active);
 
   const startPrivateWith = (userId: number) => {
     setInfoOpen(false);
@@ -118,6 +196,7 @@ export const ConversationPanel = ({
 
   return (
     <section className="flex-1 flex flex-col min-w-0 h-full bg-[#efeae2] dark:bg-[#0b141a]">
+      {/* Header */}
       <header className="h-16 px-4 flex items-center justify-between bg-card border-b border-border shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           {onBack && (
@@ -142,34 +221,67 @@ export const ConversationPanel = ({
             <div className="flex items-center gap-3 min-w-0">{roomIdentity}</div>
           )}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="size-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-              aria-label="Opciones del chat"
-            >
-              <MoreVertical size={18} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setInfoOpen(true)}>
-              <Info size={14} />
-              Info del chat
-            </DropdownMenuItem>
-            {canDeleteRoom && onDeleteRoom && (
-              <DropdownMenuItem
-                onClick={onDeleteRoom}
-                className="text-destructive focus:text-destructive"
+
+        <div className="flex items-center gap-1">
+          {/* Botón lupa — abre/cierra búsqueda */}
+          <button
+            type="button"
+            onClick={() => setShowSearch((v) => !v)}
+            className={`size-9 rounded-full flex items-center justify-center transition-colors ${
+              showSearch
+                ? "bg-sky-500/15 text-sky-600"
+                : "hover:bg-muted text-muted-foreground"
+            }`}
+            aria-label={showSearch ? "Cerrar búsqueda" : "Buscar en conversación"}
+            title="Buscar en conversación"
+          >
+            <Search size={18} />
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="size-9 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
+                aria-label="Opciones del chat"
               >
-                <Trash2 size={14} />
-                Eliminar conversación
+                <MoreVertical size={18} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setInfoOpen(true)}>
+                <Info size={14} />
+                Info del chat
               </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {canDeleteRoom && onDeleteRoom && (
+                <DropdownMenuItem
+                  onClick={onDeleteRoom}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 size={14} />
+                  Eliminar conversación
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
 
+      {/* Barra de búsqueda (se desliza bajo el header) */}
+      {showSearch && (
+        <ChatSearchBar
+          matchCount={matchingIds.length}
+          currentMatch={matchingIds.length > 0 ? currentMatchIndex + 1 : 0}
+          onSearch={(q) => {
+            setSearchQuery(q);
+            setCurrentMatchIndex(0);
+          }}
+          onNavigate={handleSearchNavigate}
+          onClose={handleCloseSearch}
+        />
+      )}
+
+      {/* Mensajes */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
         {hasMore && (
           <div className="flex justify-center py-2">
@@ -191,8 +303,11 @@ export const ConversationPanel = ({
           const prev = messages[index - 1];
           const showDay = !prev || !isSameDay(prev.created_at, message.created_at);
           const showSender =
-            isGroup &&
-            (!prev || prev.sender !== message.sender || showDay);
+            isGroup && (!prev || prev.sender !== message.sender || showDay);
+
+          const matchIdx = matchingIds.indexOf(message.id);
+          const isCurrentMatch = matchIdx !== -1 && matchIdx === currentMatchIndex;
+
           return (
             <div key={message.id}>
               {showDay && (
@@ -207,10 +322,14 @@ export const ConversationPanel = ({
                 mine={message.sender === currentUserId}
                 showSender={showSender}
                 canDelete={canDelete}
+                highlight={searchQuery || undefined}
+                isCurrentMatch={isCurrentMatch}
+                rooms={rooms}
                 onDelete={onDelete}
                 onOpenImage={setLightbox}
                 onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
                 onVisible={onMessageVisible}
+                onForward={handleForward}
               />
             </div>
           );
@@ -218,6 +337,7 @@ export const ConversationPanel = ({
         <div ref={bottomRef} />
       </div>
 
+      {/* Footer: composer o modo solo-lectura */}
       {isAuditRoom ? (
         <div className="px-4 py-3 bg-amber-500/10 border-t border-amber-500/30 text-center text-[13px] text-amber-700 dark:text-amber-400 flex items-center justify-center gap-2">
           <Eye size={14} />
@@ -230,11 +350,7 @@ export const ConversationPanel = ({
             activo ni una autorización vigente.
           </p>
           {canUnlockDirect && room.room_type === "DIRECT" && onUnlockDirect && (
-            <Button
-              size="sm"
-              onClick={onUnlockDirect}
-              disabled={unlocking}
-            >
+            <Button size="sm" onClick={onUnlockDirect} disabled={unlocking}>
               {unlocking ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
@@ -245,9 +361,14 @@ export const ConversationPanel = ({
           )}
         </div>
       ) : (
-        <ChatComposer onSend={onSend} onTyping={onTyping} />
+        <ChatComposer
+          onSend={onSend}
+          onTyping={onTyping}
+          members={activeMembers}
+        />
       )}
 
+      {/* Lightbox de imagen */}
       {lightbox && (
         <button
           type="button"
