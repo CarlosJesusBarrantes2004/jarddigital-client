@@ -52,6 +52,16 @@ export interface ChatRoom {
   unread_count: number;
 }
 
+export interface ChatMessageReplySnippet {
+  id: number;
+  room: number;
+  sender: number | null;
+  sender_nombre: string | null;
+  content: string | null;
+  message_type: ChatMessageType;
+  is_deleted: boolean;
+}
+
 export interface ChatMessage {
   id: number;
   room: number;
@@ -68,6 +78,7 @@ export interface ChatMessage {
   created_at: string;
   delivery_status: ChatDeliveryStatus;
   is_read: boolean;
+  reply_to?: ChatMessageReplySnippet | null;
 }
 
 export interface PaginatedMessages {

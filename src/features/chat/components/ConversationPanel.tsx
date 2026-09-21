@@ -47,7 +47,7 @@ interface ConversationPanelProps {
   onDelete: (message: ChatMessage) => void;
   onTyping: () => void;
   onBack?: () => void;
-  onStartPrivateChat?: (userId: number) => void;
+  onStartPrivateChat?: (userId: number, replyMessage?: ChatMessage) => void;
   onMessageVisible?: (messageId: number) => void;
   users?: ChatDirectoryUser[];
   onRoomUpdated?: (room: ChatRoom) => void;
@@ -57,6 +57,8 @@ interface ConversationPanelProps {
   isAuditRoom?: boolean;
   canDeleteRoom?: boolean;
   onDeleteRoom?: () => void;
+  pendingReply?: { roomId: number; message: ChatMessage } | null;
+  onClearPendingReply?: () => void;
 }
 
 export const ConversationPanel = ({
@@ -83,10 +85,15 @@ export const ConversationPanel = ({
   isAuditRoom,
   canDeleteRoom,
   onDeleteRoom,
+  pendingReply,
+  onClearPendingReply,
 }: ConversationPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [consumedReplyId, setConsumedReplyId] = useState<number | null>(null);
 
   // ── Búsqueda interna ────────────────────────────────────────────────────
   const [showSearch, setShowSearch] = useState(false);
@@ -173,22 +180,29 @@ export const ConversationPanel = ({
   const canStartPrivate = isGroup && Boolean(onStartPrivateChat);
   const activeMembers = room.members.filter((m) => m.is_active);
 
-  const startPrivateWith = (userId: number) => {
-    setInfoOpen(false);
-    onStartPrivateChat?.(userId);
-  };
+  // For audit DIRECT chats, pick the first member as "right side" perspective
+  const auditPerspectiveId = isAuditDirect
+    ? room.members[0]?.user ?? null
+    : null;
+
+  // Header: show both names for audit DIRECT chats
+  const headerName = isAuditDirect
+    ? room.members.map((m) => m.nombre_completo).join(" · ")
+    : room.display_name;
 
   const roomIdentity = (
     <>
       <RoomAvatar room={room} className="size-10" />
       <div className="min-w-0">
-        <p className="text-sm font-semibold truncate">{room.display_name}</p>
+        <p className="text-sm font-semibold truncate">{headerName}</p>
         <p className="text-[11px] text-muted-foreground truncate">
           {typingName
             ? `${typingName} está escribiendo…`
             : isGroup
               ? `${room.members.length} integrantes`
-              : "Chat privado"}
+              : isAuditDirect
+                ? "Chat privado — Auditoría"
+                : "Chat privado"}
         </p>
       </div>
     </>
@@ -309,7 +323,7 @@ export const ConversationPanel = ({
           const isCurrentMatch = matchIdx !== -1 && matchIdx === currentMatchIndex;
 
           return (
-            <div key={message.id}>
+            <div key={message.id} data-message-id={message.id}>
               {showDay && (
                 <div className="flex justify-center my-3">
                   <span className="text-[11px] bg-white/80 dark:bg-secondary px-3 py-1 rounded-full text-muted-foreground shadow-sm">

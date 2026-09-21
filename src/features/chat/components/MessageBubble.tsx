@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type TouchEvent as ReactTouchEvent } from "react";
 import {
   Check,
   CheckCheck,
@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ChatDeliveryStatus, ChatMessage } from "../types/chat.types";
+import type { ChatDeliveryStatus, ChatMessage, ChatMessageReplySnippet } from "../types/chat.types";
 import {
   avatarTone,
   formatMessageClock,
@@ -37,10 +37,13 @@ interface MessageBubbleProps {
   rooms?: import("../types/chat.types").ChatRoom[];
   onDelete: (message: ChatMessage) => void;
   onOpenImage: (url: string) => void;
-  onStartPrivateChat?: (userId: number) => void;
+  onStartPrivateChat?: (userId: number, replyMessage?: ChatMessage) => void;
   onVisible?: (messageId: number) => void;
   onForward?: (message: ChatMessage, targetRoomId: number) => Promise<void>;
 }
+
+// Minimum swipe distance (px) to trigger reply
+const SWIPE_REPLY_THRESHOLD = 60;
 
 export const MessageBubble = ({
   message,
@@ -61,9 +64,69 @@ export const MessageBubble = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const reportedRef = useRef(false);
   const senderName = message.sender_nombre || "Usuario";
+
+  // In audit mode, align messages based on perspective user
+  const effectiveMine = auditPerspectiveId != null
+    ? message.sender === auditPerspectiveId
+    : mine;
+
   const canPrivate = Boolean(
     onStartPrivateChat && !mine && message.sender,
   );
+
+  // --- Swipe-to-reply state ---
+  const swipeRef = useRef({
+    startX: 0,
+    startY: 0,
+    swiping: false,
+    triggered: false,
+  });
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const canReply = Boolean(onReply && !message.is_deleted && !isReadOnly);
+
+  const handleTouchStart = useCallback((e: ReactTouchEvent) => {
+    if (!canReply) return;
+    const touch = e.touches[0];
+    swipeRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      swiping: false,
+      triggered: false,
+    };
+  }, [canReply]);
+
+  const handleTouchMove = useCallback((e: ReactTouchEvent) => {
+    if (!canReply) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - swipeRef.current.startX;
+    const dy = touch.clientY - swipeRef.current.startY;
+
+    // Only trigger horizontal swipe if horizontal movement exceeds vertical
+    if (!swipeRef.current.swiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      swipeRef.current.swiping = true;
+    }
+
+    if (!swipeRef.current.swiping) return;
+
+    // Only allow right swipe (positive dx), capped at threshold + some extra
+    const offset = Math.max(0, Math.min(dx, SWIPE_REPLY_THRESHOLD + 20));
+    setSwipeOffset(offset);
+
+    if (offset >= SWIPE_REPLY_THRESHOLD && !swipeRef.current.triggered) {
+      swipeRef.current.triggered = true;
+      // Haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(30);
+    }
+  }, [canReply]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (swipeRef.current.triggered && onReply) {
+      onReply(message);
+    }
+    setSwipeOffset(0);
+    swipeRef.current = { startX: 0, startY: 0, swiping: false, triggered: false };
+  }, [message, onReply]);
 
   useEffect(() => {
     reportedRef.current = false;
@@ -117,46 +180,110 @@ export const MessageBubble = ({
       id={`msg-${message.id}`}
       className={cn("flex w-full gap-2", mine ? "justify-end" : "justify-start")}
     >
-      {canPrivate && (
-        <DropdownMenu open={privateMenuOpen} onOpenChange={setPrivateMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="size-8 shrink-0 self-end rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-              aria-label={`Chatear con ${senderName}`}
-            >
-              <Avatar className="size-8">
-                <AvatarFallback
-                  className={cn("text-white text-[10px]", avatarTone(senderName))}
-                >
-                  {initials(senderName)}
-                </AvatarFallback>
-              </Avatar>
-            </button>
-          </DropdownMenuTrigger>
-          <PrivateChatMenuContent
-            memberName={senderName}
-            onChat={() => onStartPrivateChat?.(message.sender!)}
-          />
-        </DropdownMenu>
+      {/* Swipe-to-reply indicator */}
+      {swipeOffset > 0 && (
+        <div
+          className={cn(
+            "absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center rounded-full size-8 transition-opacity",
+            swipeOffset >= SWIPE_REPLY_THRESHOLD
+              ? "bg-sky-500 text-white opacity-100"
+              : "bg-muted text-muted-foreground opacity-70",
+          )}
+          style={{ transform: `translate(${Math.max(0, swipeOffset - 36)}px, -50%)` }}
+        >
+          <CornerUpLeft size={16} />
+        </div>
       )}
 
       <div
         className={cn(
-          "relative max-w-[78%] rounded-lg px-2.5 py-1.5 shadow-sm",
-          mine
-            ? "bg-[#d9fdd3] dark:bg-sky-900/55 rounded-br-none"
-            : "bg-white dark:bg-secondary rounded-bl-none",
-          canPrivate && "cursor-pointer",
+          "flex w-full gap-2 transition-transform",
+          effectiveMine ? "justify-end" : "justify-start"
         )}
-        onClick={handleBubbleClick}
+        style={{
+          transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : undefined,
+          transition: swipeOffset === 0 ? "transform 200ms ease-out" : "none",
+        }}
       >
-        {showSender && !mine && (
-          <button
-            type="button"
-            className={cn(
-              "text-[11px] font-semibold text-sky-700 dark:text-sky-300 mb-0.5 text-left",
-              canPrivate && "hover:underline",
+        {canPrivate && (
+          <DropdownMenu open={privateMenuOpen} onOpenChange={setPrivateMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="size-8 shrink-0 self-end rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                aria-label={`Chatear con ${senderName}`}
+              >
+                <Avatar className="size-8">
+                  <AvatarFallback
+                    className={cn("text-white text-[10px]", avatarTone(senderName))}
+                  >
+                    {initials(senderName)}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <PrivateChatMenuContent
+              memberName={senderName}
+              onChat={() => onStartPrivateChat?.(message.sender!)}
+              onReplyPrivately={() => onStartPrivateChat?.(message.sender!, message)}
+            />
+          </DropdownMenu>
+        )}
+
+        <div
+          className={cn(
+            "relative max-w-[78%] rounded-lg px-2.5 py-1.5 shadow-sm",
+            effectiveMine
+              ? "bg-[#d9fdd3] dark:bg-sky-900/55 rounded-br-none"
+              : "bg-white dark:bg-secondary rounded-bl-none",
+            canPrivate && "cursor-pointer",
+          )}
+          onClick={handleBubbleClick}
+        >
+          {showSender && (!effectiveMine || auditPerspectiveId != null) && (
+            <button
+              type="button"
+              className={cn(
+                "text-[11px] font-semibold text-sky-700 dark:text-sky-300 mb-0.5",
+                effectiveMine ? "text-right block w-full" : "text-left",
+                canPrivate && "hover:underline",
+              )}
+              onClick={(event) => {
+                event.stopPropagation();
+                openPrivateMenu();
+              }}
+            >
+              {senderName}
+            </button>
+          )}
+
+          {/* Reply snippet */}
+          {message.reply_to && (
+            <ReplySnippet
+              snippet={message.reply_to}
+              onScrollTo={onScrollToMessage}
+              mine={effectiveMine}
+            />
+          )}
+
+          {message.is_deleted ? (
+            <p className="text-[13px] italic text-muted-foreground">
+              Este mensaje fue eliminado
+            </p>
+          ) : (
+            <MessageBody
+              message={message}
+              mine={effectiveMine}
+              onOpenImage={onOpenImage}
+            />
+          )}
+
+          <div className="flex items-center justify-end gap-1 mt-0.5">
+            <span className="text-[10px] text-muted-foreground">
+              {formatMessageClock(message.created_at)}
+            </span>
+            {effectiveMine && !message.is_deleted && (
+              <DeliveryTicks status={resolveDeliveryStatus(message)} />
             )}
             onClick={(event) => {
               event.stopPropagation();
@@ -244,6 +371,69 @@ export const MessageBubble = ({
         />
       )}
     </div>
+  );
+};
+
+/** Inline preview of the message being replied to */
+const ReplySnippet = ({
+  snippet,
+  onScrollTo,
+  mine,
+}: {
+  snippet: ChatMessageReplySnippet;
+  onScrollTo?: (messageId: number) => void;
+  mine: boolean;
+}) => {
+  const replyName = snippet.sender_nombre || "Usuario";
+
+  const previewText = snippet.is_deleted
+    ? "Este mensaje fue eliminado"
+    : snippet.message_type === "IMAGE"
+      ? "📷 Imagen"
+      : snippet.message_type === "AUDIO"
+        ? "🎤 Audio"
+        : snippet.message_type === "PDF"
+          ? "📄 PDF"
+          : snippet.message_type === "DOCUMENT"
+            ? "📎 Documento"
+            : snippet.content || "";
+
+  const previewIcon = !snippet.is_deleted && snippet.message_type === "IMAGE" ? (
+    <ImageIcon size={12} className="shrink-0 text-muted-foreground" />
+  ) : !snippet.is_deleted && snippet.message_type === "AUDIO" ? (
+    <Mic size={12} className="shrink-0 text-muted-foreground" />
+  ) : !snippet.is_deleted && (snippet.message_type === "PDF" || snippet.message_type === "DOCUMENT") ? (
+    <FileText size={12} className="shrink-0 text-muted-foreground" />
+  ) : null;
+
+  return (
+    <button
+      type="button"
+      data-no-private-menu
+      className={cn(
+        "block w-full text-left rounded-md px-2.5 py-1.5 mb-1 border-l-[3px] transition-colors",
+        mine
+          ? "bg-[#c5f0bc] dark:bg-sky-800/40 border-l-emerald-600 dark:border-l-sky-400"
+          : "bg-gray-100 dark:bg-muted/60 border-l-sky-500 dark:border-l-sky-400",
+      )}
+      onClick={(e) => {
+        e.stopPropagation();
+        onScrollTo?.(snippet.id);
+      }}
+    >
+      <p className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 truncate">
+        {replyName}
+      </p>
+      <div className="flex items-center gap-1">
+        {previewIcon}
+        <p className={cn(
+          "text-[12px] truncate",
+          snippet.is_deleted ? "italic text-muted-foreground" : "text-muted-foreground",
+        )}>
+          {previewText}
+        </p>
+      </div>
+    </button>
   );
 };
 

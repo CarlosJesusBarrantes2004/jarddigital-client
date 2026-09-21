@@ -62,6 +62,7 @@ export const ChatPage = () => {
   const [pendingDeleteRoom, setPendingDeleteRoom] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [typingName, setTypingName] = useState<string | null>(null);
+  const [pendingReply, setPendingReply] = useState<{ roomId: number; message: ChatMessage } | null>(null);
   const activeRoomIdRef = useRef<number | null>(null);
   const typingTimer = useRef<number | undefined>(undefined);
   const openingDirectRef = useRef<number | null>(null);
@@ -232,7 +233,7 @@ export const ChatPage = () => {
         if (!sent) {
           void chatApi.markRead(currentRoom, ids);
         }
-      }, 200);
+      }, 300);
     },
     [sendViaSocket],
   );
@@ -417,29 +418,36 @@ export const ChatPage = () => {
     }
   };
 
-  const openDirect = async (userId: number) => {
+  const openDirect = async (userId: number, replyMessage?: ChatMessage) => {
     if (!userId || userId === currentUserId) return;
     if (openingDirectRef.current === userId) return;
     openingDirectRef.current = userId;
+    
     try {
       if (filter === "grupos") setFilter("todos");
       setSearch("");
 
-      const existing = findDirectRoomWithUser(rooms, userId);
+      let targetRoom: ChatRoom;
+      const existing = findDirectRoomWithUser(rooms, userId, currentUserId);
+      
       if (existing) {
-        await selectRoom(existing);
-        return;
+        targetRoom = existing;
+      } else {
+        targetRoom = await chatApi.createRoom({
+          room_type: "DIRECT",
+          member_ids: [userId],
+        });
+        patchRooms((prev) => {
+          const exists = prev.some((item) => item.id === targetRoom.id);
+          return exists ? prev : [targetRoom, ...prev];
+        });
       }
 
-      const room = await chatApi.createRoom({
-        room_type: "DIRECT",
-        member_ids: [userId],
-      });
-      patchRooms((prev) => {
-        const exists = prev.some((item) => item.id === room.id);
-        return exists ? prev : [room, ...prev];
-      });
-      await selectRoom(room);
+      if (replyMessage) {
+        setPendingReply({ roomId: targetRoom.id, message: replyMessage });
+      }
+
+      await selectRoom(targetRoom);
     } catch (error) {
       toast.error(
         chatApi.extraerError(
@@ -593,11 +601,14 @@ export const ChatPage = () => {
             </div>
           ) : (
             <ConversationPanel
+              key={activeRoom?.id ?? "empty"}
               room={activeRoom}
               messages={messages}
               loading={loadingMessages}
               currentUserId={currentUserId}
               canDelete={canDelete}
+              pendingReply={pendingReply}
+              onClearPendingReply={() => setPendingReply(null)}
               typingName={typingName}
               hasMore={hasMore}
               rooms={rooms}
@@ -611,7 +622,7 @@ export const ChatPage = () => {
                 if (activeRoomId) sendTyping(activeRoomId);
               }}
               onBack={closeConversation}
-              onStartPrivateChat={(userId) => void openDirect(userId)}
+              onStartPrivateChat={(userId, replyMsg) => void openDirect(userId, replyMsg)}
               onMessageVisible={enqueueVisibleRead}
               users={usersQuery.data ?? []}
               canUnlockDirect={canAllowDirect || isDueno}

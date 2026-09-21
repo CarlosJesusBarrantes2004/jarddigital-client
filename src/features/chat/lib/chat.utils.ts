@@ -51,11 +51,13 @@ export function mergeGroupSnapshot(
 export function findDirectRoomWithUser(
   rooms: ChatRoom[],
   userId: number,
+  currentUserId: number,
 ): ChatRoom | undefined {
   return rooms.find(
     (room) =>
       room.room_type === "DIRECT" &&
-      room.members.some((member) => member.user === userId),
+      room.members.some((member) => member.user === userId) &&
+      room.members.some((member) => member.user === currentUserId),
   );
 }
 

@@ -34,6 +34,8 @@ interface ChatComposerProps {
   members?: ChatMember[];
   onSend: (payload: SendMessagePayload) => Promise<void>;
   onTyping?: () => void;
+  replyTo?: ChatMessage | null;
+  onCancelReply?: () => void;
 }
 
 export const ChatComposer = ({
@@ -42,6 +44,8 @@ export const ChatComposer = ({
   members = [],
   onSend,
   onTyping,
+  replyTo,
+  onCancelReply,
 }: ChatComposerProps) => {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -119,6 +123,7 @@ export const ChatComposer = ({
     if (!canSend) return;
 
     const content = text.trim();
+    const replyId = replyTo?.id ?? undefined;
     setText("");
     mentionedIdsRef.current.clear();
     setSending(true);
@@ -225,6 +230,8 @@ export const ChatComposer = ({
   };
 
   const uploadAndSend = async (file: File) => {
+    const replyId = replyTo?.id ?? undefined;
+    onCancelReply?.();
     setSending(true);
     try {
       const uploaded = await uploadChatAssetToCloudinary(file, "chat");
@@ -232,6 +239,7 @@ export const ChatComposer = ({
         message_type: messageTypeFromFile(file),
         file_url: uploaded.url,
         file_name: uploaded.name,
+        reply_to_id: replyId,
       });
     } catch (error) {
       toast.error(
