@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { authService } from "../services/authService";
+import { TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/api/axios";
 
 import { AuthContext } from "./AuthContext";
 
@@ -44,6 +45,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const checkAuth = useCallback(async (): Promise<User | null> => {
+    // Guard: si no hay ningún token en storage, no tiene sentido llamar
+    // a /users/me/ — daría 401, el interceptor intentaría refrescar, y si
+    // tampoco hay refresh token se redirige a /auth/login, causando un
+    // bucle de remontajes cuando el usuario ya está en esa ruta.
+    const hasToken =
+      sessionStorage.getItem(TOKEN_KEY) ??
+      localStorage.getItem(TOKEN_KEY) ??
+      sessionStorage.getItem(REFRESH_TOKEN_KEY) ??
+      localStorage.getItem(REFRESH_TOKEN_KEY);
+
+    if (!hasToken) {
+      setIsLoading(false);
+      return null;
+    }
+
     try {
       const userData = await authService.getUserProfile();
       setUserState(userData);
