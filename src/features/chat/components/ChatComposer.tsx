@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { uploadChatAssetToCloudinary } from "@/lib/cloudinary.utils";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import { messageTypeFromFile } from "../lib/chat.utils";
-import type { SendMessagePayload } from "../types/chat.types";
+import type { ChatMessage, SendMessagePayload } from "../types/chat.types";
 
 const EMOJIS = [
   "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎", "🤔", "😴",
@@ -27,6 +27,8 @@ interface ChatComposerProps {
   disabledReason?: string;
   onSend: (payload: SendMessagePayload) => Promise<void>;
   onTyping?: () => void;
+  replyTo?: ChatMessage | null;
+  onCancelReply?: () => void;
 }
 
 export const ChatComposer = ({
@@ -34,6 +36,8 @@ export const ChatComposer = ({
   disabledReason,
   onSend,
   onTyping,
+  replyTo,
+  onCancelReply,
 }: ChatComposerProps) => {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -53,6 +57,16 @@ export const ChatComposer = ({
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 150);
+    };
+    window.addEventListener("focus-chat-composer", handleFocus);
+    return () => window.removeEventListener("focus-chat-composer", handleFocus);
+  }, []);
 
   // Cleanup ObjectURL on unmount or when preview changes
   useEffect(() => {
@@ -78,9 +92,11 @@ export const ChatComposer = ({
     // If there's a pasted image, send it (with optional text as content)
     if (pastedImage) {
       const content = text.trim() || undefined;
+      const replyId = replyTo?.id ?? undefined;
       setText("");
       const imageToSend = pastedImage;
       clearPastedImage();
+      onCancelReply?.();
       setSending(true);
       try {
         const uploaded = await uploadChatAssetToCloudinary(imageToSend, "chat");
@@ -89,6 +105,7 @@ export const ChatComposer = ({
           content,
           file_url: uploaded.url,
           file_name: uploaded.name,
+          reply_to_id: replyId,
         });
       } catch (error) {
         toast.error(
@@ -102,10 +119,12 @@ export const ChatComposer = ({
 
     // Text-only send
     const content = text.trim();
+    const replyId = replyTo?.id ?? undefined;
     setText("");
+    onCancelReply?.();
     setSending(true);
     try {
-      await onSend({ content, message_type: "TEXT" });
+      await onSend({ content, message_type: "TEXT", reply_to_id: replyId });
     } catch (error) {
       setText(content);
       throw error;
@@ -139,6 +158,8 @@ export const ChatComposer = ({
   };
 
   const uploadAndSend = async (file: File) => {
+    const replyId = replyTo?.id ?? undefined;
+    onCancelReply?.();
     setSending(true);
     try {
       const uploaded = await uploadChatAssetToCloudinary(file, "chat");
@@ -146,6 +167,7 @@ export const ChatComposer = ({
         message_type: messageTypeFromFile(file),
         file_url: uploaded.url,
         file_name: uploaded.name,
+        reply_to_id: replyId,
       });
     } catch (error) {
       toast.error(
@@ -189,6 +211,38 @@ export const ChatComposer = ({
       <input ref={imageRef} type="file" accept="image/*" hidden onChange={onFile} />
       <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={onFile} />
       <input ref={txtRef} type="file" accept=".txt,text/plain" hidden onChange={onFile} />
+
+      {/* Reply bar */}
+      {replyTo && (
+        <div className="mb-2 flex items-center gap-2 bg-muted/60 border border-border rounded-xl px-3 py-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex-1 min-w-0 border-l-[3px] border-l-sky-500 pl-2">
+            <p className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 truncate">
+              {replyTo.sender_nombre || "Usuario"}
+            </p>
+            <p className="text-[12px] text-muted-foreground truncate">
+              {replyTo.is_deleted
+                ? "Este mensaje fue eliminado"
+                : replyTo.message_type === "IMAGE"
+                  ? "\uD83D\uDCF7 Imagen"
+                  : replyTo.message_type === "AUDIO"
+                    ? "\uD83C\uDFA4 Audio"
+                    : replyTo.message_type === "PDF"
+                      ? "\uD83D\uDCC4 PDF"
+                      : replyTo.message_type === "DOCUMENT"
+                        ? "\uD83D\uDCCE Documento"
+                        : replyTo.content || ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="size-6 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center shrink-0"
+            aria-label="Cancelar respuesta"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Pasted image preview */}
       {pastedImage && pastedPreviewUrl && (

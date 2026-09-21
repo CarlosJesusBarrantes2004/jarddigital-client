@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Eye, Info, Loader2, MoreVertical, Trash2, Unlock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +32,7 @@ interface ConversationPanelProps {
   onDelete: (message: ChatMessage) => void;
   onTyping: () => void;
   onBack?: () => void;
-  onStartPrivateChat?: (userId: number) => void;
+  onStartPrivateChat?: (userId: number, replyMessage?: ChatMessage) => void;
   onMessageVisible?: (messageId: number) => void;
   users?: ChatDirectoryUser[];
   onRoomUpdated?: (room: ChatRoom) => void;
@@ -42,6 +42,8 @@ interface ConversationPanelProps {
   isAuditRoom?: boolean;
   canDeleteRoom?: boolean;
   onDeleteRoom?: () => void;
+  pendingReply?: { roomId: number; message: ChatMessage } | null;
+  onClearPendingReply?: () => void;
 }
 
 export const ConversationPanel = ({
@@ -67,10 +69,15 @@ export const ConversationPanel = ({
   isAuditRoom,
   canDeleteRoom,
   onDeleteRoom,
+  pendingReply,
+  onClearPendingReply,
 }: ConversationPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [consumedReplyId, setConsumedReplyId] = useState<number | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,7 +85,39 @@ export const ConversationPanel = ({
 
   useEffect(() => {
     setInfoOpen(false);
-  }, [room?.id]);
+    if (
+      pendingReply &&
+      pendingReply.roomId === room?.id &&
+      consumedReplyId !== pendingReply.message.id
+    ) {
+      setReplyTo(pendingReply.message);
+      setConsumedReplyId(pendingReply.message.id);
+      
+      // Delay focus to ensure ChatComposer has rendered the reply bar
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("focus-chat-composer"));
+      }, 300);
+    }
+  }, [pendingReply, room?.id, consumedReplyId]);
+
+  const scrollToMessage = useCallback((messageId: number) => {
+    const container = scrollAreaRef.current;
+    if (!container) return;
+    const el = container.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Brief highlight effect
+    el.classList.add("bg-sky-500/10");
+    setTimeout(() => el.classList.remove("bg-sky-500/10"), 1500);
+  }, []);
+
+  const startPrivateWith = useCallback(
+    (userId: number, replyMessage?: ChatMessage) => {
+      setInfoOpen(false);
+      onStartPrivateChat?.(userId, replyMessage);
+    },
+    [onStartPrivateChat],
+  );
 
   if (!room) {
     return (
@@ -94,23 +133,31 @@ export const ConversationPanel = ({
 
   const isGroup = room.room_type === "GROUP";
   const canStartPrivate = isGroup && Boolean(onStartPrivateChat);
+  const isAuditDirect = Boolean(isAuditRoom && !isGroup);
 
-  const startPrivateWith = (userId: number) => {
-    setInfoOpen(false);
-    onStartPrivateChat?.(userId);
-  };
+  // For audit DIRECT chats, pick the first member as "right side" perspective
+  const auditPerspectiveId = isAuditDirect
+    ? room.members[0]?.user ?? null
+    : null;
+
+  // Header: show both names for audit DIRECT chats
+  const headerName = isAuditDirect
+    ? room.members.map((m) => m.nombre_completo).join(" · ")
+    : room.display_name;
 
   const roomIdentity = (
     <>
       <RoomAvatar room={room} className="size-10" />
       <div className="min-w-0">
-        <p className="text-sm font-semibold truncate">{room.display_name}</p>
+        <p className="text-sm font-semibold truncate">{headerName}</p>
         <p className="text-[11px] text-muted-foreground truncate">
           {typingName
             ? `${typingName} está escribiendo…`
             : isGroup
               ? `${room.members.length} integrantes`
-              : "Chat privado"}
+              : isAuditDirect
+                ? "Chat privado — Auditoría"
+                : "Chat privado"}
         </p>
       </div>
     </>
@@ -170,7 +217,7 @@ export const ConversationPanel = ({
         </DropdownMenu>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
         {hasMore && (
           <div className="flex justify-center py-2">
             <button
@@ -191,10 +238,10 @@ export const ConversationPanel = ({
           const prev = messages[index - 1];
           const showDay = !prev || !isSameDay(prev.created_at, message.created_at);
           const showSender =
-            isGroup &&
+            (isGroup || isAuditDirect) &&
             (!prev || prev.sender !== message.sender || showDay);
           return (
-            <div key={message.id}>
+            <div key={message.id} data-message-id={message.id}>
               {showDay && (
                 <div className="flex justify-center my-3">
                   <span className="text-[11px] bg-white/80 dark:bg-secondary px-3 py-1 rounded-full text-muted-foreground shadow-sm">
@@ -211,6 +258,19 @@ export const ConversationPanel = ({
                 onOpenImage={setLightbox}
                 onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
                 onVisible={onMessageVisible}
+                auditPerspectiveId={auditPerspectiveId ?? undefined}
+                onReply={
+                  !isAuditRoom && !room.is_readonly
+                    ? (msg) => {
+                        setReplyTo(msg);
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent("focus-chat-composer"));
+                        }, 100);
+                      }
+                    : undefined
+                }
+                onScrollToMessage={scrollToMessage}
+                isReadOnly={Boolean(isAuditRoom || room.is_readonly)}
               />
             </div>
           );
@@ -245,7 +305,7 @@ export const ConversationPanel = ({
           )}
         </div>
       ) : (
-        <ChatComposer onSend={onSend} onTyping={onTyping} />
+        <ChatComposer onSend={onSend} onTyping={onTyping} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
       )}
 
       {lightbox && (
