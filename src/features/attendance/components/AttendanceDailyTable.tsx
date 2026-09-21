@@ -3,14 +3,12 @@ import {
   CheckCircle2,
   XCircle,
   Minus,
-  Save,
   Loader2,
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGlobalAttendanceData, useSaveMultiAsistenciaMasiva } from "../api";
 import type {
-  AsistenciaItemPayload,
   AttendanceUser,
   AttendanceFilters,
 } from "../types";
@@ -29,7 +27,7 @@ interface Props {
  * - TODOS los días (incluyendo domingos) → false (no asistió por defecto)
  * - RRHH debe marcar explícitamente "Asistió" para reducir el descuento
  */
-function getValorPorDefecto(_fechaISO: string): boolean | null {
+function getValorPorDefecto(): boolean | null {
   // Por defecto, cualquier día sin marcar se considera "Falta" (false)
   return false;
 }
@@ -227,7 +225,7 @@ export function AttendanceDailyTable({ filters, onFiltersChange }: Props) {
                       const status =
                         currentDBValue !== null
                           ? currentDBValue
-                          : getValorPorDefecto(selectedDate);
+                          : getValorPorDefecto();
 
                       return (
                         <tr

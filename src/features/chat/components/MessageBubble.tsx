@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent, type TouchEv
 import {
   Check,
   CheckCheck,
+  CornerUpLeft,
   CornerUpRight,
+  FileText,
+  Image as ImageIcon,
+  Mic,
   MoreVertical,
   Trash2,
 } from "lucide-react";
@@ -41,6 +45,7 @@ interface MessageBubbleProps {
   onVisible?: (messageId: number) => void;
   onForward?: (message: ChatMessage, targetRoomId: number) => Promise<void>;
   auditPerspectiveId?: number | null;
+  isReadOnly?: boolean;
   onReply?: (message: ChatMessage) => void;
   onScrollToMessage?: (messageId: number) => void;
 }
@@ -62,6 +67,7 @@ export const MessageBubble = ({
   onVisible,
   onForward,
   auditPerspectiveId,
+  isReadOnly = false,
   onReply,
   onScrollToMessage,
 }: MessageBubbleProps) => {
@@ -184,7 +190,10 @@ export const MessageBubble = ({
     <div
       ref={rootRef}
       id={`msg-${message.id}`}
-      className={cn("flex w-full gap-2", mine ? "justify-end" : "justify-start")}
+      className={cn("relative flex w-full gap-2", mine ? "justify-end" : "justify-start")}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Swipe-to-reply indicator */}
       {swipeOffset > 0 && (
@@ -243,6 +252,7 @@ export const MessageBubble = ({
               ? "bg-[#d9fdd3] dark:bg-sky-900/55 rounded-br-none"
               : "bg-white dark:bg-secondary rounded-bl-none",
             canPrivate && "cursor-pointer",
+            isCurrentMatch && "ring-2 ring-sky-400",
           )}
           onClick={handleBubbleClick}
         >

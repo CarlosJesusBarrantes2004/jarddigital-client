@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { MapPin, Globe, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback } from "react";
+import { MapPin, Globe, ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";

@@ -9,15 +9,6 @@ import { useRoles } from "@/features/core/hooks/useRoles";
 import { SECTIONS } from "@/components/sidebar";
 import type { RoleCode } from "@/features/auth/types";
 
-// Modules available in the sidebar
-const AVAILABLE_MODULES = [
-  "Operaciones",
-  "Comercial",
-  "Finanzas",
-  "Capital Humano",
-  "Configuración",
-];
-
 export const ModulesManager = () => {
   const { roles, loading: isLoadingRoles } = useRoles();
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
@@ -79,14 +70,6 @@ export const ModulesManager = () => {
 
     fetchModules();
   }, [selectedRoleId, roles]);
-
-  const toggleModule = (moduleName: string) => {
-    setSelectedModules((prev) =>
-      prev.includes(moduleName)
-        ? prev.filter((m) => m !== moduleName)
-        : [...prev, moduleName]
-    );
-  };
 
   const handleSave = async () => {
     if (!selectedRoleId) return;

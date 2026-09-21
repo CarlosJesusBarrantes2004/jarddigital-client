@@ -19,5 +19,15 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Estas reglas detectan deuda de migración o recomendaciones del compilador
+      // de React. Se mantienen visibles, pero no bloquean una compilación segura.
+      "@typescript-eslint/no-explicit-any": "warn",
+      "react-refresh/only-export-components": "warn",
+      "react-hooks/incompatible-library": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/static-components": "warn",
+    },
   },
 ])

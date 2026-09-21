@@ -1,5 +1,7 @@
 export type ChatRoomType = "DIRECT" | "GROUP";
 
+export type ChatFilter = "todos" | "grupos" | "privados" | "auditoria";
+
 export type ChatMessageType = "TEXT" | "IMAGE" | "AUDIO" | "DOCUMENT" | "PDF";
 
 export type ChatMemberRole = "ADMIN" | "MEMBER";

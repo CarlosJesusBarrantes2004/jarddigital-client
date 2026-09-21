@@ -109,10 +109,10 @@ export function ModalityForm({
                 <FormControl>
                   <input
                     placeholder="Ej: CALL"
-                    disabled={!!modality}
+                    disabled={Boolean(modality)}
                     className={cn(
                       "h-11 bg-background border rounded-xl px-3.5 font-mono text-sm text-foreground transition-all outline-none focus:border-primary focus:ring-4 focus:ring-primary/10",
-                      !!modality ? "opacity-50 cursor-not-allowed bg-muted" : "",
+                      modality ? "opacity-50 cursor-not-allowed bg-muted" : "",
                       form.formState.errors.codigo
                         ? "border-destructive focus:border-destructive focus:ring-destructive/10"
                         : "border-border",

@@ -89,7 +89,6 @@ export const ConversationPanel = ({
   onClearPendingReply,
 }: ConversationPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -372,6 +371,7 @@ export const ConversationPanel = ({
                 onVisible={onMessageVisible}
                 onForward={handleForward}
                 auditPerspectiveId={auditPerspectiveId}
+                isReadOnly={Boolean(isAuditRoom || room.is_readonly)}
                 onReply={handleReply}
                 onScrollToMessage={scrollToMessage}
               />

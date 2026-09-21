@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { uploadChatAssetToCloudinary } from "@/lib/cloudinary.utils";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import { messageTypeFromFile } from "../lib/chat.utils";
-import type { ChatMember, SendMessagePayload } from "../types/chat.types";
+import type { ChatMember, ChatMessage, SendMessagePayload } from "../types/chat.types";
 import { MentionDropdown } from "./MentionDropdown";
 import { PastePreviewModal } from "./PastePreviewModal";
 
@@ -133,6 +133,7 @@ export const ChatComposer = ({
         content,
         message_type: "TEXT",
         mentioned_user_ids: extractMentionIds(content),
+        reply_to_id: replyId,
       });
     } catch (error) {
       setText(content);

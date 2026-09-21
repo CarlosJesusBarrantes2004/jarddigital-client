@@ -694,7 +694,7 @@ export function VentaFormBackoffice({
 
     // FIX #5: Si el estado destino es RECHAZADO o ATENDIDO y la venta tenía un
     // sub-estado en SOT, lo limpiamos enviando null para que no quede esa validación.
-    const estadoDestinoCode = estadoSeleccionado?.codigo?.toUpperCase();
+    const estadoDestinoCode = estadoSeleccionado?.codigo?.toUpperCase() ?? "";
     const subEstadoFinal =
       estadoDestinoCode === "RECHAZADO" || ["ATENDIDO", "ATENDIDA"].includes(estadoDestinoCode)
         ? null

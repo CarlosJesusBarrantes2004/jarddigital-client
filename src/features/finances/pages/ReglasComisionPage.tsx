@@ -54,7 +54,7 @@ export const ReglasComisionPage = () => {
       ]);
       setReglas(reglasData.results);
       setModalidades(modsData);
-    } catch (error) {
+    } catch {
       toast.error("Error al cargar configuración");
     } finally {
       setIsLoading(false);

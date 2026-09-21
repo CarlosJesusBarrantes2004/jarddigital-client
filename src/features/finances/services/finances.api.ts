@@ -19,10 +19,10 @@ export interface ReglaComision {
   creado_en: string;
 }
 
-export interface ReglaComisionPayload extends Omit<
+export type ReglaComisionPayload = Omit<
   ReglaComision,
   "id" | "creado_en" | "codigo_modalidad"
-> {}
+>;
 
 export interface HistoricoPlanilla {
   id: number;

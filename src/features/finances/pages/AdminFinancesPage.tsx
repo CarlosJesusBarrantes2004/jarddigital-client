@@ -79,7 +79,7 @@ export const AdminFinancesPage = () => {
       ]);
       setPlanillas(dataAsesores);
       setNoAsesores(dataNoAsesores);
-    } catch (error) {
+    } catch {
       toast.error("Error de lectura");
     } finally {
       setIsLoadingTable(false);
@@ -140,7 +140,7 @@ export const AdminFinancesPage = () => {
       });
 
       setLiveDetalleVentas(ventasAisladas);
-    } catch (error) {
+    } catch {
       toast.error("No se pudo calcular la proyección de este asesor");
       setShowLiveModal(false);
     } finally {

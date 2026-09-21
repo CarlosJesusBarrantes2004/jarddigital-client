@@ -15,8 +15,6 @@ import {
   Laptop,
   Wallet,
   Newspaper,
-  Tag,
-  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -285,13 +283,11 @@ const NavItem = ({
 
 const NavSection = ({
   section,
-  roleCode,
   expanded,
   onClickItem,
   chatUnread = 0,
 }: {
   section: RouteSection;
-  roleCode: RoleCode;
   expanded: boolean;
   onClickItem?: () => void;
   chatUnread?: number;
@@ -501,14 +497,14 @@ export const Sidebar = ({
 
   // Filtrar SECTIONS por módulo y luego por roles en items
   const visibleSections = SECTIONS.map((section) => {
-    const hasExplicitModules =
-      user?.modulos_permitidos && user.modulos_permitidos.length > 0;
+    const permittedModules = user?.modulos_permitidos ?? [];
+    const hasExplicitModules = permittedModules.length > 0;
 
     // Si el usuario tiene modulos_permitidos configurados (> 0), usamos la base de datos
     // Si no tiene ninguno (array vacío o undefined), usamos la configuración por defecto del código
     const hasModuleAccess = hasExplicitModules
-      ? user.modulos_permitidos.includes(section.title) ||
-      section.items.some((i) => user.modulos_permitidos!.includes(i.label))
+      ? permittedModules.includes(section.title) ||
+      section.items.some((i) => permittedModules.includes(i.label))
       : section.items.some(
         (item) => item.roles.length === 0 || item.roles.includes(roleCode),
       );
@@ -521,8 +517,8 @@ export const Sidebar = ({
     const visibleItems = hasExplicitModules
       ? section.items.filter(
         (i) =>
-          user.modulos_permitidos.includes(i.label) ||
-          user.modulos_permitidos.includes(section.title),
+          permittedModules.includes(i.label) ||
+          permittedModules.includes(section.title),
       )
       : section.items.filter(
         (item) => item.roles.length === 0 || item.roles.includes(roleCode),
@@ -626,7 +622,6 @@ export const Sidebar = ({
               <NavSection
                 key={section.title}
                 section={section}
-                roleCode={roleCode}
                 expanded={expanded}
                 onClickItem={() => setMobileOpen(false)}
                 chatUnread={chatUnread}

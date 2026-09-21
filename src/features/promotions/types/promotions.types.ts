@@ -36,7 +36,7 @@ export interface CreatePromocionPayload {
   territorios?: Omit<PromocionTerritorio, "id" | "nombre_departamento" | "nombre_provincia" | "nombre_distrito">[];
 }
 
-export interface UpdatePromocionPayload extends Partial<CreatePromocionPayload> {}
+export type UpdatePromocionPayload = Partial<CreatePromocionPayload>;
 
 export interface Departamento {
   id: number;

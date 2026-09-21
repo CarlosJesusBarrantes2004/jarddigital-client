@@ -119,7 +119,7 @@ export const PromocionForm = ({
             const deptoName = first.nombre_departamento ?? departamentos.find(d => d.id === deptoId)?.nombre ?? "";
 
             // Load provinces for this depto
-            let provincias = await promotionsService.getProvincias(deptoId).catch(() => []);
+            const provincias = await promotionsService.getProvincias(deptoId).catch(() => []);
 
             // Is "todas las provincias"?
             const todasProvs = terrs.length === 1 && !first.id_provincia && !first.id_distrito;
@@ -209,7 +209,6 @@ export const PromocionForm = ({
   };
 
   /* ─── Territory summary for display ─── */
-  const territoryCount = buildTerritorioPayload(todosDepartamentos, entries).length;
   const territorySummary = buildTerritorioSummary(todosDepartamentos, entries);
   const hasTerritory = todosDepartamentos || entries.some(e => e.id_departamento);
 

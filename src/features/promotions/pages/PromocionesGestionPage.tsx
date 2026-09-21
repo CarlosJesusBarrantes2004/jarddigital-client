@@ -5,8 +5,6 @@ import {
   Pencil,
   Trash2,
   MapPin,
-  Loader2,
-  Package,
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

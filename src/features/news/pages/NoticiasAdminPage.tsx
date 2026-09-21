@@ -6,7 +6,6 @@ import {
   Trash2,
   Calendar,
   User,
-  Loader2,
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
