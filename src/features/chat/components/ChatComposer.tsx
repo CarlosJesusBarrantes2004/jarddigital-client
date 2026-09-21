@@ -68,6 +68,21 @@ export const ChatComposer = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
 
+  // Al elegir "Responder" el compositor puede haberse montado recién (por
+  // ejemplo, al abrir un chat directo). Esperar al render evita que el foco se
+  // pierda en el panel anterior y deja el cursor listo para escribir.
+  useEffect(() => {
+    if (!replyTo) return;
+    const frame = window.requestAnimationFrame(() => textareaRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [replyTo]);
+
+  useEffect(() => {
+    const focusComposer = () => textareaRef.current?.focus();
+    window.addEventListener("focus-chat-composer", focusComposer);
+    return () => window.removeEventListener("focus-chat-composer", focusComposer);
+  }, []);
+
   // Auto-resize del textarea
   useEffect(() => {
     const el = textareaRef.current;
@@ -135,6 +150,7 @@ export const ChatComposer = ({
         mentioned_user_ids: extractMentionIds(content),
         reply_to_id: replyId,
       });
+      onCancelReply?.();
     } catch (error) {
       setText(content);
       throw error;
@@ -157,8 +173,10 @@ export const ChatComposer = ({
         caption,
         file_url: uploaded.url,
         file_name: uploaded.name,
+        reply_to_id: replyTo?.id ?? undefined,
       });
       setText("");
+      onCancelReply?.();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "No se pudo subir la imagen.",
@@ -232,7 +250,6 @@ export const ChatComposer = ({
 
   const uploadAndSend = async (file: File) => {
     const replyId = replyTo?.id ?? undefined;
-    onCancelReply?.();
     setSending(true);
     try {
       const uploaded = await uploadChatAssetToCloudinary(file, "chat");
@@ -242,6 +259,7 @@ export const ChatComposer = ({
         file_name: uploaded.name,
         reply_to_id: replyId,
       });
+      onCancelReply?.();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "No se pudo subir el archivo.",
@@ -284,6 +302,38 @@ export const ChatComposer = ({
       <input ref={imageRef} type="file" accept="image/*" hidden onChange={onFile} />
       <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={onFile} />
       <input ref={txtRef} type="file" accept=".txt,text/plain" hidden onChange={onFile} />
+
+      {replyTo && (
+        <div className="mb-2 flex items-center gap-3 rounded-lg border-l-4 border-sky-500 bg-muted/60 px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-sky-600 dark:text-sky-400">
+              Respondiendo a {replyTo.sender_nombre || "Usuario"}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {replyTo.is_deleted
+                ? "Este mensaje fue eliminado"
+                : replyTo.message_type === "IMAGE"
+                  ? "📷 Imagen"
+                  : replyTo.message_type === "AUDIO"
+                    ? "🎤 Audio"
+                    : replyTo.message_type === "PDF"
+                      ? "📄 PDF"
+                      : replyTo.message_type === "DOCUMENT"
+                        ? `📎 ${replyTo.file_name || "Documento"}`
+                        : replyTo.content || "Mensaje"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Cancelar respuesta"
+            title="Cancelar respuesta"
+          >
+            <X size={17} />
+          </button>
+        </div>
+      )}
 
       {recorder.isRecording && (
         <div className="flex items-center gap-2 mb-2 px-2 text-sm text-red-600">
