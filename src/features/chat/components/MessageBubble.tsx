@@ -326,6 +326,7 @@ export const MessageBubble = ({
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 align={effectiveMine ? "end" : "start"}
+                data-no-private-menu
                 onCloseAutoFocus={(e) => e.preventDefault()}
               >
                 {canReply && (
