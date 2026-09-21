@@ -343,7 +343,8 @@ export const ConversationPanel = ({
           const prev = messages[index - 1];
           const showDay = !prev || !isSameDay(prev.created_at, message.created_at);
           const showSender =
-            isGroup && (!prev || prev.sender !== message.sender || showDay);
+            (isAuditRoom && room.room_type === "DIRECT") ||
+            (isGroup && (!prev || prev.sender !== message.sender || showDay));
 
           const matchIdx = matchingIds.indexOf(message.id);
           const isCurrentMatch = matchIdx !== -1 && matchIdx === currentMatchIndex;
