@@ -368,7 +368,7 @@ export const ConversationPanel = ({
                 rooms={rooms}
                 onDelete={onDelete}
                 onOpenImage={setLightbox}
-                onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
+                onStartPrivateChat={canStartPrivate ? onStartPrivateChat : undefined}
                 onVisible={onMessageVisible}
                 onForward={handleForward}
                 auditPerspectiveId={auditPerspectiveId}
@@ -441,7 +441,7 @@ export const ConversationPanel = ({
         onRoomUpdated={(updated) => {
           onRoomUpdated?.(updated);
         }}
-        onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
+        onStartPrivateChat={canStartPrivate ? onStartPrivateChat : undefined}
       />
     </section>
   );
