@@ -40,6 +40,9 @@ interface MessageBubbleProps {
   onStartPrivateChat?: (userId: number, replyMessage?: ChatMessage) => void;
   onVisible?: (messageId: number) => void;
   onForward?: (message: ChatMessage, targetRoomId: number) => Promise<void>;
+  auditPerspectiveId?: number | null;
+  onReply?: (message: ChatMessage) => void;
+  onScrollToMessage?: (messageId: number) => void;
 }
 
 // Minimum swipe distance (px) to trigger reply
@@ -58,6 +61,9 @@ export const MessageBubble = ({
   onStartPrivateChat,
   onVisible,
   onForward,
+  auditPerspectiveId,
+  onReply,
+  onScrollToMessage,
 }: MessageBubbleProps) => {
   const [privateMenuOpen, setPrivateMenuOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);

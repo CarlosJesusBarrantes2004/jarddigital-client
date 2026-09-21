@@ -143,6 +143,31 @@ export const ConversationPanel = ({
     setCurrentMatchIndex(0);
   };
 
+  // ── Manejo de responder mensajes ────────────────────────────────────────
+  useEffect(() => {
+    if (pendingReply && pendingReply.message.id !== consumedReplyId && room && pendingReply.roomId === room.id) {
+      setReplyTo(pendingReply.message);
+      setConsumedReplyId(pendingReply.message.id);
+      window.dispatchEvent(new Event("focus-chat-composer"));
+    }
+  }, [pendingReply, consumedReplyId, room]);
+
+  const handleReply = useCallback((msg: ChatMessage) => {
+    setReplyTo(msg);
+    window.dispatchEvent(new Event("focus-chat-composer"));
+  }, []);
+
+  const scrollToMessage = useCallback((messageId: number) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("bg-sky-50", "dark:bg-sky-900/20");
+      setTimeout(() => {
+        el.classList.remove("bg-sky-50", "dark:bg-sky-900/20");
+      }, 2000);
+    }
+  }, []);
+
   // ── Reenvío de mensajes ─────────────────────────────────────────────────
   const handleForward = useCallback(
     async (message: ChatMessage, targetRoomId: number) => {
@@ -346,6 +371,9 @@ export const ConversationPanel = ({
                 onStartPrivateChat={canStartPrivate ? startPrivateWith : undefined}
                 onVisible={onMessageVisible}
                 onForward={handleForward}
+                auditPerspectiveId={auditPerspectiveId}
+                onReply={handleReply}
+                onScrollToMessage={scrollToMessage}
               />
             </div>
           );
@@ -381,6 +409,11 @@ export const ConversationPanel = ({
           onSend={onSend}
           onTyping={onTyping}
           members={activeMembers}
+          replyTo={replyTo}
+          onCancelReply={() => {
+            setReplyTo(null);
+            onClearPendingReply?.();
+          }}
         />
       )}
 
