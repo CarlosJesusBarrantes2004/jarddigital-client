@@ -266,34 +266,6 @@ export const MessageBubble = ({
             />
           )}
 
-          {message.is_deleted ? (
-            <p className="text-[13px] italic text-muted-foreground">
-              Este mensaje fue eliminado
-            </p>
-          ) : (
-            <MessageBody
-              message={message}
-              mine={effectiveMine}
-              onOpenImage={onOpenImage}
-            />
-          )}
-
-          <div className="flex items-center justify-end gap-1 mt-0.5">
-            <span className="text-[10px] text-muted-foreground">
-              {formatMessageClock(message.created_at)}
-            </span>
-            {effectiveMine && !message.is_deleted && (
-              <DeliveryTicks status={resolveDeliveryStatus(message)} />
-            )}
-            onClick={(event) => {
-              event.stopPropagation();
-              openPrivateMenu();
-            }}
-          >
-            {senderName}
-          </button>
-        )}
-
         {/* Etiqueta de reenviado */}
         {message.is_forwarded && (
           <p className="text-[10px] text-muted-foreground flex items-center gap-1 mb-0.5">
@@ -309,7 +281,7 @@ export const MessageBubble = ({
         ) : (
           <MessageBody
             message={message}
-            mine={mine}
+            mine={effectiveMine}
             highlight={highlight}
             onOpenImage={onOpenImage}
           />
@@ -319,7 +291,7 @@ export const MessageBubble = ({
           <span className="text-[10px] text-muted-foreground">
             {formatMessageClock(message.created_at)}
           </span>
-          {mine && !message.is_deleted && (
+          {effectiveMine && !message.is_deleted && (
             <DeliveryTicks status={resolveDeliveryStatus(message)} />
           )}
           {(canDelete || onForward) && !message.is_deleted && (
@@ -381,6 +353,7 @@ export const MessageBubble = ({
           onForward={onForward}
         />
       )}
+    </div>
     </div>
   );
 };
