@@ -178,6 +178,8 @@ export const ConversationPanel = ({
 
   const isGroup = room.room_type === "GROUP";
   const canStartPrivate = isGroup && Boolean(onStartPrivateChat);
+  const isMember = room.members.some((m) => m.user === currentUserId);
+  const isAuditDirect = room.room_type === "DIRECT" && !isMember;
   const activeMembers = room.members.filter((m) => m.is_active);
 
   // For audit DIRECT chats, pick the first member as "right side" perspective
