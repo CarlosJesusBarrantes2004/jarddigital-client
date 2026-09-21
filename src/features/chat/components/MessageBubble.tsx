@@ -336,7 +336,18 @@ export const MessageBubble = ({
                   <MoreVertical size={12} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={mine ? "end" : "start"}>
+              <DropdownMenuContent 
+                align={effectiveMine ? "end" : "start"}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                {canReply && (
+                  <DropdownMenuItem
+                    onSelect={() => onReply?.(message)}
+                  >
+                    <CornerUpLeft size={14} />
+                    Responder
+                  </DropdownMenuItem>
+                )}
                 {onForward && (
                   <DropdownMenuItem
                     onClick={() => setForwardOpen(true)}

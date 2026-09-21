@@ -163,6 +163,7 @@ export interface SendMessagePayload {
   file_name?: string;
   is_forwarded?: boolean;
   mentioned_user_ids?: number[];
+  reply_to_id?: number | null;
 }
 
 export interface ChatWsNotification {
