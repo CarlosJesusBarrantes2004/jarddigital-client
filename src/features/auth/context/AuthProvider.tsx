@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { authService } from "../services/authService";
-import { TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/api/axios";
 
 import { AuthContext } from "./AuthContext";
 
