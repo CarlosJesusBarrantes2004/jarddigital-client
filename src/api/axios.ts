@@ -24,7 +24,6 @@ export const REFRESH_TOKEN_KEY = "jard:refreshToken";
 /** URLs de la API cuyo 401 NO debe disparar el flujo de refresco. */
 const AUTH_ENDPOINTS = [
   "/token/refresh/",
-  "/users/me/",
   "/auth/login/",
 ] as const;
 
