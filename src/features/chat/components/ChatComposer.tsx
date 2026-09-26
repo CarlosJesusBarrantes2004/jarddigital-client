@@ -3,6 +3,7 @@ import {
   FileText,
   Image as ImageIcon,
   Mic,
+  Music,
   Paperclip,
   SendHorizontal,
   Smile,
@@ -65,6 +66,7 @@ export const ChatComposer = ({
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
   const txtRef = useRef<HTMLInputElement>(null);
+  const audioFileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
 
@@ -302,6 +304,7 @@ export const ChatComposer = ({
       <input ref={imageRef} type="file" accept="image/*" hidden onChange={onFile} />
       <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={onFile} />
       <input ref={txtRef} type="file" accept=".txt,text/plain" hidden onChange={onFile} />
+      <input ref={audioFileRef} type="file" accept="audio/*" hidden onChange={onFile} />
 
       {replyTo && (
         <div className="mb-2 flex items-center gap-3 rounded-lg border-l-4 border-sky-500 bg-muted/60 px-3 py-2">
@@ -431,6 +434,13 @@ export const ChatComposer = ({
                 onClick={() => txtRef.current?.click()}
               >
                 <FileText size={16} className="text-sky-500" /> TXT
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm hover:bg-muted"
+                onClick={() => audioFileRef.current?.click()}
+              >
+                <Music size={16} className="text-emerald-500" /> Audio
               </button>
             </div>
           )}
