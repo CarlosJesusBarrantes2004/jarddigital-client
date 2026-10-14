@@ -26,6 +26,28 @@ export const productosService = {
     return data;
   },
 
+  /** Todos los productos que coinciden con los filtros, para exportación. */
+  getAllForExport: async (filtros: ProductoFiltros = {}): Promise<Producto[]> => {
+    const items: Producto[] = [];
+    let page = 1;
+
+    while (true) {
+      const { data } = await api.get<ProductosResponse>("/sales/productos/", {
+        params: cleanParams({
+          ...filtros,
+          page,
+          page_size: 500,
+        }),
+      });
+
+      if (Array.isArray(data)) return data;
+
+      items.push(...data.results);
+      if (!data.next) return items;
+      page += 1;
+    }
+  },
+
   /** Detalle de un producto */
   getById: async (id: number): Promise<Producto> => {
     const { data } = await api.get(`/sales/productos/${id}/`);

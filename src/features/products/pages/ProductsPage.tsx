@@ -10,6 +10,7 @@ import {
   TrendingUp,
   ToggleLeft,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ import { buildColumnsProductos } from "../components/Columns";
 import { DataTable } from "@/features/sales";
 import { ProductoForm } from "../components/ProductForm";
 import { ConfirmDialog } from "../components/Confirmdialog";
+import { productosService } from "../services/product.service";
 
 // ── Debounce ──────────────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay: number): T {
@@ -128,6 +130,7 @@ export function ProductosPage() {
   );
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [tab, setTab] = useState<Tab>("activos");
+  const [exportando, setExportando] = useState(false);
 
   const [filtros, setFiltros] = useState<Omit<ProductoFiltros, "activo">>({});
   const [busqueda, setBusqueda] = useState("");
@@ -243,6 +246,36 @@ export function ProductosPage() {
       refetchInactivos();
     } catch {
       toast.error("Error al reactivar el producto");
+    }
+  };
+
+  const handleExportar = async () => {
+    try {
+      setExportando(true);
+      const productosFiltrados = await productosService.getAllForExport({
+        ...filtros,
+        activo: tab === "activos",
+      });
+
+      if (productosFiltrados.length === 0) {
+        toast.info("No hay productos para exportar con los filtros actuales");
+        return;
+      }
+
+      const { exportProductsExcel } = await import(
+        "../lib/exportProductsExcel"
+      );
+      await exportProductsExcel(
+        productosFiltrados,
+        tab === "activos" ? "Activos" : "Inactivos",
+      );
+      toast.success(
+        `${productosFiltrados.length} producto${productosFiltrados.length === 1 ? "" : "s"} exportado${productosFiltrados.length === 1 ? "" : "s"}`,
+      );
+    } catch {
+      toast.error("No se pudo generar el archivo de Excel");
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -366,52 +399,72 @@ export function ProductosPage() {
           </button>
         </div>
 
-        {/* ── Filter chips ── */}
-        {tab === "activos" && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <FilterChip
-              label="Todos"
-              active={Object.keys(filtros).length === 0}
-              activeClass="bg-muted text-foreground border-border"
-              onClick={limpiar}
-            />
-            <div className="h-4 w-px bg-border mx-1" />
-            <FilterChip
-              label="⭐ Alto valor"
-              active={(filtros as ProductoFiltros).es_alto_valor === true}
-              activeClass="bg-[#C9975A]/10 text-[#C9975A] border-[#C9975A]/30"
-              onClick={() => {
-                setPage(1);
-                setFiltros((f) => ({
-                  ...f,
-                  es_alto_valor:
-                    (f as ProductoFiltros).es_alto_valor === true
-                      ? undefined
-                      : true,
-                }));
-              }}
-            />
-            <div className="h-4 w-px bg-border mx-1" />
-            {TIPOS_SOLUCION.map((tipo) => (
-              <FilterChip
-                key={tipo}
-                label={tipo}
-                active={(filtros as ProductoFiltros).tipo_solucion === tipo}
-                activeClass="bg-primary/10 text-primary border-primary/30"
-                onClick={() => {
-                  setPage(1);
-                  setFiltros((f) => ({
-                    ...f,
-                    tipo_solucion:
-                      (f as ProductoFiltros).tipo_solucion === tipo
-                        ? undefined
-                        : tipo,
-                  }));
-                }}
-              />
-            ))}
+        {/* ── Filtros rápidos y exportación ── */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {tab === "activos" && (
+              <>
+                <FilterChip
+                  label="Todos"
+                  active={
+                    !(filtros as ProductoFiltros).es_alto_valor &&
+                    !(filtros as ProductoFiltros).tipo_solucion
+                  }
+                  activeClass="bg-muted text-foreground border-border"
+                  onClick={limpiar}
+                />
+                <div className="mx-1 h-4 w-px bg-border" />
+                <FilterChip
+                  label="⭐ Alto valor"
+                  active={(filtros as ProductoFiltros).es_alto_valor === true}
+                  activeClass="bg-[#C9975A]/10 text-[#C9975A] border-[#C9975A]/30"
+                  onClick={() => {
+                    setPage(1);
+                    setFiltros((f) => ({
+                      ...f,
+                      es_alto_valor:
+                        (f as ProductoFiltros).es_alto_valor === true
+                          ? undefined
+                          : true,
+                    }));
+                  }}
+                />
+                <div className="mx-1 h-4 w-px bg-border" />
+                {TIPOS_SOLUCION.map((tipo) => (
+                  <FilterChip
+                    key={tipo}
+                    label={tipo}
+                    active={(filtros as ProductoFiltros).tipo_solucion === tipo}
+                    activeClass="bg-primary/10 text-primary border-primary/30"
+                    onClick={() => {
+                      setPage(1);
+                      setFiltros((f) => ({
+                        ...f,
+                        tipo_solucion:
+                          (f as ProductoFiltros).tipo_solucion === tipo
+                            ? undefined
+                            : tipo,
+                      }));
+                    }}
+                  />
+                ))}
+              </>
+            )}
           </div>
-        )}
+          <button
+            type="button"
+            onClick={handleExportar}
+            disabled={exportando || isLoading}
+            className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-600 transition-all hover:-translate-y-px hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:text-emerald-400 sm:w-auto"
+          >
+            {exportando ? (
+              <RefreshCw size={15} className="animate-spin" />
+            ) : (
+              <Download size={15} />
+            )}
+            {exportando ? "Exportando…" : "Exportar Excel"}
+          </button>
+        </div>
 
         {/* ── Search & filters bar ── */}
         <div className="bg-card/50 border border-border rounded-2xl p-4 shadow-sm flex flex-col gap-4">

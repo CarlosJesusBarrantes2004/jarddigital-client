@@ -59,52 +59,67 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-background font-sans overflow-hidden transition-colors duration-300">
-      {/* Fondo Atmosférico (Se adapta al modo claro/oscuro) */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[30%] left-[20%] w-[50%] h-[50%] bg-primary/10 blur-[120px] rounded-full mix-blend-screen dark:mix-blend-lighten" />
-        <div className="absolute bottom-[20%] right-[20%] w-[40%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full mix-blend-screen dark:mix-blend-lighten" />
-        {/* Grilla Sutil */}
-        <div
-          className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02]"
-          style={{
-            backgroundImage:
-              "linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)",
-            backgroundSize: "80px 80px",
-          }}
-        />
+    <main className="relative min-h-[100svh] overflow-hidden bg-slate-50 p-4 font-sans transition-colors duration-300 dark:bg-background sm:p-6 lg:p-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
       </div>
 
-      {/* Tarjeta Glassmorphism */}
-      <div className="relative z-10 w-full max-w-[420px] mx-6 bg-background/60 dark:bg-card/40 border border-border/50 backdrop-blur-xl rounded-[20px] p-10 md:p-12 shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-700">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-[38px] h-[38px] bg-gradient-to-br from-primary to-blue-500 rounded-xl flex items-center justify-center font-serif font-bold text-[1.1rem] text-primary-foreground shadow-md">
-            J
+      <div className="relative mx-auto grid min-h-[calc(100svh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.12)] dark:border-border dark:bg-card sm:min-h-[calc(100svh-3rem)] lg:min-h-[680px] lg:grid-cols-[1.08fr_0.92fr]">
+        <section className="relative hidden overflow-hidden border-r border-slate-200 bg-white lg:flex lg:flex-col lg:justify-between">
+          <div className="absolute left-0 top-0 h-1.5 w-full bg-gradient-to-r from-cyan-400 via-sky-500 to-blue-600" />
+          <div className="px-10 pt-12 xl:px-14">
+            <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+              Plataforma comercial
+            </span>
+            <h2 className="mt-6 max-w-md text-3xl font-semibold leading-tight tracking-tight text-slate-900 xl:text-4xl">
+              Todo tu equipo conectado en un solo lugar.
+            </h2>
+            <p className="mt-4 max-w-md text-sm leading-6 text-slate-500">
+              Gestiona tus operaciones, productos y resultados de forma clara y segura.
+            </p>
           </div>
-          <span className="font-serif text-xl font-bold text-foreground tracking-tight">
-            Jard Digital
-          </span>
-        </div>
 
-        {/* Titular */}
-        <div className="mb-8">
-          <h1 className="font-serif text-[1.75rem] font-bold text-foreground leading-[1.2] mb-1.5">
-            Bienvenido
-            <br />
-            de nuevo
-          </h1>
-          <p className="text-[0.85rem] text-muted-foreground font-light">
-            Ingresa tus credenciales para continuar
+          <div className="flex flex-1 items-center justify-center px-8 py-8 xl:px-12">
+            <img
+              src="/images/login.jpeg"
+              alt="Jard Digital"
+              className="h-auto w-full max-w-[620px] object-contain"
+            />
+          </div>
+
+          <p className="px-10 pb-8 text-xs text-slate-400 xl:px-14">
+            Acceso exclusivo para personal autorizado
           </p>
-        </div>
+        </section>
 
-        {/* Formulario */}
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          className="space-y-5"
-        >
+        <section className="flex items-center justify-center bg-background px-5 py-8 dark:bg-card sm:px-10 sm:py-12 lg:px-12 xl:px-16">
+          <div className="w-full max-w-[420px] animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="mb-8 flex justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm dark:border-border lg:hidden">
+              <img
+                src="/images/login.jpeg"
+                alt="Jard Digital"
+                className="h-20 w-full max-w-[260px] object-contain"
+              />
+            </div>
+
+            <div className="mb-8">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                Jard Digital
+              </p>
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem]">
+                Bienvenido de nuevo
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Ingresa tus credenciales para acceder al sistema.
+              </p>
+            </div>
+
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              noValidate
+              className="space-y-5"
+            >
           <div>
             <label
               htmlFor="username"
@@ -160,21 +175,27 @@ export const LoginPage = () => {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full h-[52px] mt-7 bg-primary text-primary-foreground font-medium text-[15px] rounded-xl flex items-center justify-center gap-2.5 transition-all duration-200 hover:opacity-90 hover:-translate-y-[1px] shadow-lg shadow-primary/25 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <div className="w-[18px] h-[18px] border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-            ) : (
-              <>
-                <LogIn size={18} /> Entrar al Sistema
-              </>
-            )}
-          </button>
-        </form>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="mt-7 flex h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-primary text-[15px] font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:-translate-y-[1px] hover:opacity-90 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? (
+                  <div className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                ) : (
+                  <>
+                    <LogIn size={18} /> Entrar al sistema
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="mt-8 text-center text-xs leading-5 text-muted-foreground/70">
+              Si tienes problemas para ingresar, comunícate con el administrador.
+            </p>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 };
