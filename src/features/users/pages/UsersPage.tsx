@@ -58,7 +58,7 @@ import { userService } from "../services/userService";
 type Tab = "activos" | "inactivos";
 
 export const UsersPage = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, activeWorkspace } = useAuth();
   const {
     users, // ← activos (comportamiento original)
     inactiveUsers, // ← inactivos (nuevo — ver hook)
