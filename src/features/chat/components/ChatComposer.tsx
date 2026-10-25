@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText,
   Image as ImageIcon,
   Mic,
+  Music,
   Paperclip,
   SendHorizontal,
   Smile,
@@ -19,12 +20,12 @@ import { MentionDropdown } from "./MentionDropdown";
 import { PastePreviewModal } from "./PastePreviewModal";
 
 const EMOJIS = [
-  "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎", "🤔", "😴",
-  "😭", "😡", "👍", "👎", "🙏", "👏", "🔥", "✨", "💪", "🚀",
-  "✅", "❌", "🎉", "❤️", "💙", "💚", "💛", "💯", "📌", "📎",
+  "ðŸ˜€", "ðŸ˜", "ðŸ˜‚", "ðŸ¤£", "ðŸ˜Š", "ðŸ˜", "ðŸ˜˜", "ðŸ˜Ž", "ðŸ¤”", "ðŸ˜´",
+  "ðŸ˜­", "ðŸ˜¡", "ðŸ‘", "ðŸ‘Ž", "ðŸ™", "ðŸ‘", "ðŸ”¥", "âœ¨", "ðŸ’ª", "ðŸš€",
+  "âœ…", "âŒ", "ðŸŽ‰", "â¤ï¸", "ðŸ’™", "ðŸ’š", "ðŸ’›", "ðŸ’¯", "ðŸ“Œ", "ðŸ“Ž",
 ];
 
-/** Regex para detectar un fragmento de mención activo: @ seguido de caracteres. */
+/** Regex para detectar un fragmento de menciÃ³n activo: @ seguido de caracteres. */
 const MENTION_REGEX = /@([^\s]*)$/;
 
 interface ChatComposerProps {
@@ -52,12 +53,12 @@ export const ChatComposer = ({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
 
-  // ── Imagen pegada desde portapapeles ────────────────────────────────────
+  // â”€â”€ Imagen pegada desde portapapeles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [pastedImage, setPastedImage] = useState<File | null>(null);
   const [pastedPreviewUrl, setPastedPreviewUrl] = useState<string | null>(null);
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
 
-  // ── Menciones @usuario ──────────────────────────────────────────────────
+  // â”€â”€ Menciones @usuario â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   /** IDs de usuarios que fueron etiquetados con @ en el mensaje actual */
   const mentionedIdsRef = useRef<Set<number>>(new Set());
@@ -65,10 +66,11 @@ export const ChatComposer = ({
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
   const txtRef = useRef<HTMLInputElement>(null);
+  const audioFileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
 
-  // Al elegir "Responder" el compositor puede haberse montado recién (por
+  // Al elegir "Responder" el compositor puede haberse montado reciÃ©n (por
   // ejemplo, al abrir un chat directo). Esperar al render evita que el foco se
   // pierda en el panel anterior y deja el cursor listo para escribir.
   useEffect(() => {
@@ -110,7 +112,7 @@ export const ChatComposer = ({
     [text, sending, disabled, pastedImage],
   );
 
-  // ── Extrae IDs mencionados del texto final (para el payload) ───────────
+  // â”€â”€ Extrae IDs mencionados del texto final (para el payload) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const extractMentionIds = (content: string): number[] => {
     const mentioned: number[] = [];
     const matches = content.match(/@(\S+)/g) ?? [];
@@ -126,14 +128,14 @@ export const ChatComposer = ({
         }
       }
     }
-    // Combinar con IDs acumulados del dropdown (más preciso)
+    // Combinar con IDs acumulados del dropdown (mÃ¡s preciso)
     for (const id of mentionedIdsRef.current) {
       if (!mentioned.includes(id)) mentioned.push(id);
     }
     return mentioned;
   };
 
-  // ── Envío de texto (con menciones) ─────────────────────────────────────
+  // â”€â”€ EnvÃ­o de texto (con menciones) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const submitText = async () => {
     if (!canSend) return;
 
@@ -159,7 +161,7 @@ export const ChatComposer = ({
     }
   };
 
-  // ── Envío de imagen pegada con caption ──────────────────────────────────
+  // â”€â”€ EnvÃ­o de imagen pegada con caption â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const submitPastedImage = async (caption: string) => {
     if (!pastedImage) return;
     const imageToSend = pastedImage;
@@ -187,7 +189,7 @@ export const ChatComposer = ({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Si el dropdown de menciones está abierto, Escape lo cierra
+    // Si el dropdown de menciones estÃ¡ abierto, Escape lo cierra
     if (mentionQuery !== null && event.key === "Escape") {
       event.preventDefault();
       setMentionQuery(null);
@@ -200,20 +202,20 @@ export const ChatComposer = ({
     }
   };
 
-  // ── Detección de mención activa al escribir ─────────────────────────────
+  // â”€â”€ DetecciÃ³n de menciÃ³n activa al escribir â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
     setText(value);
     onTyping?.();
 
-    // Detectar patrón @query al final del cursor
+    // Detectar patrÃ³n @query al final del cursor
     const cursorPos = event.target.selectionStart ?? value.length;
     const textBeforeCursor = value.slice(0, cursorPos);
     const match = MENTION_REGEX.exec(textBeforeCursor);
     setMentionQuery(match ? match[1] : null);
   };
 
-  // ── Selección de un miembro del dropdown de menciones ──────────────────
+  // â”€â”€ SelecciÃ³n de un miembro del dropdown de menciones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleMentionSelect = (member: ChatMember) => {
     // Insertar @NombreCompleto en lugar del fragmento @query
     const cursorPos = textareaRef.current?.selectionStart ?? text.length;
@@ -224,15 +226,15 @@ export const ChatComposer = ({
     mentionedIdsRef.current.add(member.user);
     setMentionQuery(null);
 
-    // Devolver foco al textarea después de la selección
+    // Devolver foco al textarea despuÃ©s de la selecciÃ³n
     setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
-  // ── Interceptar pegado de imagen del portapapeles ───────────────────────
+  // â”€â”€ Interceptar pegado de imagen del portapapeles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(event.clipboardData.items);
     const imageItem = items.find((item) => item.type.startsWith("image/"));
-    if (!imageItem) return; // no hay imagen → pegado normal
+    if (!imageItem) return; // no hay imagen â†’ pegado normal
     event.preventDefault();
     const file = imageItem.getAsFile();
     if (!file) return;
@@ -273,7 +275,7 @@ export const ChatComposer = ({
   const onFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (file) void uploadAndSend(file);
+    if (file) { if (file.type.startsWith("image/")) { if (pastedPreviewUrl) URL.revokeObjectURL(pastedPreviewUrl); setPastedImage(file); setPastedPreviewUrl(URL.createObjectURL(file)); setPasteModalOpen(true); setAttachOpen(false); } else { void uploadAndSend(file); } }
   };
 
   const toggleMic = async () => {
@@ -285,14 +287,14 @@ export const ChatComposer = ({
     try {
       await recorder.start();
     } catch {
-      toast.error("No se pudo acceder al micrófono.");
+      toast.error("No se pudo acceder al micrÃ³fono.");
     }
   };
 
   if (disabled) {
     return (
       <div className="px-4 py-3 bg-muted/40 border-t border-border text-center text-[13px] text-muted-foreground">
-        {disabledReason || "Esta conversación está en solo lectura."}
+        {disabledReason || "Esta conversaciÃ³n estÃ¡ en solo lectura."}
       </div>
     );
   }
@@ -302,6 +304,7 @@ export const ChatComposer = ({
       <input ref={imageRef} type="file" accept="image/*" hidden onChange={onFile} />
       <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={onFile} />
       <input ref={txtRef} type="file" accept=".txt,text/plain" hidden onChange={onFile} />
+      <input ref={audioFileRef} type="file" accept="audio/*" hidden onChange={onFile} />
 
       {replyTo && (
         <div className="mb-2 flex items-center gap-3 rounded-lg border-l-4 border-sky-500 bg-muted/60 px-3 py-2">
@@ -313,13 +316,13 @@ export const ChatComposer = ({
               {replyTo.is_deleted
                 ? "Este mensaje fue eliminado"
                 : replyTo.message_type === "IMAGE"
-                  ? "📷 Imagen"
+                  ? "ðŸ“· Imagen"
                   : replyTo.message_type === "AUDIO"
-                    ? "🎤 Audio"
+                    ? "ðŸŽ¤ Audio"
                     : replyTo.message_type === "PDF"
-                      ? "📄 PDF"
+                      ? "ðŸ“„ PDF"
                       : replyTo.message_type === "DOCUMENT"
-                        ? `📎 ${replyTo.file_name || "Documento"}`
+                        ? `ðŸ“Ž ${replyTo.file_name || "Documento"}`
                         : replyTo.content || "Mensaje"}
             </p>
           </div>
@@ -338,19 +341,19 @@ export const ChatComposer = ({
       {recorder.isRecording && (
         <div className="flex items-center gap-2 mb-2 px-2 text-sm text-red-600">
           <span className="size-2 rounded-full bg-red-500 animate-pulse" />
-          Grabando nota de voz… {Math.floor(recorder.durationMs / 1000)}s
+          Grabando nota de vozâ€¦ {Math.floor(recorder.durationMs / 1000)}s
           <button
             type="button"
             onClick={recorder.cancel}
             className="ml-auto text-muted-foreground hover:text-foreground"
-            aria-label="Cancelar grabación"
+            aria-label="Cancelar grabaciÃ³n"
           >
             <X size={16} />
           </button>
         </div>
       )}
 
-      {/* Modal de previsualización de imagen pegada */}
+      {/* Modal de previsualizaciÃ³n de imagen pegada */}
       {pastedImage && pastedPreviewUrl && (
         <PastePreviewModal
           file={pastedImage}
@@ -431,6 +434,13 @@ export const ChatComposer = ({
                 onClick={() => txtRef.current?.click()}
               >
                 <FileText size={16} className="text-sky-500" /> TXT
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm hover:bg-muted"
+                onClick={() => audioFileRef.current?.click()}
+              >
+                <Music size={16} className="text-emerald-500" /> Audio
               </button>
             </div>
           )}
