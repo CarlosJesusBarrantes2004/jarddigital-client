@@ -24,6 +24,7 @@ import {
   UserX,
   RotateCcw,
   Loader2,
+  Download,
 } from "lucide-react";
 import {
   Sheet,
@@ -51,6 +52,7 @@ import { UsersTable } from "../components/UsersTable";
 import type { CreateUserPayload, UpdateUserPayload, User } from "../types";
 import { cn } from "@/lib/utils";
 import { esUsuarioDueno } from "../utils";
+import { userService } from "../services/userService";
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 type Tab = "activos" | "inactivos";
@@ -83,6 +85,25 @@ export const UsersPage = () => {
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const rolesConVisionGlobal = ["DUENO", "RRHH", "BACKOFFICE", "COORDINADOR"];
+      const tieneVisionGlobal = rolesConVisionGlobal.includes(currentUser?.rol?.codigo || "");
+      await userService.exportExcel({
+        ...filters,
+        activo: tab === "activos",
+        id_modalidad_sede: tieneVisionGlobal ? filters.id_modalidad_sede : activeWorkspace?.id_modalidad_sede,
+      });
+      toast.success("Excel de colaboradores descargado");
+    } catch {
+      toast.error("No se pudo exportar a Excel. Inténtalo de nuevo.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const openCreate = () => {
     setEditingUser(undefined);
@@ -253,6 +274,7 @@ export const UsersPage = () => {
               ? `Activos (${stats.active})`
               : `Inactivos (${stats.inactive})`}
           </button>
+
         ))}
       </div>
 
@@ -296,6 +318,16 @@ export const UsersPage = () => {
           </button>
 
           {/* Solo mostramos "Nuevo colaborador" cuando estamos en la pestaña activos */}
+          <button
+            type="button"
+            className="h-10 px-3.5 bg-background border border-border rounded-xl text-[13px] font-medium flex items-center gap-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {isExporting ? "Generando..." : "Exportar Excel"}
+          </button>
+
           {tab === "activos" && (
             <button
               type="button"

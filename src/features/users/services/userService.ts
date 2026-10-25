@@ -65,6 +65,23 @@ export const userService = {
     return data.map(normalizeUser);
   },
 
+  exportExcel: async (filters: UserFilters): Promise<void> => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.id_rol) params.append('id_rol', String(filters.id_rol));
+    if (filters.id_modalidad_sede) params.append('id_modalidad_sede', String(filters.id_modalidad_sede));
+    if (filters.activo !== undefined) params.append('activo', String(filters.activo));
+    const { data } = await api.get<Blob>(`/users/empleados/exportar-excel/?${params}`, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Colaboradores.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
+
   getById: async (id: number): Promise<User> => {
     const { data } = await api.get<RawUser>(`/users/empleados/${id}/`);
     return normalizeUser(data);
