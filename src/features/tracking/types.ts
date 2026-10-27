@@ -55,6 +55,8 @@ export interface VentaParaSeguimiento {
 
 export interface Seguimiento {
   id: number;
+  venta_id?: number;
+  prediccion_churn?: PrediccionChurn | null;
   venta: VentaParaSeguimiento;
   codigo_pago: string | null;
   ciclo_facturacion: string | null; // ISO date
@@ -63,6 +65,26 @@ export interface Seguimiento {
   descuento_realizado: boolean;
   meses_evaluados: SeguimientoMensual[];
   activo: boolean;
+}
+
+export type NivelRiesgo = "ALTO" | "MEDIO" | "BAJO";
+
+export interface FactorShap {
+  variable?: string;
+  feature?: string;
+  factor?: string;
+  nombre?: string;
+  valor_shap?: number;
+  shap_value?: number;
+  impacto?: number;
+  valor?: string | number | null;
+}
+
+export interface PrediccionChurn {
+  probabilidad_churn: number | null;
+  nivel_riesgo: NivelRiesgo | null;
+  factores_shap?: FactorShap[] | null;
+  fecha_calculo?: string | null;
 }
 
 // ─── Filter params ───────────────────────────────────────────

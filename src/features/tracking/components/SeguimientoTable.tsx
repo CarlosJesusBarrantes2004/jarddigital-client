@@ -11,11 +11,16 @@ import {
   Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSeguimientos } from "../api";
+import { riskLevel, useRetentionSeguimientos } from "../churn";
+import { RiskBadge } from "./RiskBadge";
+import { RetentionControls } from "./RetentionControls";
+import { RetentionSummaryWidget } from "./RetentionSummaryWidget";
+import { ShapExplanationDrawer } from "./ShapExplanationDrawer";
+import { RetentionActionModal } from "./RetentionActionModal";
 import { formatDate, getNombreAsesor, getNombreProducto } from "../utils";
 import { SeguimientoFilterBar } from "./SeguimientoFilterBar";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
-import type { Seguimiento, SeguimientoFilters } from "../types";
+import type { NivelRiesgo, Seguimiento, SeguimientoFilters } from "../types";
 
 function PagoBadge({ paid }: { paid: boolean }) {
   return paid ? (
@@ -47,9 +52,13 @@ function EstadoTag({ estado }: { estado: string | null | undefined }) {
 function SeguimientoRow({
   seg,
   onView,
+  onShap,
+  onRetention,
 }: {
   seg: Seguimiento;
   onView: () => void;
+  onShap: () => void;
+  onRetention: () => void;
 }) {
   const [hoveredMes, setHoveredMes] = useState<number | null>(null);
   const meses =
@@ -222,17 +231,35 @@ function SeguimientoRow({
         )}
       </td>
 
+      <td className="px-3 py-3"><RiskBadge prediction={seg.prediccion_churn} /></td>
       <td className="px-3 py-3">
         <button
           type="button"
           onClick={onView}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all opacity-0 group-hover:opacity-100"
+          aria-label={`Ver seguimiento de ${seg.venta.cliente_nombre}`}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
         >
           <Eye size={13} />
         </button>
+        <button type="button" onClick={onShap} className="text-[11px] text-primary whitespace-nowrap hover:underline">Ver Factores (SHAP)</button>
+        {riskLevel(seg.prediccion_churn) === "ALTO" && <button type="button" onClick={onRetention} className="block text-[11px] text-primary whitespace-nowrap hover:underline mt-1">Registrar gestión</button>}
       </td>
     </tr>
   );
+}
+
+function ThCol({ label, field, className, ordering, onOrder }: {
+  label: string;
+  field?: string;
+  className?: string;
+  ordering?: string;
+  onOrder?: (field: string) => void;
+}) {
+  return <th className={cn("px-3 py-3 text-left text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap", className)}>
+    {field ? <button type="button" onClick={() => onOrder?.(field)} className="flex items-center gap-1 hover:text-foreground">
+      {label}{ordering?.replace("-", "") === field && (ordering?.startsWith("-") ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
+    </button> : label}
+  </th>;
 }
 
 export function SeguimientoTable() {
@@ -247,65 +274,37 @@ export function SeguimientoTable() {
   });
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [shap, setShap] = useState<Seguimiento | null>(null);
+  const [retention, setRetention] = useState<Seguimiento | null>(null);
+  const [risk, setRisk] = useState<NivelRiesgo | "">("");
+  const [descendingRisk, setDescendingRisk] = useState(false);
   const [ordering, setOrdering] = useState<string>(
     "-id_venta__fecha_real_inst",
   );
 
-  const { data, isLoading } = useSeguimientos({ ...filters, ordering });
-
-  const seguimientos = Array.isArray(data) ? data : (data?.results ?? []);
-  const totalCount = Array.isArray(data) ? data.length : (data?.count ?? 0);
-
-  const hasNext = !Array.isArray(data) && !!data?.next;
-  const hasPrev = !Array.isArray(data) && !!data?.previous;
+  const { rows: seguimientos, count: totalCount, isLoading, isError, retry, hasNext, hasPrev, summary } = useRetentionSeguimientos({ ...filters, ordering }, risk, descendingRisk);
   const currentPage = filters.page ?? 1;
 
   const PAGE_SIZE = 50;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const toggleOrder = (field: string) => {
+    setDescendingRisk(false);
+    setFilters(prev => ({ ...prev, page: 1 }));
     setOrdering((prev) => (prev === field ? `-${field}` : field));
   };
-
-  const ThCol = ({
-    label,
-    field,
-    className,
-  }: {
-    label: string;
-    field?: string;
-    className?: string;
-  }) => (
-    <th
-      className={cn(
-        "px-3 py-3 text-left text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap",
-        field && "cursor-pointer hover:text-foreground select-none",
-        className,
-      )}
-      onClick={field ? () => toggleOrder(field) : undefined}
-    >
-      <div className="flex items-center gap-1">
-        {label}
-        {field &&
-          ordering.replace("-", "") === field &&
-          (ordering.startsWith("-") ? (
-            <ChevronDown size={10} />
-          ) : (
-            <ChevronUp size={10} />
-          ))}
-      </div>
-    </th>
-  );
 
   return (
     <div className="flex flex-col h-full">
       {/* CORRECCIÓN: relative z-30 y sin backdrop-blur para el panel superior */}
-      <div className="p-4 border-b border-border bg-background shrink-0 relative z-30">
+      <div className="p-4 border-b border-border bg-background shrink-0 relative z-30 space-y-3">
+        <RetentionSummaryWidget rows={summary.data ?? []} loading={summary.isPending} error={summary.isError} onRetry={() => void summary.refetch()} />
         <SeguimientoFilterBar
           filters={filters}
           onChange={setFilters}
           role="encargado"
         />
+        <RetentionControls risk={risk} descending={descendingRisk} onChange={(level, descending) => { setRisk(level); setDescendingRisk(descending); setFilters(prev => ({ ...prev, page: 1 })); }} />
       </div>
 
       <div className="px-4 py-2.5 flex items-center gap-2 shrink-0">
@@ -323,16 +322,16 @@ export function SeguimientoTable() {
         <table className="w-full border-collapse min-w-[1300px]">
           <thead className="sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <tr className="border-b border-border">
-              <ThCol label="Cliente" field="id_venta__cliente_nombre" />
+              <ThCol ordering={ordering} onOrder={toggleOrder} label="Cliente" field="id_venta__cliente_nombre" />
               <ThCol label="G." className="text-center" />
-              <ThCol label="Asesor" field="id_venta__id_asesor__nombre" />
+              <ThCol ordering={ordering} onOrder={toggleOrder} label="Asesor" field="id_venta__id_asesor__nombre" />
               <ThCol label="Producto" />
-              <ThCol
+              <ThCol ordering={ordering} onOrder={toggleOrder}
                 label="F. Inst."
                 field="id_venta__fecha_real_inst"
                 className="text-center"
               />
-              <ThCol
+              <ThCol ordering={ordering} onOrder={toggleOrder}
                 label="Ciclo"
                 field="ciclo_facturacion"
                 className="text-center"
@@ -348,14 +347,15 @@ export function SeguimientoTable() {
               ))}
               <ThCol label="Estado" className="text-center" />
               <ThCol label="Dto." className="text-center" />
-              <th className="px-3 py-3 w-10" />
+              <ThCol label="Riesgo IA" />
+              <ThCol label="Acciones" />
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
+            {isError ? <tr><td colSpan={17} className="p-6 text-center text-sm" role="alert">No se pudieron cargar los seguimientos. <button type="button" onClick={() => void retry()} className="text-primary underline">Reintentar</button></td></tr> : isLoading ? (
               Array.from({ length: 8 }, (_, i) => (
                 <tr key={i} className="border-b border-border/30">
-                  {Array.from({ length: 16 }, (_, j) => (
+                  {Array.from({ length: 17 }, (_, j) => (
                     <td key={j} className="px-3 py-3">
                       <div className="h-4 bg-muted rounded animate-pulse" />
                     </td>
@@ -365,18 +365,20 @@ export function SeguimientoTable() {
             ) : seguimientos.length === 0 ? (
               <tr>
                 <td
-                  colSpan={16}
+                  colSpan={17}
                   className="px-3 py-16 text-center text-muted-foreground text-[13px]"
                 >
                   No se encontraron seguimientos con los filtros actuales.
                 </td>
               </tr>
             ) : (
-              seguimientos.map((seg) => (
+              seguimientos.map((seg, index) => (
                 <SeguimientoRow
-                  key={seg.id}
+                  key={seg.id ? `seguimiento-${seg.id}-${index}` : `seg-row-${index}`}
                   seg={seg}
                   onView={() => setSelectedId(seg.id)}
+                  onShap={() => setShap(seg)}
+                  onRetention={() => setRetention(seg)}
                 />
               ))
             )}
@@ -408,6 +410,8 @@ export function SeguimientoTable() {
         </div>
       </div>
 
+      {shap && <ShapExplanationDrawer seguimiento={shap} onClose={() => setShap(null)} />}
+      {retention && <RetentionActionModal seguimiento={retention} onClose={() => setRetention(null)} />}
       {selectedId !== null && (
         <SeguimientoDrawer
           seguimientoId={selectedId}

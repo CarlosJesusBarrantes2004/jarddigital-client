@@ -31,16 +31,18 @@ export const trackingKeys = {
   detail: (id: number) => [...trackingKeys.all, "detail", id] as const,
 };
 
-export function useSeguimientos(filters: SeguimientoFilters = {}) {
+export async function fetchSeguimientos(filters: SeguimientoFilters, signal?: AbortSignal) {
+  const { data } = await api.get<PaginatedResponse<Seguimiento> | Seguimiento[]>(
+    "/tracking/seguimientos/", { params: cleanParams(filters), signal },
+  );
+  return data;
+}
+
+export function useSeguimientos(filters: SeguimientoFilters = {}, enabled = true) {
   return useQuery({
     queryKey: trackingKeys.list(filters),
-    queryFn: async () => {
-      const { data } = await api.get<PaginatedResponse<Seguimiento>>(
-        "/tracking/seguimientos/",
-        { params: cleanParams(filters) },
-      );
-      return data;
-    },
+    queryFn: ({ signal }) => fetchSeguimientos(filters, signal),
+    enabled,
     staleTime: 30_000,
   });
 }

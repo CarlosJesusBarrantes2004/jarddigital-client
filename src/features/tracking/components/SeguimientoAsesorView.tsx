@@ -12,10 +12,15 @@ import {
   Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSeguimientos } from "../api";
+import { riskLevel, useRetentionSeguimientos } from "../churn";
+import { RiskBadge } from "./RiskBadge";
+import { RetentionControls } from "./RetentionControls";
+import { RetentionSummaryWidget } from "./RetentionSummaryWidget";
+import { ShapExplanationDrawer } from "./ShapExplanationDrawer";
+import { RetentionActionModal } from "./RetentionActionModal";
 import { formatDate, MESES_ES, getNombreProducto } from "../utils";
 import { SeguimientoDrawer } from "./SeguimientoDrawer";
-import type { Seguimiento, SeguimientoFilters } from "../types";
+import type { NivelRiesgo, Seguimiento, SeguimientoFilters } from "../types";
 
 function MultiSelectCheckbox({
   values = [],
@@ -106,9 +111,13 @@ const ANIOS = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1];
 function AsesorSeguimientoCard({
   seg,
   onView,
+  onShap,
+  onRetention,
 }: {
   seg: Seguimiento;
   onView: () => void;
+  onShap: (seg: Seguimiento) => void;
+  onRetention: (seg: Seguimiento) => void;
 }) {
   const mes1 = seg.meses_evaluados?.find((m) => m.mes_numero === 1);
   const primerMesPagado = mes1?.pago_cliente_realizado ?? false;
@@ -222,6 +231,11 @@ function AsesorSeguimientoCard({
         )}
       </div>
 
+      <div className="flex flex-col items-start gap-1 shrink-0">
+        <RiskBadge prediction={seg.prediccion_churn} />
+        <button type="button" onClick={() => onShap(seg)} className="text-[11px] text-primary hover:underline">Ver Factores (SHAP)</button>
+        {riskLevel(seg.prediccion_churn) === "ALTO" && <button type="button" onClick={() => onRetention(seg)} className="text-[11px] text-primary hover:underline">Registrar gestión</button>}
+      </div>
       <button
         type="button"
         onClick={onView}
@@ -237,10 +251,14 @@ function MesGroup({
   mesKey,
   segs,
   onView,
+  onShap,
+  onRetention,
 }: {
   mesKey: string;
   segs: Seguimiento[];
   onView: (id: number) => void;
+  onShap: (seg: Seguimiento) => void;
+  onRetention: (seg: Seguimiento) => void;
 }) {
   const [open, setOpen] = useState(true);
   const pagados = segs.filter(
@@ -258,7 +276,7 @@ function MesGroup({
       >
         <Calendar size={14} className="text-primary shrink-0" />
         <span className="flex-1 text-[13px] font-bold text-foreground">
-          {mesLabel(mesKey)}
+          {mesKey === "riesgo" ? "Mayor riesgo de abandono" : mesLabel(mesKey)}
         </span>
         <span className="text-[11px] font-mono text-muted-foreground">
           {segs.length} ventas · {pagados}/{segs.length} pagados
@@ -280,11 +298,13 @@ function MesGroup({
 
       {open && (
         <div className="divide-y-0">
-          {segs.map((seg) => (
+          {segs.map((seg, index) => (
             <AsesorSeguimientoCard
-              key={seg.id}
+              key={seg.id ? `seguimiento-${seg.id}-${index}` : `seg-row-${index}`}
               seg={seg}
               onView={() => onView(seg.id)}
+              onShap={onShap}
+              onRetention={onRetention}
             />
           ))}
         </div>
@@ -304,28 +324,28 @@ export function SeguimientoAsesorView() {
     };
   });
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [shap, setShap] = useState<Seguimiento | null>(null);
+  const [retention, setRetention] = useState<Seguimiento | null>(null);
+  const [risk, setRisk] = useState<NivelRiesgo | "">("");
+  const [descendingRisk, setDescendingRisk] = useState(false);
   const [search, setSearch] = useState("");
   const [showPrimerPago, setShowPrimerPago] = useState<boolean | undefined>(
     undefined,
   );
 
-  const { data, isLoading } = useSeguimientos({
+  const { rows: seguimientos, count: totalCount, isLoading, isError, retry, hasNext, hasPrev, summary } = useRetentionSeguimientos({
     ...filters,
     search: search || undefined,
     primer_mes_pagado: showPrimerPago,
-  });
-
-  const seguimientos = Array.isArray(data) ? data : (data?.results ?? []);
-  const totalCount = Array.isArray(data) ? data.length : (data?.count ?? 0);
-
-  const hasNext = !Array.isArray(data) && !!data?.next;
-  const hasPrev = !Array.isArray(data) && !!data?.previous;
+  }, risk, descendingRisk);
   const currentPage = filters.page ?? 1;
 
   const PAGE_SIZE = 50;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  const groups = groupByMesInstalacion(seguimientos);
+  const groups: [string, Seguimiento[]][] = descendingRisk
+    ? (seguimientos.length ? [["riesgo", seguimientos]] : [])
+    : groupByMesInstalacion(seguimientos);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -349,6 +369,8 @@ export function SeguimientoAsesorView() {
     <div className="flex flex-col h-full">
       {/* CORRECCIÓN: relative z-30 y sin backdrop-blur */}
       <div className="p-4 border-b border-border bg-background shrink-0 space-y-3 relative z-30">
+        <RetentionSummaryWidget rows={summary.data ?? []} loading={summary.isPending} error={summary.isError} onRetry={() => void summary.refetch()} />
+        <RetentionControls risk={risk} descending={descendingRisk} onChange={(level, descending) => { setRisk(level); setDescendingRisk(descending); setFilters(prev => ({ ...prev, page: 1 })); }} />
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-[280px]">
             <input
@@ -418,7 +440,7 @@ export function SeguimientoAsesorView() {
       </div>
 
       <div className="flex-1 overflow-auto p-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full">
-        {isLoading ? (
+        {isError ? <p role="alert" className="text-sm">No se pudieron cargar los seguimientos. <button type="button" onClick={() => void retry()} className="text-primary underline">Reintentar</button></p> : isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }, (_, i) => (
               <div
@@ -444,6 +466,8 @@ export function SeguimientoAsesorView() {
               mesKey={key}
               segs={segs}
               onView={setSelectedId}
+              onShap={setShap}
+              onRetention={setRetention}
             />
           ))
         )}
@@ -473,6 +497,8 @@ export function SeguimientoAsesorView() {
         </div>
       </div>
 
+      {shap && <ShapExplanationDrawer seguimiento={shap} onClose={() => setShap(null)} />}
+      {retention && <RetentionActionModal seguimiento={retention} onClose={() => setRetention(null)} />}
       {selectedId !== null && (
         <SeguimientoDrawer
           seguimientoId={selectedId}
