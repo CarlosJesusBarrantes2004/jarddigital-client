@@ -258,11 +258,11 @@ export function SeguimientoFilterBar({
   const handleSedeChange = (val: string) => {
     setFiltroSedeId(val);
     setFiltroModalidadId("");
-    update({ 
-      id_sucursal: val ? Number(val) : undefined, 
-      id_modalidad: undefined, 
-      modalidad_sede: undefined, 
-      nombre_asesor: undefined 
+    update({
+      id_sucursal: val ? Number(val) : undefined,
+      id_modalidad: undefined,
+      modalidad_sede: undefined,
+      nombre_asesor: undefined
     });
   };
 
@@ -272,7 +272,7 @@ export function SeguimientoFilterBar({
     const ws = workspaces.find(
       (w) => w.id_sucursal.toString() === filtroSedeId && w.id_modalidad.toString() === val
     );
-    update({ 
+    update({
       id_modalidad: val ? Number(val) : undefined,
       modalidad_sede: ws?.id_modalidad_sede,
       nombre_asesor: undefined
