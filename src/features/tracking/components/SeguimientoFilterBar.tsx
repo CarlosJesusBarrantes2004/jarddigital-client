@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search, Filter, X, ChevronDown, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MESES_ES } from "../utils";
@@ -6,6 +7,7 @@ import { exportarExcelPendientes } from "../api";
 import type { SeguimientoFilters, EstadoSeguimientoType } from "../types";
 import { useAuth } from "@/features/auth/context/useAuth";
 import { userService } from "@/features/users/services/userService";
+import { coreService } from "@/features/core/services/coreService";
 
 interface FilterBarProps {
   filters: SeguimientoFilters;
@@ -157,6 +159,19 @@ export function SeguimientoFilterBar({
 
   const workspaces = user?.sucursales ?? [];
 
+  // ── Carga de todas las sucursales del sistema (igual que módulo Ventas) ──
+  const { data: todasLasBranches = [] } = useQuery({
+    queryKey: ["core", "branches"],
+    queryFn: coreService.getBranches,
+    staleTime: 1000 * 60 * 10, // 10 minutos de caché
+  });
+
+  // --- Filtros dinámicos de Asesores por Sede/Modalidad ---
+  const [filtroSedeId, setFiltroSedeId] = useState<string>("");
+  const [filtroModalidadId, setFiltroModalidadId] = useState<string>("");
+  const [asesoresOpciones, setAsesoresOpciones] = useState<{ value: string; label: string }[]>([]);
+  const [cargandoAsesores, setCargandoAsesores] = useState(false);
+
   const activeCount = Object.entries(filters).filter(
     ([k, v]) =>
       k !== "search" &&
@@ -171,7 +186,11 @@ export function SeguimientoFilterBar({
   const update = (partial: Partial<SeguimientoFilters>) =>
     onChange({ ...filters, ...partial, page: 1 });
 
-  const clear = () => onChange({ page: 1, page_size: 50 });
+  const clear = () => {
+    setFiltroSedeId("");
+    setFiltroModalidadId("");
+    onChange({ page: 1, page_size: 50 });
+  };
 
   const handleExport = async () => {
     try {
@@ -184,38 +203,56 @@ export function SeguimientoFilterBar({
     }
   };
 
-  // --- Filtros dinámicos de Asesores por Sede/Modalidad ---
-  const [filtroSedeId, setFiltroSedeId] = useState<string>("");
-  const [filtroModalidadId, setFiltroModalidadId] = useState<string>("");
-  const [asesoresOpciones, setAsesoresOpciones] = useState<{ value: string; label: string }[]>([]);
-  const [cargandoAsesores, setCargandoAsesores] = useState(false);
-
   const opcionesSede = useMemo(() => {
-    const unique = new Map<number, string>();
-    workspaces.forEach(w => unique.set(w.id_sucursal, w.nombre_sucursal));
-    return Array.from(unique.entries())
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([id, nombre]) => ({ value: id.toString(), label: nombre }));
-  }, [workspaces]);
+    // Si el usuario tiene sucursales asignadas, usar solo esas (asesor/supervisor con sedes específicas).
+    // Si no (DUENO, SEGUIMIENTO, etc.), usar TODAS las sucursales del sistema.
+    if (workspaces.length > 0) {
+      const unique = new Map<number, string>();
+      workspaces.forEach(w => unique.set(w.id_sucursal, w.nombre_sucursal));
+      return Array.from(unique.entries())
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([id, nombre]) => ({ value: id.toString(), label: nombre }));
+    }
+    // Fallback: todas las sucursales activas del sistema
+    return todasLasBranches
+      .filter(b => b.activo)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .map(b => ({ value: b.id.toString(), label: b.nombre }));
+  }, [workspaces, todasLasBranches]);
 
   const opcionesModalidad = useMemo(() => {
     if (!filtroSedeId) return [];
-    const unique = new Map<number, string>();
-    workspaces
-      .filter((w) => w.id_sucursal.toString() === filtroSedeId)
-      .forEach(w => unique.set(w.id_modalidad, w.nombre_modalidad));
-    return Array.from(unique.entries())
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([id, nombre]) => ({ value: id.toString(), label: nombre }));
-  }, [workspaces, filtroSedeId]);
+    // Si el usuario tiene sucursales asignadas, derivar las modalidades de ellas
+    if (workspaces.length > 0) {
+      const unique = new Map<number, string>();
+      workspaces
+        .filter((w) => w.id_sucursal.toString() === filtroSedeId)
+        .forEach(w => unique.set(w.id_modalidad, w.nombre_modalidad));
+      return Array.from(unique.entries())
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([id, nombre]) => ({ value: id.toString(), label: nombre }));
+    }
+    // Fallback: modalidades de la branch seleccionada en el sistema
+    const branch = todasLasBranches.find(b => b.id.toString() === filtroSedeId);
+    return (branch?.modalidades ?? [])
+      .filter(m => m.activo)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .map(m => ({ value: m.id.toString(), label: m.nombre }));
+  }, [workspaces, todasLasBranches, filtroSedeId]);
 
+  // Resuelve el id_modalidad_sede para cargar asesores.
+  // Prioriza workspaces del usuario; si están vacíos, busca en todasLasBranches.
   const selectedModalidadSede = useMemo(() => {
     if (!filtroSedeId || !filtroModalidadId) return undefined;
-    return workspaces.find(
+    // 1) Desde las sucursales del usuario (caso normal)
+    const fromUser = workspaces.find(
       (w) =>
         w.id_sucursal.toString() === filtroSedeId &&
         w.id_modalidad.toString() === filtroModalidadId
     )?.id_modalidad_sede;
+    if (fromUser !== undefined) return fromUser;
+    // 2) No disponible desde el usuario — se omite carga de asesores
+    return undefined;
   }, [workspaces, filtroSedeId, filtroModalidadId]);
 
   const handleSedeChange = (val: string) => {
@@ -231,6 +268,7 @@ export function SeguimientoFilterBar({
 
   const handleModalidadChange = (val: string) => {
     setFiltroModalidadId(val);
+    // Busca el id_modalidad_sede desde los workspaces del usuario si están disponibles
     const ws = workspaces.find(
       (w) => w.id_sucursal.toString() === filtroSedeId && w.id_modalidad.toString() === val
     );
